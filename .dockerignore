@@ -1,0 +1,19 @@
+# Build artifacts / tooling
+.dart_tool/
+**/.dart_tool/
+build/
+coverage/
+
+# VCS / IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+
+# Secrets / local config (provided at runtime via env_file)
+.env
+.env.local
+
+# Docs (not needed in the image)
+docs/

@@ -1,0 +1,36 @@
+# Dart / Pub
+.dart_tool/
+.packages
+build/
+pubspec_overrides.yaml
+
+# Coverage
+coverage/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+# Local MCP config carries the embedding API key + machine-specific paths.
+.mcp.json
+.claude.json
+
+# Keys / certs / credentials — never commit
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.ppk
+secrets/
+*.secret
+
+# OS
+.DS_Store
+Thumbs.db

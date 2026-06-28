@@ -1,0 +1,4 @@
+# Managed by oracle_migration — do not edit by hand.
+# Pins the migration tooling for this repository.
+version: 1
+dialect: postgresql

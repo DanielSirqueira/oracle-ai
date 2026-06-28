@@ -1,0 +1,20 @@
+name: oracle_migration
+description: >-
+  Versioned, file-based SQL migration system for Oracle AI (PostgreSQL). Pure
+  Dart. Provides a programmatic API (MigrationSystem) used on MCP startup to
+  keep the database schema up to date.
+version: 0.1.0
+publish_to: 'none'
+resolution: workspace
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+
+dependencies:
+  oracle_core:
+  crypto: '>=3.0.6 <4.0.0'
+  path: '>=1.9.0 <2.0.0'
+
+dev_dependencies:
+  lints: '>=4.0.0 <6.0.0'
+  test: '>=1.24.0 <2.0.0'

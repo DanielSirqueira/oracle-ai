@@ -1,0 +1,23 @@
+name: oracle_core
+description: >-
+  Oracle AI core — pure Dart foundation: PostgreSQL database layer (connection
+  pool, parameterized statements, pgvector-aware row reads), environment config,
+  failure hierarchy, and dependency injection.
+version: 0.1.0
+publish_to: 'none'
+resolution: workspace
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+
+dependencies:
+  auto_injector: '>=2.1.0 <3.0.0'
+  collection: '>=1.18.0 <2.0.0'
+  http: '>=1.2.0 <2.0.0'
+  postgres: '>=3.5.6 <4.0.0'
+  result_dart: '>=2.2.0 <3.0.0'
+  uuid: '>=4.5.1 <5.0.0'
+
+dev_dependencies:
+  lints: '>=4.0.0 <6.0.0'
+  test: '>=1.24.0 <2.0.0'

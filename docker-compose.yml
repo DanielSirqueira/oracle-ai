@@ -1,0 +1,48 @@
+name: oracle_ai
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: oracle-postgres
+    environment:
+      POSTGRES_USER: ${ORACLE_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${ORACLE_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${ORACLE_DB_NAME:-oracle_ai}
+    ports:
+      - "${ORACLE_DB_PORT:-5432}:5432"
+    volumes:
+      - oracle_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORACLE_DB_USER:-postgres} -d ${ORACLE_DB_NAME:-oracle_ai}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Persistent hook receiver: always up (independent of the per-session MCP),
+  # so agent hooks never race a cold MCP startup. Captures sessions/messages and
+  # serves SessionStart/UserPromptSubmit injection. Migrations are embedded.
+  oracle:
+    build: .
+    container_name: oracle-hooks
+    command: ["serve-hooks"]
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Inside the compose network the database is reachable as `db:5432`.
+      ORACLE_DB_HOST: db
+      ORACLE_DB_PORT: "5432"
+      ORACLE_DB_NAME: oracle_db
+      ORACLE_DB_AUTO_CREATE: "false"   # the db service already created it
+      # Bind 0.0.0.0 INSIDE the container so the published port is reachable.
+      ORACLE_HTTP_HOST: 0.0.0.0
+      ORACLE_HTTP_PORT: "49500"
+      ORACLE_MAINTENANCE_INTERVAL_MINUTES: "30"
+    ports:
+      - "49500:49500"               # agent hooks (host) -> this daemon
+    restart: unless-stopped
+
+volumes:
+  oracle_pgdata:

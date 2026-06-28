@@ -1,0 +1,20 @@
+name: oracle_ai
+description: >-
+  Oracle AI — long-term memory for AI coding agents (Claude Code, Codex, ...),
+  backed by PostgreSQL + pgvector and exposed over MCP. Dart workspace built with
+  Clean Architecture + DDD (domain / infra / external).
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+
+# Dart pub workspace — single, shared dependency resolution across all packages.
+workspace:
+  - packages/oracle_core
+  - packages/oracle_migration
+  - packages/oracle_memory
+  - packages/oracle_server
+
+dev_dependencies:
+  lints: '>=4.0.0 <6.0.0'

@@ -1,0 +1,63 @@
+name: oracle_ai_prod
+
+# Production topology: ONE shared hooks daemon + the database.
+#
+#   agents (Claude Code / Codex on the host)
+#     │  hooks (http) ───────────────► oracle (serve-hooks daemon) :49500
+#     │  MCP   (stdio) ─ spawned per agent (host binary `serve-mcp` OR
+#     │                   `docker exec -i oracle_ai_prod-oracle-1 \
+#     │                    /app/oracle_ai serve-mcp`) ─┐
+#     └──────────────────────────────────────────────►│ db :5432 (pgvector)
+#
+# The daemon owns the hook receiver + the maintenance scheduler + migrations,
+# so per-agent MCP processes never fight over the port and run `serve-mcp`
+# (MCP only, no hooks). All share one database.
+#
+# Start:  docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ${ORACLE_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${ORACLE_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${ORACLE_DB_NAME:-oracle_ai}
+    ports:
+      # Published so a HOST-NATIVE `serve-mcp` can reach the same DB. Omit this
+      # mapping if every MCP runs via `docker exec` inside the compose network.
+      - "${ORACLE_DB_PORT:-5432}:5432"
+    volumes:
+      - oracle_pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORACLE_DB_USER:-postgres} -d ${ORACLE_DB_NAME:-oracle_ai}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Shared hooks daemon: hook receiver (HTTP) + scheduler + migrations on boot.
+  oracle:
+    build: .
+    command: ["serve-hooks"]
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      ORACLE_DB_HOST: db
+      ORACLE_DB_PORT: "5432"
+      ORACLE_DB_AUTO_CREATE: "false"      # the db service already created it
+      ORACLE_MIGRATIONS_DIR: /app/migrations
+      # Bind 0.0.0.0 INSIDE the container so the published port is reachable
+      # from the host (127.0.0.1 inside the container would not be).
+      ORACLE_HTTP_HOST: 0.0.0.0
+      ORACLE_HTTP_PORT: "49500"
+      # The daemon runs maintenance on a timer (single place, no per-agent dup).
+      ORACLE_MAINTENANCE_INTERVAL_MINUTES: "${ORACLE_MAINTENANCE_INTERVAL_MINUTES:-30}"
+      ORACLE_METRICS_ENABLED: "true"
+    ports:
+      - "${ORACLE_HTTP_PORT:-49500}:49500"  # hooks reachable from host agents
+    restart: unless-stopped
+
+volumes:
+  oracle_pgdata_prod:

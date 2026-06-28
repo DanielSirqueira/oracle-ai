@@ -1,0 +1,19 @@
+name: oracle_memory
+description: >-
+  Oracle AI domain — feature modules built with Clean Architecture + DDD
+  (domain / infra / external). Hosts the vertical slices of the memory system:
+  project, session, request, memory, rule, handoff, ...
+version: 0.1.0
+publish_to: 'none'
+resolution: workspace
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+
+dependencies:
+  oracle_core:
+  collection: '>=1.18.0 <2.0.0'
+
+dev_dependencies:
+  lints: '>=4.0.0 <6.0.0'
+  test: '>=1.24.0 <2.0.0'
