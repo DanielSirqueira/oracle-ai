@@ -467,28 +467,74 @@ class _ModeCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? OracleBrand.violet.withValues(alpha: 0.08) : OracleBrand.gray900,
+          color: selected ? OracleBrand.violet.withValues(alpha: 0.16) : OracleBrand.gray900,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? OracleBrand.violet : OracleBrand.gray700,
-            width: selected ? 2 : 1,
+            color: selected ? OracleBrand.violetSoft : OracleBrand.gray700,
+            width: 2,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: OracleBrand.violet.withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : const [],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Icon(icon, size: 20,
-                  color: selected ? OracleBrand.violetSoft : OracleBrand.gray400),
+              // Featured icon in a tinted square (Untitled UI pattern).
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? OracleBrand.violet.withValues(alpha: 0.30)
+                      : OracleBrand.gray800,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 20,
+                    color: selected ? Colors.white : OracleBrand.gray400),
+              ),
               const Spacer(),
-              if (badge != null) badge!,
+              // Explicit radio indicator — no ambiguity about the selection.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? OracleBrand.violet : Colors.transparent,
+                  border: Border.all(
+                    color: selected ? OracleBrand.violetSoft : OracleBrand.gray500,
+                    width: 2,
+                  ),
+                ),
+                child: selected
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+              ),
             ]),
             const SizedBox(height: 12),
             Text(title,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: selected ? Colors.white : OracleBrand.gray100)),
             const SizedBox(height: 6),
             Text(description,
-                style: const TextStyle(fontSize: 12, color: OracleBrand.gray400, height: 1.5)),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: selected ? OracleBrand.gray100 : OracleBrand.gray400,
+                    height: 1.5)),
+            if (badge != null) ...[
+              const SizedBox(height: 10),
+              badge!,
+            ],
           ],
         ),
       ),
