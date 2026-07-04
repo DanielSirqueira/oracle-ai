@@ -205,7 +205,40 @@ scheduler runs only in the daemon (one place, no per-agent duplication).
 - Automatic: `ORACLE_MAINTENANCE_ON_STARTUP=true` (once on boot) and/or `ORACLE_MAINTENANCE_INTERVAL_MINUTES=N`
   (timer). In multi-agent setups, prefer running this in the single daemon.
 
-## 9. Troubleshooting
+## 9. Backup & restore
+
+Oracle ships a **portable, Dart-native backup** — no `pg_dump` needed on the host. A backup is a plain
+`.sql` **data seed** (all rows, embeddings included); the schema is owned by the migrations, so the seed
+restores into a freshly-migrated database. The file is small, inspectable, and safe to commit — the shared
+memory bank travels with the repo and restores identically anywhere.
+
+**Make a backup** (CLI or the `oracle_maintenance_backup` tool):
+
+```bash
+oracle_ai backup-db                       # writes backups/oracle_seed.sql
+oracle_ai backup-db path/to/seed.sql      # or a chosen path
+```
+
+**Restore** (only into an empty DB unless you force it — restore never truncates):
+
+```bash
+oracle_ai restore-db                      # backups/oracle_seed.sql -> empty DB
+oracle_ai restore-db path/to/seed.sql --force
+```
+
+**Auto-restore on `docker compose up`.** Set `ORACLE_DB_SEED_PATH` (the compose files default it to
+`/app/backups/oracle_seed.sql` and mount `./backups`). On a **fresh volume**, the boot-owning process
+(`serve-hooks` / all-in-one) restores the seed **if the DB is empty** — bringing the stack up rehydrates the
+saved memory. It never overwrites a populated database, and a per-agent `serve-mcp` never seeds (no
+cold-start race). `ORACLE_DB_SEED_ON_EMPTY=false` disables it.
+
+**Versioning a shared memory bank.** Seeds are git-ignored by default (they may hold sensitive content). To
+commit one intentionally: `git add -f backups/oracle_seed.sql`. A teammate who clones and runs
+`docker compose up` on a fresh volume gets the same memory.
+
+Typical loop: `oracle_ai backup-db` → commit the seed → colleague pulls → `docker compose up` restores it.
+
+## 10. Troubleshooting
 
 | Symptom | Cause / action |
 |---|---|

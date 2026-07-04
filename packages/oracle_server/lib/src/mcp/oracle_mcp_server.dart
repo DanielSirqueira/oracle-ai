@@ -5,6 +5,7 @@ import 'package:mcp_dart/mcp_dart.dart' as mcp;
 import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 
+import '../backup/db_backup_service.dart';
 import '../recall_service.dart';
 import '../repo_root.dart';
 
@@ -30,7 +31,14 @@ re-derive, record durable learnings as you go.
   of re-deriving context. If the task looks familiar, `oracle_request_search` finds past user demands like it
   (then `oracle_request_messages` shows how they were handled).
 - Save durable, non-trivial learnings with `oracle_memory_save` (decision/gotcha/rule/fact) — not transient
-  chatter. Refine rules with `oracle_rule_save` (re-saving the same key supersedes it).
+  chatter. To avoid duplicates, recall first, and give a recurring memory a stable `key` so re-saving updates
+  one memory in place instead of piling up near-duplicates (or pass `supersedes` with the id it replaces).
+  Refine rules with `oracle_rule_save` (re-saving the same key supersedes it).
+- SKILLS: a centralized, shared skill library (procedural how-to guides) lives here — one copy for every
+  agent, no per-agent folders. Before starting a non-trivial kind of task, `oracle_skill_search` with the
+  task context; load the winner with `oracle_skill_get` (searches return name+description only — cheap).
+  Save reusable know-how with `oracle_skill_save` (stable kebab-case key; omit project/product for a
+  global skill; re-saving the same key updates it).
 - At the end of a task / before context compaction, write a handoff with `oracle_handoff_begin`.
 - Keep memory healthy: retire/forget what is wrong or obsolete. Bad memory is worse than none.
 Capture is automatic — hooks record the session, each user request, and your work (messages) as
@@ -98,7 +106,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<ListProjectsUsecase>()(ProjectFilter(
           search: '${a['search'] ?? ''}',
-          limit: (a['limit'] as num?)?.toInt() ?? 50,
+          limit: _clampLimit(a['limit'], fallback: 50, max: 200),
         ));
         return result.fold((list) => _ok(list.map(_projectJson).toList()), _err);
       },
@@ -119,8 +127,12 @@ Capture is automatic — hooks record the session, each user request, and your w
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
+        final repoPath = '${a['repoPath'] ?? ''}';
+        // Canonicalize to the git root (as the hooks and session_brief do), so a
+        // call from a subdirectory or worktree maps to the SAME project instead
+        // of creating a duplicate disjoint from the hook-captured one.
         final result = await injector.get<ResolveProjectUsecase>()(
-          '${a['repoPath'] ?? ''}',
+          repoPath.trim().isEmpty ? repoPath : repoRootOf(repoPath),
           name: a['name']?.toString(),
           productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
         );
@@ -154,12 +166,26 @@ Capture is automatic — hooks record the session, each user request, and your w
     // --- memory ---
     server.tool(
       'oracle_memory_save',
-      description: 'Save a consolidated memory (decision/gotcha/rule/fact). '
-          'Only save durable, non-trivial learnings.',
+      description: 'Save a consolidated memory (decision/gotcha/rule/fact). Only save durable, '
+          'non-trivial learnings. To AVOID DUPLICATES: give a recurring memory a stable `key` '
+          '(kebab-case, e.g. "filter-rollout-progress") and re-save with the same key to update '
+          'it in place instead of piling up near-duplicates — re-saving an unchanged keyed memory '
+          'is a free no-op (no re-embedding). Alternatively pass `supersedes` with the id of a '
+          'memory this one replaces. Recall first (oracle_memory_search) before creating a new one.',
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'projectId': {'type': 'string'},
           'productId': {'type': 'string'},
+          'key': {
+            'type': 'string',
+            'description': 'Optional stable slug (kebab-case). Re-saving the same key in the same '
+                'project/product supersedes the previous version — use it to update one memory '
+                'instead of creating duplicates.'
+          },
+          'supersedes': {
+            'type': 'string',
+            'description': 'Optional id of a memory this one replaces (retired in the same write).'
+          },
           'tier': {'type': 'string', 'description': 'episodic | semantic | procedural'},
           'kind': {'type': 'string', 'description': 'decision | gotcha | rule | fact'},
           'title': {'type': 'string'},
@@ -168,24 +194,35 @@ Capture is automatic — hooks record the session, each user request, and your w
             'type': 'array',
             'items': {'type': 'string'}
           },
-          'importance': {'type': 'number'},
+          'importance': {
+            'type': 'number',
+            'description': '0..1; ranks memories in the session brief. Defaults to 0.5. '
+                'Episodic memories below 0.3 that go unaccessed are eligible for auto-decay.'
+          },
         },
         required: ['title', 'body'],
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
+        final key = a['key']?.toString().trim();
+        final supersedes = a['supersedes']?.toString().trim();
         final result = await injector.get<SaveMemoryUsecase>()(MemoryEntity(
           id: const IdVO.empty(),
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          key: (key == null || key.isEmpty) ? null : key,
+          supersedes: (supersedes == null || supersedes.isEmpty) ? null : IdVO(supersedes),
           tier: MemoryTier.parse('${a['tier'] ?? 'semantic'}'),
           kind: MemoryKind.parse('${a['kind'] ?? 'fact'}'),
           title: TextVO('${a['title'] ?? ''}'),
           body: TextVO('${a['body'] ?? ''}'),
           tags: _stringList(a['tags']),
-          importance: (a['importance'] as num?)?.toDouble() ?? 0,
+          // Default to a neutral 0.5 (not 0): a 0 importance sinks below the decay
+          // threshold and makes the importance-ordered brief degenerate to newest-first.
+          importance: (a['importance'] as num?)?.toDouble() ?? 0.5,
         ));
-        return result.fold((m) => _ok(_memoryJson(m)), _err);
+        if (result.isError()) return _err(result.exceptionOrNull()!);
+        return _ok(await _memoryJsonWithSimilar(result.getOrThrow()));
       },
     );
 
@@ -205,24 +242,28 @@ Capture is automatic — hooks record the session, each user request, and your w
             'type': 'array',
             'items': {'type': 'string'}
           },
-          'limit': {'type': 'integer'},
+          'limit': {'type': 'integer', 'description': 'Default 10, max 50'},
+          'full': {
+            'type': 'boolean',
+            'description': 'Default false → id+title+snippet per hit (cheap). '
+                'true → full body (use only when you truly need every body inline).'
+          },
         },
         required: ['query'],
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
+        final full = a['full'] == true;
         final result = await injector.get<SearchMemoriesUsecase>()(MemorySearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
           tiers: _stringList(a['tiers']).map(MemoryTier.parse).toList(),
           kinds: _stringList(a['kinds']).map(MemoryKind.parse).toList(),
-          limit: (a['limit'] as num?)?.toInt() ?? 10,
+          limit: _clampLimit(a['limit'], fallback: 10),
         ));
         return result.fold(
-          (list) => _ok(list
-              .map((e) => {'memory': _memoryJson(e.memory), 'score': e.score})
-              .toList()),
+          (list) => _ok(list.map((e) => _memoryHit(e, full: full)).toList()),
           _err,
         );
       },
@@ -308,7 +349,8 @@ Capture is automatic — hooks record the session, each user request, and your w
           priority: (a['priority'] as num?)?.toInt() ?? 50,
           tags: _stringList(a['tags']),
         ));
-        return result.fold((r) => _ok(_ruleJson(r)), _err);
+        if (result.isError()) return _err(result.exceptionOrNull()!);
+        return _ok(await _ruleJsonWithSimilar(result.getOrThrow()));
       },
     );
 
@@ -373,7 +415,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<RulesForTaskUsecase>()(RulesForTaskQuery(
           projectId: IdVO('${a['projectId'] ?? ''}'),
           scope: a['scope']?.toString(),
-          limit: (a['limit'] as num?)?.toInt() ?? 50,
+          limit: _clampLimit(a['limit'], fallback: 50, max: 100),
         ));
         return result.fold((list) => _ok(list.map(_ruleJson).toList()), _err);
       },
@@ -392,22 +434,27 @@ Capture is automatic — hooks record the session, each user request, and your w
             'type': 'array',
             'items': {'type': 'string'}
           },
-          'limit': {'type': 'integer'},
+          'limit': {'type': 'integer', 'description': 'Default 10, max 50'},
+          'full': {
+            'type': 'boolean',
+            'description': 'Default false → id+title+snippet per hit; true → full content.'
+          },
         },
         required: ['query'],
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
+        final full = a['full'] == true;
         final result = await injector.get<SearchRulesUsecase>()(RuleSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
           scope: a['scope']?.toString(),
           severities: _stringList(a['severities']).map(RuleSeverity.parse).toList(),
-          limit: (a['limit'] as num?)?.toInt() ?? 10,
+          limit: _clampLimit(a['limit'], fallback: 10),
         ));
         return result.fold(
-          (list) => _ok(list.map((e) => {'rule': _ruleJson(e.rule), 'score': e.score}).toList()),
+          (list) => _ok(list.map((e) => _ruleHit(e, full: full)).toList()),
           _err,
         );
       },
@@ -446,9 +493,172 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<ListProductsUsecase>()(ProductFilter(
           search: '${a['search'] ?? ''}',
-          limit: (a['limit'] as num?)?.toInt() ?? 50,
+          limit: _clampLimit(a['limit'], fallback: 50, max: 200),
         ));
         return result.fold((list) => _ok(list.map(_productJson).toList()), _err);
+      },
+    );
+
+    // --- skill (centralized shared skill library) ---
+    server.tool(
+      'oracle_skill_save',
+      description: 'Save a reusable skill (SKILL.md-style how-to) into the CENTRAL shared '
+          'library — one copy for every agent, no per-agent folders. Use a stable kebab-case '
+          '`key`; re-saving the same key in the same scope supersedes it. Omit projectId AND '
+          'productId for a GLOBAL skill (visible everywhere). `description` is the recall '
+          'trigger — write it as "what it does + when to use it". Re-saving unchanged content '
+          'is a free no-op.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'key': {'type': 'string', 'description': 'Stable kebab-case slug (e.g. filter-rollout-recipe)'},
+          'name': {'type': 'string', 'description': 'Display name'},
+          'description': {
+            'type': 'string',
+            'description': 'What it does + when to use it (this is what searches match on)'
+          },
+          'content': {'type': 'string', 'description': 'The skill body (markdown, SKILL.md style)'},
+          'projectId': {'type': 'string', 'description': 'Scope to one project (omit for wider scope)'},
+          'productId': {'type': 'string', 'description': 'Scope to a product (omit for global)'},
+          'tags': {
+            'type': 'array',
+            'items': {'type': 'string'}
+          },
+        },
+        required: ['key', 'name', 'description', 'content'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<SaveSkillUsecase>()(SkillEntity(
+          id: const IdVO.empty(),
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          key: '${a['key'] ?? ''}'.trim(),
+          name: TextVO('${a['name'] ?? ''}'),
+          description: TextVO('${a['description'] ?? ''}'),
+          content: TextVO('${a['content'] ?? ''}'),
+          tags: _stringList(a['tags']),
+        ));
+        return result.fold((s) => _ok(_skillJson(s)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_skill_search',
+      description: 'Find skills in the shared library by task context (hybrid search: vector + '
+          'full-text). Returns name+description+key per hit (cheap, progressive disclosure) — '
+          'load the winner with oracle_skill_get. Global skills are always included; projectId/'
+          'productId add their scoped skills.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'query': {'type': 'string', 'description': 'The task context (what you are about to do)'},
+          'projectId': {'type': 'string'},
+          'productId': {'type': 'string'},
+          'limit': {'type': 'integer', 'description': 'Default 10, max 50'},
+        },
+        required: ['query'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<SearchSkillsUsecase>()(SkillSearchFilter(
+          query: '${a['query'] ?? ''}',
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          limit: _clampLimit(a['limit'], fallback: 10),
+        ));
+        return result.fold(
+          (list) => _ok(list
+              .map((e) => {
+                    'id': e.skill.id.value,
+                    'key': e.skill.key,
+                    'name': e.skill.name.value,
+                    'description': e.skill.description.value,
+                    'scope': e.skill.projectId != null
+                        ? 'project'
+                        : (e.skill.productId != null ? 'product' : 'global'),
+                    'score': e.score,
+                  })
+              .toList()),
+          _err,
+        );
+      },
+    );
+
+    server.tool(
+      'oracle_skill_get',
+      description: 'Load one skill\'s full content (the "use the skill" step after '
+          'oracle_skill_search). Pass an id, or a key — a key resolves project → product → '
+          'global, so a project-specific version overrides the shared one.',
+      toolInputSchema: const mcp.ToolInputSchema(properties: {
+        'id': {'type': 'string'},
+        'key': {'type': 'string'},
+        'projectId': {'type': 'string', 'description': 'Used for key resolution'},
+        'productId': {'type': 'string', 'description': 'Used for key resolution'},
+      }),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<GetSkillUsecase>()(
+          id: a['id'] == null ? null : IdVO('${a['id']}'),
+          key: a['key']?.toString(),
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+        );
+        return result.fold((s) => _ok(_skillJson(s)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_skill_list',
+      description: 'Inventory of the current skills visible to a scope (global + product + '
+          'project). Name+description+key only.',
+      toolInputSchema: const mcp.ToolInputSchema(properties: {
+        'projectId': {'type': 'string'},
+        'productId': {'type': 'string'},
+        'limit': {'type': 'integer', 'description': 'Default 200'},
+      }),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<ListSkillsUsecase>()(
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          limit: _clampLimit(a['limit'], fallback: 200, max: 500),
+        );
+        return result.fold(
+          (list) => _ok(list
+              .map((s) => {
+                    'id': s.id.value,
+                    'key': s.key,
+                    'name': s.name.value,
+                    'description': s.description.value,
+                    'scope': s.projectId != null
+                        ? 'project'
+                        : (s.productId != null ? 'product' : 'global'),
+                  })
+              .toList()),
+          _err,
+        );
+      },
+    );
+
+    server.tool(
+      'oracle_skill_retire',
+      description: 'Retire a skill that is wrong or obsolete. Soft by default (kept for '
+          'audit with a reason); pass hard=true to delete permanently.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'id': {'type': 'string'},
+          'reason': {'type': 'string'},
+          'hard': {'type': 'boolean'},
+        },
+        required: ['id'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<RetireSkillUsecase>()(
+          IdVO('${a['id'] ?? ''}'),
+          reason: a['reason']?.toString(),
+          hard: a['hard'] == true,
+        );
+        return result.fold((s) => _ok(_skillJson(s)), _err);
       },
     );
 
@@ -506,20 +716,26 @@ Capture is automatic — hooks record the session, each user request, and your w
           'query': {'type': 'string'},
           'projectId': {'type': 'string'},
           'area': {'type': 'string'},
-          'limit': {'type': 'integer'},
+          'limit': {'type': 'integer', 'description': 'Default 10, max 50'},
+          'full': {
+            'type': 'boolean',
+            'description': 'Default false → id+area+snippet per hit; true → full content. '
+                'Architecture pages can be large — prefer the default, then get the area you need.'
+          },
         },
         required: ['query'],
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
+        final full = a['full'] == true;
         final result = await injector.get<SearchArchitectureUsecase>()(ArchitectureSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           area: a['area']?.toString(),
-          limit: (a['limit'] as num?)?.toInt() ?? 10,
+          limit: _clampLimit(a['limit'], fallback: 10),
         ));
         return result.fold(
-          (list) => _ok(list.map((e) => {'architecture': _architectureJson(e.architecture), 'score': e.score}).toList()),
+          (list) => _ok(list.map((e) => _architectureHit(e, full: full)).toList()),
           _err,
         );
       },
@@ -641,7 +857,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<RecentSessionsUsecase>()(
           IdVO('${a['projectId'] ?? ''}'),
-          limit: (a['limit'] as num?)?.toInt() ?? 20,
+          limit: _clampLimit(a['limit'], fallback: 20, max: 100),
         );
         return result.fold((list) => _ok(list.map(_sessionJson).toList()), _err);
       },
@@ -663,7 +879,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<SessionHistoryUsecase>()(
           IdVO('${a['sessionId'] ?? ''}'),
-          limit: (a['limit'] as num?)?.toInt() ?? 40,
+          limit: _clampLimit(a['limit'], fallback: 40, max: 200),
         );
         return result.fold((list) => _ok(list.map(_messageJson).toList()), _err);
       },
@@ -683,7 +899,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<SessionRequestsUsecase>()(
           IdVO('${a['sessionId'] ?? ''}'),
-          limit: (a['limit'] as num?)?.toInt() ?? 50,
+          limit: _clampLimit(a['limit'], fallback: 50, max: 200),
         );
         return result.fold((list) => _ok(list.map(_requestJson).toList()), _err);
       },
@@ -704,7 +920,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<RequestMessagesUsecase>()(
           IdVO('${a['requestId'] ?? ''}'),
-          limit: (a['limit'] as num?)?.toInt() ?? 100,
+          limit: _clampLimit(a['limit'], fallback: 100, max: 500),
         );
         return result.fold((list) => _ok(list.map(_messageJson).toList()), _err);
       },
@@ -728,7 +944,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<RequestSearchUsecase>()(
           IdVO('${a['projectId'] ?? ''}'),
           '${a['query'] ?? ''}',
-          limit: (a['limit'] as num?)?.toInt() ?? 10,
+          limit: _clampLimit(a['limit'], fallback: 10, max: 50),
         );
         return result.fold((list) => _ok(list.map(_requestJson).toList()), _err);
       },
@@ -770,7 +986,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           minImportance: (a['minImportance'] as num?)?.toDouble() ?? 0.3,
           minAccessCount: (a['minAccessCount'] as num?)?.toInt() ?? 2,
           dedupDistance: (a['dedupDistance'] as num?)?.toDouble() ?? 0.05,
-          limit: (a['limit'] as num?)?.toInt() ?? 500,
+          limit: _clampLimit(a['limit'], fallback: 500, max: 5000),
         ));
         return result.fold((r) => _ok(_maintenanceJson(r)), _err);
       },
@@ -779,8 +995,10 @@ Capture is automatic — hooks record the session, each user request, and your w
     server.tool(
       'oracle_maintenance_lint',
       description: 'Read-only health check over the memory bank: counts of memories/rules '
-          'without an embedding (invisible to semantic recall) and old user demands the '
-          'agent never answered (requests with no messages). Changes nothing.',
+          'without an embedding (invisible to semantic recall), old user demands the agent '
+          'never answered (requests with no messages), and vectors whose embedding model '
+          'differs from the configured one (invisible to same-model recall until re-embedded '
+          'via oracle_maintenance_reembed). Changes nothing.',
       toolInputSchema: const mcp.ToolInputSchema(properties: {}),
       callback: ({args, extra}) async {
         final result = await injector.get<LintUsecase>()();
@@ -790,9 +1008,66 @@ Capture is automatic — hooks record the session, each user request, and your w
             'memoriesWithoutEmbedding': r.memoriesWithoutEmbedding,
             'rulesWithoutEmbedding': r.rulesWithoutEmbedding,
             'requestsWithoutMessages': r.requestsWithoutMessages,
+            'vectorsWithStaleModel': r.vectorsWithStaleModel,
+            'currentModel': r.currentModel,
           }),
           _err,
         );
+      },
+    );
+
+    server.tool(
+      'oracle_maintenance_reembed',
+      description: 'Re-embed rows whose vector is missing or was produced by a different '
+          'embedding model, using the currently configured embedder — the fix for empty '
+          'semantic recall after switching provider/model (see oracle_maintenance_lint '
+          "vectorsWithStaleModel). Bounded per call; re-run while 'mayHaveMore' is true.",
+      toolInputSchema: const mcp.ToolInputSchema(properties: {
+        'limit': {'type': 'integer', 'description': 'Max rows to re-embed this pass (default 200, max 2000)'},
+      }),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<ReembedUsecase>()(
+          limit: _clampLimit(a['limit'], fallback: 200, max: 2000),
+        );
+        return result.fold(
+          (r) => _ok({
+            'model': r.model,
+            'scanned': r.scanned,
+            'reembedded': r.reembedded,
+            'failed': r.failed,
+            'mayHaveMore': r.mayHaveMore,
+          }),
+          _err,
+        );
+      },
+    );
+
+    server.tool(
+      'oracle_maintenance_backup',
+      description: 'Write a portable snapshot of the whole memory bank (all data, embeddings '
+          'included) to a .sql seed file. The schema is owned by the migrations, so the seed is '
+          'data only and restores into a fresh database — commit it to version the shared memory, '
+          'or bring the stack up on a new volume to restore it automatically. Restoring is a CLI/'
+          "boot operation (oracle_ai restore-db), not a tool, since it's destructive on a populated DB.",
+      toolInputSchema: const mcp.ToolInputSchema(properties: {
+        'path': {'type': 'string', 'description': 'Output file (default backups/oracle_seed.sql)'},
+      }),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final raw = a['path']?.toString().trim();
+        final path = (raw == null || raw.isEmpty) ? 'backups/oracle_seed.sql' : raw;
+        try {
+          final report = await DbBackupService(injector.get<Database>()).backup(path);
+          return _ok({
+            'path': report.path,
+            'rows': report.rows,
+            'bytes': report.bytes,
+            'perTable': report.perTable,
+          });
+        } catch (error) {
+          return _err(SystemFailure(errorMessage: 'backup failed: $error', stackTrace: StackTrace.current));
+        }
       },
     );
 
@@ -826,7 +1101,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<RecentMetricsUsecase>()(
           IdVO('${a['projectId'] ?? ''}'),
-          limit: (a['limit'] as num?)?.toInt() ?? 20,
+          limit: _clampLimit(a['limit'], fallback: 20, max: 100),
         );
         return result.fold((list) => _ok(list.map(_sessionMetricJson).toList()), _err);
       },
@@ -837,6 +1112,21 @@ Capture is automatic — hooks record the session, each user request, and your w
 
   static List<String> _stringList(Object? value) =>
       value is List ? value.map((e) => e.toString()).toList() : const [];
+
+  /// Clamps a caller-supplied `limit` into `[1, max]`, defaulting to [fallback]
+  /// when absent/invalid — so an oversized value can't force a giant scan or
+  /// materialize a huge result on the shared daemon.
+  static int _clampLimit(Object? raw, {int fallback = 10, int max = 50}) {
+    // Tolerate a string-typed number ("20"), a frequent LLM tool-call shape, and
+    // any other type, degrading to [fallback] instead of throwing a TypeError.
+    final n = switch (raw) {
+      final num v => v.toInt(),
+      final String v => int.tryParse(v.trim()) ?? fallback,
+      _ => fallback,
+    };
+    if (n < 1) return 1;
+    return n > max ? max : n;
+  }
 
   /// Caps a raw-capture field (message content / request text) so list and
   /// history payloads stay cheap in the agent's context. Truncation keeps the
@@ -874,6 +1164,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         'id': m.id.value,
         'productId': m.productId?.value,
         'projectId': m.projectId?.value,
+        'key': m.key,
         'tier': m.tier.code,
         'kind': m.kind.code,
         'title': m.title.value,
@@ -900,6 +1191,77 @@ Capture is automatic — hooks record the session, each user request, and your w
         'createdAt': r.createdAt?.toIso8601String(),
       };
 
+  static Map<String, dynamic> _skillJson(SkillEntity s) => {
+        'id': s.id.value,
+        'productId': s.productId?.value,
+        'projectId': s.projectId?.value,
+        'key': s.key,
+        'name': s.name.value,
+        'description': s.description.value,
+        'content': s.content.value,
+        'tags': s.tags,
+        'scope': s.projectId != null ? 'project' : (s.productId != null ? 'product' : 'global'),
+        'isLatest': s.isLatest,
+        'createdAt': s.createdAt?.toIso8601String(),
+      };
+
+  /// Memory JSON augmented with a near-duplicate signal: latest same-model
+  /// memories close to the one just saved, so the agent can consolidate (reuse
+  /// a key / supersedes) instead of piling up duplicates. Uses the embedding
+  /// already computed by the save — no extra embedding call.
+  static Future<Map<String, dynamic>> _memoryJsonWithSimilar(MemoryEntity m) async {
+    final json = _memoryJson(m);
+    if (m.embedding == null || m.embeddingModel == null) return json;
+    final near = await injector.get<MemoryRepository>().nearestByEmbedding(
+          productId: m.productId,
+          projectId: m.projectId,
+          embedding: m.embedding!,
+          embeddingModel: m.embeddingModel!,
+          excludeId: m.id,
+        );
+    if (near.isNotEmpty) {
+      json['similar'] = near
+          .map((n) => {
+                'id': n.memory.id.value,
+                'key': n.memory.key,
+                'title': n.memory.title.value,
+                'distance': double.parse(n.distance.toStringAsFixed(3)),
+              })
+          .toList();
+      json['similarNote'] = 'Near-duplicate memories already exist. To avoid piling up '
+          'duplicates, prefer updating one of these — re-save with its key, or pass '
+          'supersedes=<id> — instead of keeping a separate near-identical memory.';
+    }
+    return json;
+  }
+
+  /// Rule JSON augmented with the same near-duplicate signal, so the agent
+  /// refines an existing rule (reuse its key) instead of creating a duplicate.
+  static Future<Map<String, dynamic>> _ruleJsonWithSimilar(RuleEntity r) async {
+    final json = _ruleJson(r);
+    if (r.embedding == null || r.embeddingModel == null) return json;
+    final near = await injector.get<RuleRepository>().nearestByEmbedding(
+          productId: r.productId,
+          projectId: r.projectId,
+          embedding: r.embedding!,
+          embeddingModel: r.embeddingModel!,
+          excludeId: r.id,
+        );
+    if (near.isNotEmpty) {
+      json['similar'] = near
+          .map((n) => {
+                'id': n.rule.id.value,
+                'key': n.rule.key,
+                'title': n.rule.title.value,
+                'distance': double.parse(n.distance.toStringAsFixed(3)),
+              })
+          .toList();
+      json['similarNote'] = 'A similar rule already exists. Prefer refining it (re-save with '
+          'its key) over creating a near-duplicate rule.';
+    }
+    return json;
+  }
+
   static Map<String, dynamic> _productJson(ProductEntity p) => {
         'id': p.id.value,
         'name': p.name.value,
@@ -915,6 +1277,44 @@ Capture is automatic — hooks record the session, each user request, and your w
         'isLatest': a.isLatest,
         'createdAt': a.createdAt?.toIso8601String(),
       };
+
+  /// Max chars of a body/content returned by a SEARCH hit. Search is a discovery
+  /// step, so hits default to a snippet + id (cheap in context); the agent fetches
+  /// the full text with the get-by-id tool, or passes `full:true` to inline it.
+  static const _searchSnippetChars = 240;
+
+  static Map<String, dynamic> _memoryHit(MemorySearchResult e, {required bool full}) => full
+      ? {'memory': _memoryJson(e.memory), 'score': e.score}
+      : {
+          'id': e.memory.id.value,
+          'kind': e.memory.kind.code,
+          'title': e.memory.title.value,
+          'snippet': _snippet(e.memory.body.value, _searchSnippetChars),
+          'importance': e.memory.importance,
+          'score': e.score,
+        };
+
+  static Map<String, dynamic> _ruleHit(RuleSearchResult e, {required bool full}) => full
+      ? {'rule': _ruleJson(e.rule), 'score': e.score}
+      : {
+          'id': e.rule.id.value,
+          'scope': e.rule.scope,
+          'title': e.rule.title.value,
+          'severity': e.rule.severity.code,
+          'priority': e.rule.priority,
+          'snippet': _snippet(e.rule.content.value, _searchSnippetChars),
+          'score': e.score,
+        };
+
+  static Map<String, dynamic> _architectureHit(ArchitectureSearchResult e, {required bool full}) =>
+      full
+          ? {'architecture': _architectureJson(e.architecture), 'score': e.score}
+          : {
+              'id': e.architecture.id.value,
+              'area': e.architecture.area,
+              'snippet': _snippet(e.architecture.content.value, _searchSnippetChars),
+              'score': e.score,
+            };
 
   static Map<String, dynamic> _handoffJson(HandoffEntity h) => {
         'id': h.id.value,

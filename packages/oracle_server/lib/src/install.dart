@@ -18,12 +18,20 @@ String mcpJson({String? command}) {
   return const JsonEncoder.withIndent('  ').convert(entry);
 }
 
-String hooksJson({String host = '127.0.0.1', int port = 49500}) {
+String hooksJson({String host = '127.0.0.1', int port = 49500, String? token}) {
   final url = 'http://$host:$port/hook';
+  final trimmedToken = token?.trim() ?? '';
+  final hasToken = trimmedToken.isNotEmpty;
   Map<String, Object> http({bool async = false, String? matcher}) => {
         if (matcher != null) 'matcher': matcher,
         'hooks': [
-          {'type': 'http', 'url': url, if (async) 'async': true},
+          {
+            'type': 'http',
+            'url': url,
+            if (async) 'async': true,
+            // When ORACLE_HOOK_TOKEN is set, the receiver requires this header.
+            if (hasToken) 'headers': {'Authorization': 'Bearer $trimmedToken'},
+          },
         ],
       };
   final entry = {
@@ -47,11 +55,14 @@ void printInstallMcp({String? command}) {
   stdout.writeln(mcpJson(command: command));
 }
 
-void printInstallHooks({String host = '127.0.0.1', int port = 49500}) {
+void printInstallHooks({String host = '127.0.0.1', int port = 49500, String? token}) {
   stdout
     ..writeln('# Merge the "hooks" block into your Claude Code settings.json.')
     ..writeln('# SessionStart + UserPromptSubmit are SYNCHRONOUS (they inject recalled')
     ..writeln('# context); the capture hooks are async so they never block the agent.')
-    ..writeln('# The Oracle server must be running its hook receiver on this port.')
-    ..writeln(hooksJson(host: host, port: port));
+    ..writeln('# The Oracle server must be running its hook receiver on this port.');
+  if (token != null && token.trim().isNotEmpty) {
+    stdout.writeln('# ORACLE_HOOK_TOKEN is set — the Authorization header below is required.');
+  }
+  stdout.writeln(hooksJson(host: host, port: port, token: token));
 }

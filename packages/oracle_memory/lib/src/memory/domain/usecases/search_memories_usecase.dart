@@ -22,7 +22,10 @@ class SearchMemoriesUsecaseImpl implements SearchMemoriesUsecase {
         filter.query.trim().isNotEmpty &&
         filter.mode != SearchMode.keyword) {
       try {
-        filter = filter.copyWith(queryEmbedding: await _embedder.embed(filter.query));
+        filter = filter.copyWith(
+          queryEmbedding: await _embedder.embed(filter.query),
+          queryModel: _embedder.model,
+        );
       } catch (_) {/* fall back to keyword */}
     }
     return _repository.searchMemories(filter);

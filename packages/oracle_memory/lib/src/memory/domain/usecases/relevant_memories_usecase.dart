@@ -35,6 +35,7 @@ class RelevantMemoriesUsecaseImpl implements RelevantMemoriesUsecase {
     } catch (_) {
       return const Success([]); // no embedding → no recall (never block the agent)
     }
-    return _repository.relevantMemories(projectId, vector, maxDistance, limit);
+    return _repository.relevantMemories(projectId, vector, maxDistance, limit,
+        queryModel: _embedder.model);
   }
 }

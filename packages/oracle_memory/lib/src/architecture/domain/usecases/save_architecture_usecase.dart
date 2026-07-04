@@ -33,6 +33,17 @@ class SaveArchitectureUsecaseImpl implements SaveArchitectureUsecase {
       ));
     }
 
+    // Idempotent no-op: an architecture page is keyed by (project, area); when
+    // the current page for this area has identical content, return it without
+    // embedding or writing — no wasted embedding tokens, no pointless version.
+    if (architecture.embedding == null) {
+      final existing =
+          (await _repository.getByArea(architecture.projectId, architecture.area.trim())).getOrNull();
+      if (existing != null && existing.content.value == architecture.content.value) {
+        return Success(existing);
+      }
+    }
+
     if (architecture.embedding == null) {
       try {
         final vector = await _embedder.embed('${architecture.area}\n${architecture.content.value}');

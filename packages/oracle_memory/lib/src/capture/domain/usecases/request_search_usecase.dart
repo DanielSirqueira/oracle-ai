@@ -33,6 +33,6 @@ class RequestSearchUsecaseImpl implements RequestSearchUsecase {
     } catch (_) {
       return const Success([]);
     }
-    return _repository.searchRequests(projectId, vector, limit: limit);
+    return _repository.searchRequests(projectId, vector, limit: limit, queryModel: _embedder.model);
   }
 }

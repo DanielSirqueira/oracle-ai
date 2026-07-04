@@ -30,6 +30,7 @@ class DatabaseCaptureMapper {
         'session_id': req.sessionId.value,
         'user_text': req.userText.value,
         'embedding': req.embedding == null ? null : SqlVector(req.embedding!),
+        'embedding_model': req.embeddingModel,
       };
 
   static RequestEntity requestFromRow(Map<String, DataRowType> r) => RequestEntity(
@@ -37,6 +38,7 @@ class DatabaseCaptureMapper {
         sessionId: IdVO(r['session_id']!.toText()!),
         userText: TextVO(r['user_text']!.toText() ?? ''),
         embedding: r['embedding']?.toVector(),
+        embeddingModel: r['embedding_model']?.toText(),
         createdAt: r['created_at']?.toDateTime(),
       );
 

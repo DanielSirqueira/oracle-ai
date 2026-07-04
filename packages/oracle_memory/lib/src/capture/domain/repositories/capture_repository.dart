@@ -43,6 +43,7 @@ abstract interface class CaptureRepository {
     IdVO projectId,
     List<double> queryEmbedding, {
     int limit,
+    String? queryModel,
   });
 
   AsyncResultDart<List<SessionEntity>, CaptureFailure> recentSessions(IdVO projectId, {int limit});

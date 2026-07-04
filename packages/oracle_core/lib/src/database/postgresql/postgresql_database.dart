@@ -190,7 +190,6 @@ class PostgreSQLDatabase implements Database {
       return _buildResultFromResponse(
         response,
         returningForInsertId: statement.sql.toUpperCase().contains('RETURNING'),
-        useFirstRowSchema: true,
       );
     } on DatabaseFailure {
       rethrow;
@@ -206,21 +205,25 @@ class PostgreSQLDatabase implements Database {
   }
 
   /// Converts the driver [Result] into a [ResultDatabase].
+  ///
+  /// Column names come from the shared result schema; values come from EACH
+  /// row. (A previous version read `response.first[i]` for every row, which made
+  /// every row of a multi-row `RETURNING` a copy of the first — corrupting, e.g.,
+  /// the maintenance decay/dedup reports whenever more than one row was touched.)
   ResultDatabase _buildResultFromResponse(
     Result response, {
     required bool returningForInsertId,
-    bool useFirstRowSchema = false,
   }) {
     final rows = <Map<String, DataRowType>>[];
+    final columns = response.schema.columns;
 
     for (final row in response) {
       final dataRow = <String, DataRowType>{};
-      final columnCount =
-          useFirstRowSchema ? response.first.length : row.schema.columns.length;
+      final columnCount = row.length;
       for (var i = 0; i < columnCount; i++) {
-        final columnName = row.schema.columns[i].columnName ?? i.toString();
-        final value = useFirstRowSchema ? response.first[i] : row[i];
-        dataRow[columnName] = DataRowType(_pgValueToString(value));
+        final columnName =
+            (i < columns.length ? columns[i].columnName : null) ?? i.toString();
+        dataRow[columnName] = DataRowType(_pgValueToString(row[i]));
       }
       rows.add(dataRow);
     }
@@ -318,7 +321,6 @@ class PostgreSQLDatabase implements Database {
     final result = _buildResultFromResponse(
       response,
       returningForInsertId: query.sql.toUpperCase().contains('RETURNING'),
-      useFirstRowSchema: true,
     );
     query.lastInsertId = result.lastInsertId;
     results.add(result);

@@ -2,6 +2,7 @@ import 'package:oracle_core/oracle_core.dart';
 
 import 'domain/repositories/maintenance_repository.dart';
 import 'domain/usecases/lint_usecase.dart';
+import 'domain/usecases/reembed_usecase.dart';
 import 'domain/usecases/run_maintenance_usecase.dart';
 import 'external/datasources/database/database_maintenance_datasource.dart';
 import 'infra/datasources/maintenance_datasource.dart';
@@ -16,6 +17,7 @@ class MaintenanceModule extends Module {
       ..addLazySingleton<MaintenanceDatasource>(DatabaseMaintenanceDatasource.new)
       ..addLazySingleton<MaintenanceRepository>(MaintenanceRepositoryImpl.new)
       ..addLazySingleton<RunMaintenanceUsecase>(RunMaintenanceUsecaseImpl.new)
-      ..addLazySingleton<LintUsecase>(LintUsecaseImpl.new);
+      ..addLazySingleton<LintUsecase>(LintUsecaseImpl.new)
+      ..addLazySingleton<ReembedUsecase>(ReembedUsecaseImpl.new);
   }
 }

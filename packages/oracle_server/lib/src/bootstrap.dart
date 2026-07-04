@@ -4,6 +4,7 @@ import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 import 'package:oracle_migration/oracle_migration.dart';
 
+import 'backup/db_backup_service.dart';
 import 'migrations/embedded_migrations.dart';
 
 /// Brings the process up: resolves configuration, registers core dependencies
@@ -22,20 +23,34 @@ class Bootstrap {
   /// restart never silently forgets memories.
   final bool maintenanceOnStartup;
 
+  /// Path to a portable data seed to restore when the database is empty (see
+  /// [DbBackupService]). Null disables seed-on-boot. Opt-in: unset by default so
+  /// a host process never restores from a stray file — docker-compose sets it.
+  final String? seedPath;
+
+  /// Whether seed-on-boot is allowed at all (env `ORACLE_DB_SEED_ON_EMPTY`,
+  /// default true). Restore still only fires when the DB is actually empty.
+  final bool seedOnEmpty;
+
   Bootstrap({
     DatabaseConfig? config,
     Embedder? embedder,
     this.maintenanceOnStartup = false,
+    this.seedPath,
+    this.seedOnEmpty = true,
   })  : config = config ?? DatabaseConfig.fromEnv(),
         embedder = embedder ?? LocalEmbedder();
 
   /// Builds a [Bootstrap] from a merged environment map (see [loadEnv]).
   factory Bootstrap.fromEnv(Map<String, String> env) {
+    final seed = env['ORACLE_DB_SEED_PATH']?.trim();
     return Bootstrap(
       config: DatabaseConfig.fromEnv(env),
       embedder: createEmbedder(EmbeddingConfig.fromEnv(env)),
       maintenanceOnStartup:
           (env['ORACLE_MAINTENANCE_ON_STARTUP'] ?? 'false').toLowerCase() == 'true',
+      seedPath: (seed == null || seed.isEmpty) ? null : seed,
+      seedOnEmpty: (env['ORACLE_DB_SEED_ON_EMPTY'] ?? 'true').toLowerCase() == 'true',
     );
   }
 
@@ -44,7 +59,7 @@ class Bootstrap {
   ///
   /// When [ensureDatabase] is true, the target database is created if it does
   /// not exist yet (requires access to the `postgres` admin database).
-  Future<Database> start({bool ensureDatabase = false}) async {
+  Future<Database> start({bool ensureDatabase = false, bool allowSeed = false}) async {
     stderr.writeln('[oracle] starting — $config');
 
     if (ensureDatabase) {
@@ -68,11 +83,32 @@ class Bootstrap {
       );
     }
 
+    // Seed a fresh (empty) database from a portable data backup, so bringing the
+    // stack up on a new volume restores the saved memory bank. Only in the modes
+    // that own boot ([allowSeed]) — a per-agent MCP never seeds, avoiding a
+    // cold-start race — and only when the DB is empty (never overwrites data).
+    if (allowSeed && seedOnEmpty && seedPath != null) {
+      await _maybeSeed(database, seedPath!);
+    }
+
     if (maintenanceOnStartup) {
       await _runStartupMaintenance();
     }
 
     return database;
+  }
+
+  /// Restores the data seed when the database is empty. A bad or missing seed is
+  /// logged but never bricks startup — the daemon comes up on the empty DB.
+  Future<void> _maybeSeed(Database database, String path) async {
+    try {
+      final report = await DbBackupService(database).restore(path);
+      stderr.writeln(report.restored
+          ? '[oracle] seed restored from $path — ${report.rows} rows'
+          : '[oracle] seed skipped (${report.reason}) — $path');
+    } catch (error) {
+      stderr.writeln('[oracle] seed restore FAILED ($path): $error');
+    }
   }
 
   /// Opt-in deterministic sweep (decay + dedup of memories) with default policy.
@@ -123,6 +159,7 @@ class Bootstrap {
       ProjectModule(),
       ArchitectureModule(),
       RuleModule(),
+      SkillModule(),
       MemoryModule(),
       CaptureModule(),
       HandoffModule(),

@@ -40,8 +40,8 @@ class DatabaseCaptureDatasource implements CaptureDatasource {
   Future<RequestEntity> openRequest(RequestEntity request) async {
     try {
       final result = await _database.executeUpdate(SqlStatement(
-        'INSERT INTO requests (session_id, user_text, embedding) '
-        'VALUES (:session_id::uuid, :user_text, :embedding::vector(1024)) '
+        'INSERT INTO requests (session_id, user_text, embedding, embedding_model) '
+        'VALUES (:session_id::uuid, :user_text, :embedding::vector(1024), :embedding_model) '
         'RETURNING id, created_at',
         DatabaseCaptureMapper.requestParams(request),
       ));
@@ -156,15 +156,28 @@ class DatabaseCaptureDatasource implements CaptureDatasource {
     IdVO projectId,
     List<double> queryEmbedding, {
     int limit = 10,
+    String? queryModel,
   }) async {
     try {
+      final params = <String, Object?>{
+        'pid': projectId.value,
+        'qvec': SqlVector(queryEmbedding),
+        'limit': limit,
+      };
+      // Compare only same-model vectors when the caller declares the query model —
+      // cross-model cosine distances are meaningless (mirrors memory/rule/arch).
+      var modelFilter = '';
+      if (queryModel != null && queryModel.isNotEmpty) {
+        modelFilter = 'AND r.embedding_model = :qmodel ';
+        params['qmodel'] = queryModel;
+      }
       // Semantic search over the project's past demands, joined through sessions.
       final result = await _database.select(SqlStatement(
         'SELECT ${_prefixed(_requestColumns, 'r')} FROM requests r '
         'JOIN sessions s ON s.id = r.session_id '
-        'WHERE s.project_id = :pid::uuid AND r.embedding IS NOT NULL '
+        'WHERE s.project_id = :pid::uuid AND r.embedding IS NOT NULL $modelFilter'
         'ORDER BY r.embedding <=> :qvec::vector(1024) LIMIT :limit',
-        {'pid': projectId.value, 'qvec': SqlVector(queryEmbedding), 'limit': limit},
+        params,
       ));
       return result.rows.map(DatabaseCaptureMapper.requestFromRow).toList();
     } on DatabaseFailure catch (e) {

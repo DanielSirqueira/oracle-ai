@@ -6,7 +6,7 @@
 
 One PostgreSQL instance holds both the relational structure and the vector index. Embeddings are
 `vector(1024)`; recall is **hybrid** (vector + full-text) fused with Reciprocal Rank Fusion. The schema is
-defined by four **forward-only** migrations, which are **embedded in the binary** and applied automatically on
+defined by six **forward-only** migrations, which are **embedded in the binary** and applied automatically on
 startup — Oracle checks the DB ledger and runs only what is missing, with no migrations folder or configuration
 needed. The default database is **`oracle_db`**.
 
@@ -41,6 +41,8 @@ Enumerations are enforced by `CHECK` constraints: memory `tier` ∈ {episodic, s
 | `v1.1.0/001_mutation_layer` | `rules.priority`; `retired_at`/`retired_reason` on `rules`/`architectures`/`memories`. |
 | `v1.2.0/001_project_resolve` | unique index `uq_projects_repo_path` (race-safe cwd → project upsert). |
 | `v1.3.0/001_metrics` | `session_metrics` table + indexes. |
+| `v1.4.0/001_request_index` | composite `idx_requests_session (session_id, created_at DESC)` for the hot capture path. |
+| `v1.5.0/001_search_hygiene` | `requests.embedding_model`; a stored generated `fts` column + GIN on `architectures` (was an inline per-row tsvector). |
 
 The runner records applied migrations and checksums in `_migrations`, serializes with `_migrations_lock` (an
 advisory lock with a 2-minute stale-takeover), runs each migration transactionally, and is **forward-fix**

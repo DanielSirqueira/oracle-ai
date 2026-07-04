@@ -1,6 +1,7 @@
 import 'package:oracle_core/oracle_core.dart';
 
 import '../../../domain/dtos/filters/rule_search_filter.dart';
+import '../../../domain/dtos/rule_neighbor.dart';
 import '../../../domain/dtos/rule_search_result.dart';
 import '../../../domain/dtos/rules_for_task_query.dart';
 import '../../../domain/entities/rule_entity.dart';
@@ -67,6 +68,80 @@ class DatabaseRuleDatasource implements RuleDatasource {
         createdAt: row['created_at']?.toDateTime(),
         updatedAt: row['updated_at']?.toDateTime(),
       );
+    } on DatabaseFailure catch (error) {
+      throw DatasourceRuleFailure(errorMessage: error.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  @override
+  Future<RuleEntity?> currentByKey({IdVO? productId, IdVO? projectId, required String key}) async {
+    try {
+      final String sql;
+      final Map<String, Object?> params;
+      if (projectId != null) {
+        sql = 'SELECT $_columns FROM rules '
+            'WHERE is_latest AND key = :key AND project_id = :pid::uuid LIMIT 1';
+        params = {'key': key, 'pid': projectId.value};
+      } else if (productId != null) {
+        sql = 'SELECT $_columns FROM rules '
+            'WHERE is_latest AND key = :key AND project_id IS NULL AND product_id = :prodid::uuid LIMIT 1';
+        params = {'key': key, 'prodid': productId.value};
+      } else {
+        return null;
+      }
+      final result = await _database.select(SqlStatement(sql, params));
+      if (result.rows.isEmpty) return null;
+      return DatabaseRuleMapper.fromRow(result.rows.first);
+    } on DatabaseFailure catch (error) {
+      throw DatasourceRuleFailure(errorMessage: error.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  @override
+  Future<List<RuleNeighbor>> nearestByEmbedding({
+    IdVO? productId,
+    IdVO? projectId,
+    required List<double> embedding,
+    required String embeddingModel,
+    IdVO? excludeId,
+    double? maxDistance,
+    int? limit,
+  }) async {
+    try {
+      final params = <String, Object?>{
+        'vec': SqlVector(embedding),
+        'model': embeddingModel,
+        // Tight default so the signal only fires on genuinely near-duplicate
+        // rules, not every thematically related rule.
+        'maxd': maxDistance ?? 0.12,
+        'lim': limit ?? 3,
+        'xid': excludeId?.value,
+      };
+      final String owner;
+      if (projectId != null) {
+        owner = 'project_id = :pid::uuid';
+        params['pid'] = projectId.value;
+      } else if (productId != null) {
+        owner = 'project_id IS NULL AND product_id = :prodid::uuid';
+        params['prodid'] = productId.value;
+      } else {
+        return const [];
+      }
+      // Same-model only; excludes the just-saved row and retired rules.
+      final sql = 'SELECT $_columns, (embedding <=> :vec::vector(1024)) AS distance '
+          'FROM rules '
+          'WHERE is_latest AND retired_at IS NULL AND embedding IS NOT NULL '
+          'AND embedding_model = :model AND $owner '
+          'AND (:xid::uuid IS NULL OR id <> :xid::uuid) '
+          'AND (embedding <=> :vec::vector(1024)) < :maxd '
+          'ORDER BY distance LIMIT :lim';
+      final result = await _database.select(SqlStatement(sql, params));
+      return result.rows
+          .map((r) => RuleNeighbor(
+                rule: DatabaseRuleMapper.fromRow(r),
+                distance: r['distance']?.toDouble() ?? 1.0,
+              ))
+          .toList();
     } on DatabaseFailure catch (error) {
       throw DatasourceRuleFailure(errorMessage: error.errorMessage, stackTrace: StackTrace.current);
     }
@@ -140,14 +215,20 @@ class DatabaseRuleDatasource implements RuleDatasource {
       }
 
       final ctes = <String>[
-        'scoped AS (SELECT id, embedding, fts FROM rules m WHERE ${scope.join(' AND ')})',
+        'scoped AS (SELECT id, embedding, embedding_model, fts FROM rules m '
+            'WHERE ${scope.join(' AND ')})',
       ];
       final fused = <String>[];
 
       if (mode == RuleSearchMode.semantic || mode == RuleSearchMode.hybrid) {
+        final semWhere = <String>['embedding IS NOT NULL'];
+        if (filter.queryModel != null && filter.queryModel!.isNotEmpty) {
+          semWhere.add('embedding_model = :qmodel');
+          params['qmodel'] = filter.queryModel;
+        }
         ctes.add(
           'semantic AS (SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> :qvec::vector(1024)) AS rnk '
-          'FROM scoped WHERE embedding IS NOT NULL LIMIT $_candidatePool)',
+          'FROM scoped WHERE ${semWhere.join(' AND ')} ORDER BY rnk LIMIT $_candidatePool)',
         );
         fused.add('SELECT id, 1.0/($_rrfK + rnk) AS s FROM semantic');
         params['qvec'] = SqlVector(filter.queryEmbedding!);
@@ -155,7 +236,7 @@ class DatabaseRuleDatasource implements RuleDatasource {
       if (mode == RuleSearchMode.keyword || mode == RuleSearchMode.hybrid) {
         ctes.add(
           "lexical AS (SELECT id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(fts, websearch_to_tsquery('english', :q)) DESC) AS rnk "
-          "FROM scoped WHERE fts @@ websearch_to_tsquery('english', :q) LIMIT $_candidatePool)",
+          "FROM scoped WHERE fts @@ websearch_to_tsquery('english', :q) ORDER BY rnk LIMIT $_candidatePool)",
         );
         fused.add('SELECT id, 1.0/($_rrfK + rnk) AS s FROM lexical');
         params['q'] = filter.query.trim();

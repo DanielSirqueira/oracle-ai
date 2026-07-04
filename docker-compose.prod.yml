@@ -25,7 +25,9 @@ services:
     ports:
       # Published so a HOST-NATIVE `serve-mcp` can reach the same DB. Omit this
       # mapping if every MCP runs via `docker exec` inside the compose network.
-      - "${ORACLE_DB_PORT:-5432}:5432"
+      # Loopback-only by default; override ORACLE_DB_BIND=0.0.0.0 for remote MCP
+      # hosts — and then a strong ORACLE_DB_PASSWORD is mandatory.
+      - "${ORACLE_DB_BIND:-127.0.0.1}:${ORACLE_DB_PORT:-5432}:5432"
     volumes:
       - oracle_pgdata_prod:/var/lib/postgresql/data
     healthcheck:
@@ -52,11 +54,23 @@ services:
       # from the host (127.0.0.1 inside the container would not be).
       ORACLE_HTTP_HOST: 0.0.0.0
       ORACLE_HTTP_PORT: "49500"
+      # The /hook endpoint reads AND writes long-term memory; require a shared
+      # secret. Mandatory once the published port is not strictly loopback.
+      ORACLE_HOOK_TOKEN: ${ORACLE_HOOK_TOKEN:-}
       # The daemon runs maintenance on a timer (single place, no per-agent dup).
       ORACLE_MAINTENANCE_INTERVAL_MINUTES: "${ORACLE_MAINTENANCE_INTERVAL_MINUTES:-30}"
       ORACLE_METRICS_ENABLED: "true"
+      # On a fresh volume, restore the data seed IF present and the DB is empty,
+      # so the saved memory bank rehydrates on `up`. Produce it with
+      # `oracle_ai backup-db` or the oracle_maintenance_backup tool.
+      ORACLE_DB_SEED_PATH: "${ORACLE_DB_SEED_PATH:-/app/backups/oracle_seed.sql}"
+    volumes:
+      # Seed directory shared with the host (holds backups/oracle_seed.sql).
+      - ./backups:/app/backups
     ports:
-      - "${ORACLE_HTTP_PORT:-49500}:49500"  # hooks reachable from host agents
+      # Loopback-only by default; override ORACLE_HTTP_BIND=0.0.0.0 for LAN agents
+      # (and then ORACLE_HOOK_TOKEN above is mandatory).
+      - "${ORACLE_HTTP_BIND:-127.0.0.1}:${ORACLE_HTTP_PORT:-49500}:49500"  # hooks reachable from host agents
     restart: unless-stopped
 
 volumes:

@@ -9,12 +9,17 @@ class EmbeddingConfig {
   final String? apiKey;
   final String? baseUrl;
 
+  /// Hard cap on a single embedding HTTP call. Bounds how long a slow/hung
+  /// provider can block the synchronous UserPromptSubmit hook and tool calls.
+  final Duration timeout;
+
   const EmbeddingConfig({
     required this.provider,
     required this.model,
     required this.dim,
     this.apiKey,
     this.baseUrl,
+    this.timeout = const Duration(seconds: 10),
   });
 
   /// Reads embedding settings from environment variables.
@@ -31,6 +36,7 @@ class EmbeddingConfig {
     final e = env ?? Platform.environment;
     final provider = (e['ORACLE_EMBEDDING_PROVIDER'] ?? 'local').toLowerCase();
     final dim = int.tryParse(e['ORACLE_EMBEDDING_DIM'] ?? '') ?? 1024;
+    final timeoutMs = int.tryParse(e['ORACLE_EMBEDDING_TIMEOUT_MS'] ?? '') ?? 10000;
 
     final (defaultModel, defaultBase, key) = switch (provider) {
       'openai' => ('text-embedding-3-small', 'https://api.openai.com/v1', e['OPENAI_API_KEY']),
@@ -52,6 +58,7 @@ class EmbeddingConfig {
       dim: dim,
       apiKey: key,
       baseUrl: e['ORACLE_EMBEDDING_BASE_URL'] ?? defaultBase,
+      timeout: Duration(milliseconds: timeoutMs),
     );
   }
 }

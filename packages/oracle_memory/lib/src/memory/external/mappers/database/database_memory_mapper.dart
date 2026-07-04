@@ -13,6 +13,7 @@ class DatabaseMemoryMapper {
   static Map<String, Object?> toInsertParams(MemoryEntity m) => {
         'product_id': m.productId?.value,
         'project_id': m.projectId?.value,
+        'key': m.key,
         'tier': m.tier.code,
         'kind': m.kind.code,
         'title': m.title.value,
@@ -32,6 +33,7 @@ class DatabaseMemoryMapper {
       id: IdVO(row['id']!.toText()!),
       productId: productId == null ? null : IdVO(productId),
       projectId: projectId == null ? null : IdVO(projectId),
+      key: row['key']?.toText(),
       tier: MemoryTier.parse(row['tier']!.toText() ?? 'semantic'),
       kind: MemoryKind.parse(row['kind']!.toText() ?? 'fact'),
       title: TextVO(row['title']!.toText() ?? ''),
