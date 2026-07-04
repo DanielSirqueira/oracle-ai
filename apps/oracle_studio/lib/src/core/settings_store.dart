@@ -1,6 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+/// Default backup target: the user's Documents folder, in an Oracle AI dir —
+/// visible, familiar, and survives repo moves.
+String defaultBackupDir() {
+  final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.';
+  return '$home${Platform.pathSeparator}Documents${Platform.pathSeparator}Oracle AI'
+      '${Platform.pathSeparator}backups';
+}
+
 /// Studio settings, persisted as a small JSON in the user's app-data folder
 /// (%APPDATA%/OracleAI/studio_settings.json) — independent of the repo .env,
 /// which stays the backend's configuration source.
@@ -10,6 +18,7 @@ class SettingsStore {
   int backupEveryHours;
   int backupKeep;
   String language;
+  String backupDir;
 
   SettingsStore({
     this.hostHooks = true,
@@ -17,7 +26,8 @@ class SettingsStore {
     this.backupEveryHours = 24,
     this.backupKeep = 7,
     this.language = 'pt',
-  });
+    String? backupDir,
+  }) : backupDir = backupDir ?? defaultBackupDir();
 
   static String _path() {
     final base = Platform.environment['APPDATA'] ??
@@ -37,6 +47,7 @@ class SettingsStore {
         backupEveryHours: json['backupEveryHours'] as int? ?? 24,
         backupKeep: json['backupKeep'] as int? ?? 7,
         language: json['language'] as String? ?? 'pt',
+        backupDir: json['backupDir'] as String?,
       );
     } catch (_) {
       return SettingsStore(); // corrupt settings never brick the app
@@ -52,6 +63,7 @@ class SettingsStore {
       'backupEveryHours': backupEveryHours,
       'backupKeep': backupKeep,
       'language': language,
+      'backupDir': backupDir,
     }));
   }
 }

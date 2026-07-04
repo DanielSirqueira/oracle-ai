@@ -219,6 +219,56 @@ const _pt = <String, String>{
   'set.envSaved': 'Salvo. Reinicie o Studio (e o MCP) para aplicar.',
   'set.envMissing': 'Nenhum .env conectado — crie um na raiz do projeto.',
   'set.envNotFound': '(não encontrado)',
+  'set.subtitle': 'Conexão, daemon, backups e integração — tudo do Oracle em um lugar.',
+  'set.langDesc': 'Idioma da interface do Studio.',
+  'set.daemonStatus': 'Status do receptor de hooks',
+  'set.online': 'Ativo',
+  'set.offline': 'Desligado',
+  'set.portBusy': 'Porta ocupada',
+  // env form
+  'env.title': 'Conexão e ambiente (.env)',
+  'env.desc':
+      'Estas configurações valem para o Studio, o MCP dos agentes e o daemon. Salvar atualiza o arquivo .env com segurança (backup .bak automático, comentários preservados). Reinicie o Studio e os agentes para aplicar.',
+  'env.db': 'Banco de dados PostgreSQL',
+  'env.dbDesc': 'Onde a memória vive. Use o banco criado na instalação ou aponte para outro.',
+  'env.host': 'Host',
+  'env.port': 'Porta',
+  'env.user': 'Usuário',
+  'env.password': 'Senha',
+  'env.dbName': 'Nome do banco',
+  'env.embed': 'Embeddings (busca semântica)',
+  'env.embedDesc':
+      '"local" funciona offline e sem custo. Provedores de API (Gemini/OpenAI/Voyage) dão mais qualidade — após trocar, rode o re-embed na manutenção.',
+  'env.provider': 'Provedor',
+  'env.apiKey': 'API key do provedor',
+  'env.server': 'Servidor local (hooks)',
+  'env.serverDesc':
+      'Endpoint HTTP que recebe os eventos dos agentes (sessões, mensagens). Loopback por padrão.',
+  'env.httpHost': 'Host HTTP',
+  'env.httpPort': 'Porta HTTP',
+  'env.token': 'Token dos hooks',
+  'env.tokenDesc':
+      'Protege o endpoint /hook. Opcional em loopback; obrigatório se expor a porta. Ao mudar, atualize também o snippet de hooks nos agentes.',
+  'env.generate': 'Gerar',
+  'env.maint': 'Manutenção e métricas',
+  'env.interval': 'Manutenção a cada (minutos)',
+  'env.intervalDesc': '0 desliga a varredura periódica (decay + dedup de memórias).',
+  'env.metricsLabel': 'Label de métricas (experimento)',
+  'env.save': 'Salvar configurações',
+  'env.saved': 'Configurações salvas no .env. Reinicie o Studio para aplicar.',
+  'env.advanced': 'Avançado: editar o .env manualmente',
+  // backup folder
+  'bk.folder': 'Pasta de backups',
+  'bk.folderDesc':
+      'Onde os backups (manuais e agendados) são gravados. Padrão: Documentos › Oracle AI › backups.',
+  'bk.change': 'Alterar…',
+  'bk.reset': 'Usar padrão',
+  'bk.openFolder': 'Abrir pasta',
+  'bk.subtitle':
+      'Um backup é um arquivo .sql portátil com TODA a memória (embeddings inclusos). Guarde, versione ou leve para outra máquina.',
+  'bk.what': 'O que o backup contém?',
+  'bk.whatDesc':
+      'Todos os produtos, projetos, memórias, regras, skills, sessões e métricas — com snapshot consistente mesmo com agentes trabalhando. A restauração só acontece em banco vazio (nunca sobrescreve).',
 };
 
 const _en = <String, String>{
@@ -413,4 +463,52 @@ const _en = <String, String>{
   'set.envSaved': 'Saved. Restart the Studio (and the MCP) to apply.',
   'set.envMissing': 'No .env connected — create one at the project root.',
   'set.envNotFound': '(not found)',
+  'set.subtitle': 'Connection, daemon, backups and integration — all of Oracle in one place.',
+  'set.langDesc': 'Studio interface language.',
+  'set.daemonStatus': 'Hook receiver status',
+  'set.online': 'Online',
+  'set.offline': 'Off',
+  'set.portBusy': 'Port busy',
+  'env.title': 'Connection & environment (.env)',
+  'env.desc':
+      'These settings apply to the Studio, the agents\' MCP and the daemon. Saving updates the .env file safely (automatic .bak backup, comments preserved). Restart the Studio and agents to apply.',
+  'env.db': 'PostgreSQL database',
+  'env.dbDesc': 'Where the memory lives. Use the database from setup or point elsewhere.',
+  'env.host': 'Host',
+  'env.port': 'Port',
+  'env.user': 'User',
+  'env.password': 'Password',
+  'env.dbName': 'Database name',
+  'env.embed': 'Embeddings (semantic search)',
+  'env.embedDesc':
+      '"local" is offline and free. API providers (Gemini/OpenAI/Voyage) give higher quality — after switching, run re-embed in maintenance.',
+  'env.provider': 'Provider',
+  'env.apiKey': 'Provider API key',
+  'env.server': 'Local server (hooks)',
+  'env.serverDesc':
+      'HTTP endpoint receiving agent events (sessions, messages). Loopback by default.',
+  'env.httpHost': 'HTTP host',
+  'env.httpPort': 'HTTP port',
+  'env.token': 'Hook token',
+  'env.tokenDesc':
+      'Protects the /hook endpoint. Optional on loopback; required if the port is exposed. When changed, update the hooks snippet in your agents too.',
+  'env.generate': 'Generate',
+  'env.maint': 'Maintenance & metrics',
+  'env.interval': 'Maintenance every (minutes)',
+  'env.intervalDesc': '0 disables the periodic sweep (memory decay + dedup).',
+  'env.metricsLabel': 'Metrics label (experiment)',
+  'env.save': 'Save settings',
+  'env.saved': 'Settings saved to .env. Restart the Studio to apply.',
+  'env.advanced': 'Advanced: edit .env manually',
+  'bk.folder': 'Backup folder',
+  'bk.folderDesc':
+      'Where backups (manual and scheduled) are written. Default: Documents › Oracle AI › backups.',
+  'bk.change': 'Change…',
+  'bk.reset': 'Use default',
+  'bk.openFolder': 'Open folder',
+  'bk.subtitle':
+      'A backup is a portable .sql file with ALL the memory (embeddings included). Keep it, version it, or take it to another machine.',
+  'bk.what': 'What does a backup contain?',
+  'bk.whatDesc':
+      'Every product, project, memory, rule, skill, session and metric — with a consistent snapshot even while agents keep working. Restore only happens into an empty database (never overwrites).',
 };

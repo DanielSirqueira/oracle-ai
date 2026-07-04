@@ -152,7 +152,7 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
       RulesPage(project: _selected),
       SkillsPage(project: _selected),
       SessionsPage(project: _selected),
-      BackupPage(connection: widget.connection),
+      BackupPage(connection: widget.connection, daemon: widget.daemon),
       SettingsPage(connection: widget.connection, daemon: widget.daemon),
     ];
 
