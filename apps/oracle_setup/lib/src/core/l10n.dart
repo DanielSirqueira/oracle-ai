@@ -109,6 +109,10 @@ const _pt = <String, String>{
   'db.existingCardDesc':
       'Já tem um PostgreSQL 14+ rodando? Aponte para ele e teste a conexão (a extensão pgvector é criada na migração).',
   'db.ready': 'Pronto ✓',
+  'db.hintPortable':
+      'Para avançar, clique em "Baixar e instalar agora" — o banco é criado sozinho (1 clique).',
+  'db.hintDocker': 'Para avançar, clique em "Subir banco no Docker" e aguarde o contêiner ficar pronto.',
+  'db.hintExisting': 'Para avançar, preencha os dados e clique em "Testar conexão" até ficar verde.',
 };
 
 const _en = <String, String>{
@@ -203,4 +207,8 @@ const _en = <String, String>{
   'db.existingCardDesc':
       'Already run PostgreSQL 14+? Point at it and test the connection (the pgvector extension is created by the migration).',
   'db.ready': 'Ready ✓',
+  'db.hintPortable':
+      'To continue, click "Download and install now" — the database is created for you (1 click).',
+  'db.hintDocker': 'To continue, click "Start database on Docker" and wait for the container.',
+  'db.hintExisting': 'To continue, fill in the details and click "Test connection" until it turns green.',
 };

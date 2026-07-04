@@ -19,6 +19,25 @@ class _SetupWizardState extends State<SetupWizard> {
   final _state = SetupState();
   int _step = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // Pre-probe Docker/existing-DB availability so the cards show live status
+    // the moment the user reaches the database step.
+    _state.detect();
+  }
+
+  /// Why "Avançar" is blocked on the database step — shown next to the button
+  /// so the user always knows the missing action.
+  String? get _blockedHint {
+    if (_step != 1 || _canAdvance) return null;
+    return switch (_state.dbMode) {
+      DbMode.portable => l10n.t('db.hintPortable'),
+      DbMode.docker => l10n.t('db.hintDocker'),
+      DbMode.existing => l10n.t('db.hintExisting'),
+    };
+  }
+
   static const _stepKeys = [
     'step.welcome',
     'step.db',
@@ -123,6 +142,19 @@ class _SetupWizardState extends State<SetupWizard> {
                             child: Text(l10n.t('nav.back')),
                           ),
                         const Spacer(),
+                        if (_blockedHint != null) ...[
+                          const Icon(Icons.info_outline,
+                              size: 16, color: OracleBrand.warning),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _blockedHint!,
+                              style: const TextStyle(
+                                  fontSize: 12, color: OracleBrand.gray400),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                        ],
                         if (_step < _stepKeys.length - 1)
                           FilledButton(
                             onPressed: _canAdvance && !_state.busy
@@ -470,8 +502,10 @@ class _ModeCard extends StatelessWidget {
           color: selected ? OracleBrand.violet.withValues(alpha: 0.16) : OracleBrand.gray900,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? OracleBrand.violetSoft : OracleBrand.gray700,
-            width: 2,
+            // Unselected cards keep a clearly visible Untitled-UI gray-600
+            // border; selection swaps it for the brand violet.
+            color: selected ? OracleBrand.violetSoft : const Color(0xFF475467),
+            width: selected ? 2 : 1.5,
           ),
           boxShadow: selected
               ? [
