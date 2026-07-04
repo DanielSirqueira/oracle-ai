@@ -5,13 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 import 'package:oracle_server/oracle_server.dart' as server;
 
+import '../../core/brand.dart';
 import '../../core/daemon_host.dart';
 import '../../core/fmt.dart';
+import '../../core/l10n.dart';
 import '../../core/oracle_connection.dart';
 import '../../widgets/editor_dialog.dart';
 
-/// Settings: daemon hosting (hooks + maintenance), scheduled backups, agent
-/// integration snippets (MCP + hooks) and the .env editor.
+/// Settings: language, daemon hosting (hooks + maintenance), scheduled
+/// backups, agent integration snippets (MCP + hooks) and the .env editor.
 class SettingsPage extends StatefulWidget {
   final OracleConnection connection;
   final DaemonHost daemon;
@@ -48,8 +50,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final actual = await launchAtStartup.isEnabled();
     if (mounted) {
       setState(() => _autostart = actual);
-      showSnack(context,
-          actual ? 'O Studio iniciará com o Windows.' : 'Autostart desativado.');
+      showSnack(context, actual ? l10n.t('set.autostartOn') : l10n.t('set.autostartOff'));
     }
   }
 
@@ -62,18 +63,18 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveEnv() async {
     final path = widget.connection.envPath;
     if (path == null) {
-      showSnack(context, 'Nenhum .env conectado — crie um na raiz do projeto.');
+      showSnack(context, l10n.t('set.envMissing'));
       return;
     }
     await File(path).writeAsString(_envController.text, flush: true);
     if (!mounted) return;
     setState(() => _envDirty = false);
-    showSnack(context, 'Salvo. Reinicie o Studio (e o MCP) para aplicar.');
+    showSnack(context, l10n.t('set.envSaved'));
   }
 
   void _copy(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
-    showSnack(context, '$label copiado para a área de transferência.');
+    showSnack(context, '$label ${l10n.t('set.copied')}');
   }
 
   @override
@@ -96,8 +97,28 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context, _) => ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text('Configurações', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 16),
+          BrandHeader(
+            l10n.t('set.title'),
+            trailing: Row(children: [
+              const Icon(Icons.translate, size: 18),
+              const SizedBox(width: 8),
+              DropdownButton<String>(
+                value: l10n.code,
+                underline: const SizedBox.shrink(),
+                items: const [
+                  DropdownMenuItem(value: 'pt', child: Text('Português')),
+                  DropdownMenuItem(value: 'en', child: Text('English')),
+                ],
+                onChanged: (v) {
+                  if (v == null) return;
+                  settings.language = v;
+                  settings.save();
+                  l10n.set(v);
+                },
+              ),
+            ]),
+          ),
+          const SizedBox(height: 20),
 
           // ── daemon ──
           Card(
@@ -106,16 +127,13 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Daemon em segundo plano', style: Theme.of(context).textTheme.titleMedium),
+                  Text(l10n.t('set.daemon'), style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text(
-                    'Com isto ligado, o Studio hospeda o receptor de hooks e o agendador de '
-                    'manutenção — o oracle_ai.exe de console (serve-hooks) fica dispensado.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Text(l10n.t('set.daemonExplain'),
+                      style: Theme.of(context).textTheme.bodySmall),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Hospedar hooks + manutenção neste app'),
+                    title: Text(l10n.t('set.hostToggle')),
                     subtitle: Text(daemon.hooksStatus),
                     value: settings.hostHooks,
                     onChanged: (v) {
@@ -125,9 +143,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Iniciar com o Windows'),
-                    subtitle: const Text(
-                        'Abre o Studio (na bandeja) no login — hooks e backups sempre ativos.'),
+                    title: Text(l10n.t('set.autostart')),
+                    subtitle: Text(l10n.t('set.autostartSub')),
                     value: _autostart,
                     onChanged: _setAutostart,
                   ),
@@ -144,16 +161,14 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Backup agendado', style: Theme.of(context).textTheme.titleMedium),
+                  Text(l10n.t('set.schedTitle'),
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text(
-                    'Snapshots .sql com carimbo de data em backups/ (com retenção). O seed '
-                    'para commit/docker continua manual, na aba Backup.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Text(l10n.t('set.schedExplain'),
+                      style: Theme.of(context).textTheme.bodySmall),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Fazer backup automaticamente'),
+                    title: Text(l10n.t('set.schedToggle')),
                     value: settings.backupEnabled,
                     onChanged: (v) {
                       settings.backupEnabled = v;
@@ -161,15 +176,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     },
                   ),
                   Row(children: [
-                    const Text('A cada'),
+                    Text(l10n.t('set.every')),
                     const SizedBox(width: 12),
                     DropdownButton<int>(
                       value: settings.backupEveryHours,
-                      items: const [
-                        DropdownMenuItem(value: 6, child: Text('6 horas')),
-                        DropdownMenuItem(value: 12, child: Text('12 horas')),
-                        DropdownMenuItem(value: 24, child: Text('24 horas')),
-                        DropdownMenuItem(value: 48, child: Text('48 horas')),
+                      items: [
+                        DropdownMenuItem(value: 6, child: Text(l10n.t('set.hours6'))),
+                        DropdownMenuItem(value: 12, child: Text(l10n.t('set.hours12'))),
+                        DropdownMenuItem(value: 24, child: Text(l10n.t('set.hours24'))),
+                        DropdownMenuItem(value: 48, child: Text(l10n.t('set.hours48'))),
                       ],
                       onChanged: (v) {
                         settings.backupEveryHours = v ?? 24;
@@ -177,7 +192,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       },
                     ),
                     const SizedBox(width: 24),
-                    const Text('Manter últimos'),
+                    Text(l10n.t('set.keepLast')),
                     const SizedBox(width: 12),
                     DropdownButton<int>(
                       value: settings.backupKeep,
@@ -201,21 +216,23 @@ class _SettingsPageState extends State<SettingsPage> {
                               height: 14,
                               child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.save_outlined),
-                      label: Text(daemon.backingUp ? 'Executando…' : 'Executar agora'),
+                      label: Text(
+                          daemon.backingUp ? l10n.t('set.runningNow') : l10n.t('set.runNow')),
                     ),
                   ]),
                   if (daemon.lastBackupAt != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        'Último backup: ${fmtDateTime(daemon.lastBackupAt)} — ${daemon.lastBackupInfo}',
+                        '${l10n.t('set.lastBackup')}: ${fmtDateTime(daemon.lastBackupAt)}'
+                        ' — ${daemon.lastBackupInfo}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                   if (daemon.lastBackupError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text('Falha: ${daemon.lastBackupError}',
+                      child: Text('${l10n.t('common.failure')}: ${daemon.lastBackupError}',
                           style: TextStyle(color: Theme.of(context).colorScheme.error)),
                     ),
                 ],
@@ -231,18 +248,18 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Integração de agentes', style: Theme.of(context).textTheme.titleMedium),
+                  Text(l10n.t('set.agents'), style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   _SnippetBlock(
-                    title: '.mcp.json (raiz do projeto do agente)',
+                    title: l10n.t('set.mcpTitle'),
                     snippet: mcpSnippet,
                     onCopy: () => _copy(mcpSnippet, '.mcp.json'),
                   ),
                   const SizedBox(height: 12),
                   _SnippetBlock(
-                    title: 'settings.json do Claude Code (bloco "hooks")',
+                    title: l10n.t('set.hooksTitle'),
                     snippet: hooksSnippet,
-                    onCopy: () => _copy(hooksSnippet, 'Bloco de hooks'),
+                    onCopy: () => _copy(hooksSnippet, '"hooks"'),
                   ),
                 ],
               ),
@@ -260,13 +277,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   Row(children: [
                     Text('.env', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(width: 8),
-                    Text(widget.connection.envPath ?? '(não encontrado)',
+                    Text(widget.connection.envPath ?? l10n.t('set.envNotFound'),
                         style: Theme.of(context).textTheme.bodySmall),
                     const Spacer(),
                     FilledButton.icon(
                       onPressed: _envDirty ? _saveEnv : null,
                       icon: const Icon(Icons.save),
-                      label: const Text('Salvar .env'),
+                      label: Text(l10n.t('set.envSave')),
                     ),
                   ]),
                   const SizedBox(height: 8),
@@ -299,14 +316,18 @@ class _SnippetBlock extends StatelessWidget {
       children: [
         Row(children: [
           Expanded(child: Text(title, style: Theme.of(context).textTheme.labelLarge)),
-          IconButton(tooltip: 'Copiar', onPressed: onCopy, icon: const Icon(Icons.copy, size: 18)),
+          IconButton(
+              tooltip: l10n.t('set.copy'),
+              onPressed: onCopy,
+              icon: const Icon(Icons.copy, size: 18)),
         ]),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            color: OracleBrand.surfaceHigh,
             borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: OracleBrand.violet.withValues(alpha: 0.2)),
           ),
           child: SelectableText(
             snippet,

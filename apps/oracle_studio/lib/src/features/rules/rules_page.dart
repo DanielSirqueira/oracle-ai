@@ -3,6 +3,7 @@ import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 
 import '../../core/fmt.dart';
+import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
 
@@ -58,22 +59,25 @@ class _RulesPageState extends State<RulesPage> {
 
     final saved = await showEditorDialog(
       context,
-      title: original == null ? 'Nova regra (do projeto)' : 'Refinar regra (nova versão)',
+      title: original == null ? l10n.t('rule.newTitle') : l10n.t('rule.editTitle'),
       fields: (context, setState) => [
-        FieldRow('Key (slug estável — mesma key = atualiza)', key, enabled: original == null),
-        FieldRow('Escopo (módulo/pasta/área)', scope),
-        FieldRow('Título', title),
-        FieldRow('Conteúdo', content, maxLines: 10),
-        FieldRow('Tags (separadas por vírgula)', tags),
+        FieldRow(l10n.t('rule.fieldKey'), key, enabled: original == null),
+        FieldRow(l10n.t('rule.fieldScope'), scope),
+        FieldRow(l10n.t('rule.fieldTitle'), title),
+        FieldRow(l10n.t('rule.fieldContent'), content, maxLines: 10),
+        FieldRow(l10n.t('common.tags'), tags),
         Row(children: [
           Expanded(
             child: DropdownButtonFormField<String>(
               initialValue: severity,
-              decoration: const InputDecoration(
-                  labelText: 'Severidade', border: OutlineInputBorder(), isDense: true),
-              items: const [
-                DropdownMenuItem(value: 'required', child: Text('obrigatória')),
-                DropdownMenuItem(value: 'recommended', child: Text('recomendada')),
+              decoration: InputDecoration(
+                  labelText: l10n.t('rule.severity'),
+                  border: const OutlineInputBorder(),
+                  isDense: true),
+              items: [
+                DropdownMenuItem(value: 'required', child: Text(l10n.t('rule.required'))),
+                DropdownMenuItem(
+                    value: 'recommended', child: Text(l10n.t('rule.recommended'))),
               ],
               onChanged: (v) => severity = v ?? severity,
             ),
@@ -82,7 +86,7 @@ class _RulesPageState extends State<RulesPage> {
           Expanded(
             child: StatefulBuilder(
               builder: (context, setSlider) => Row(children: [
-                const Text('Prioridade'),
+                Text(l10n.t('rule.priority')),
                 Expanded(
                   child: Slider(
                     value: priority.toDouble(),
@@ -117,7 +121,7 @@ class _RulesPageState extends State<RulesPage> {
       },
     );
     if (saved == true && mounted) {
-      showSnack(context, original == null ? 'Regra criada.' : 'Regra refinada (nova versão).');
+      showSnack(context, original == null ? l10n.t('rule.created') : l10n.t('rule.refined'));
       _reload();
     }
   }
@@ -127,21 +131,20 @@ class _RulesPageState extends State<RulesPage> {
     if (!mounted) return;
     result.fold(
       (_) {
-        showSnack(context, 'Prioridade ajustada para $priority.');
+        showSnack(context, '${l10n.t('rule.prioritySet')} $priority.');
         _reload();
       },
-      (f) => showSnack(context, 'Falha: ${f.errorMessage}'),
+      (f) => showSnack(context, '${l10n.t('common.failure')}: ${f.errorMessage}'),
     );
   }
 
   Future<void> _retireRule(RuleEntity rule, {required bool hard}) async {
     final ok = await confirmAction(
       context,
-      title: hard ? 'Apagar permanentemente?' : 'Aposentar regra?',
-      message: hard
-          ? 'A regra "${rule.title.value}" será APAGADA para sempre.'
-          : 'A regra "${rule.title.value}" sai do recall, mas é mantida para auditoria.',
-      okLabel: hard ? 'Apagar' : 'Aposentar',
+      title: hard ? l10n.t('rule.deleteQ') : l10n.t('rule.retireQ'),
+      message: '"${rule.title.value}" '
+          '${hard ? l10n.t('rule.deleteMsg') : l10n.t('rule.retireMsg')}',
+      okLabel: hard ? l10n.t('common.delete') : l10n.t('common.retire'),
       destructive: true,
     );
     if (!ok) return;
@@ -150,29 +153,28 @@ class _RulesPageState extends State<RulesPage> {
     if (!mounted) return;
     result.fold(
       (_) {
-        showSnack(context, hard ? 'Regra apagada.' : 'Regra aposentada.');
+        showSnack(context, hard ? l10n.t('rule.deleted') : l10n.t('rule.retired'));
         _reload();
       },
-      (f) => showSnack(context, 'Falha: ${f.errorMessage}'),
+      (f) => showSnack(context, '${l10n.t('common.failure')}: ${f.errorMessage}'),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_future == null) return const Center(child: Text('Selecione um projeto.'));
+    if (_future == null) return Center(child: Text(l10n.t('common.selectProject')));
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
-              Text('Regras do projeto (com herança do produto)',
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text(l10n.t('rule.header'), style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
               FilledButton.icon(
                 onPressed: () => _editRule(),
                 icon: const Icon(Icons.add),
-                label: const Text('Nova regra'),
+                label: Text(l10n.t('rule.new')),
               ),
             ],
           ),
@@ -192,14 +194,16 @@ class _RulesPageState extends State<RulesPage> {
                       size: 20,
                     ),
                     title: Text(r.title.value, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('${r.key} · ${r.scope} · prioridade ${r.priority}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(
+                        '${r.key} · ${r.scope} · ${l10n.t('rule.priority').toLowerCase()} ${r.priority}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     onTap: () => setState(() => _selectedRule = r),
                   );
                 },
               ),
               detail: _selectedRule == null
-                  ? const Center(child: Text('Selecione uma regra.'))
+                  ? Center(child: Text(l10n.t('rule.selectOne')))
                   : _RuleDetail(
                       rule: _selectedRule!,
                       onEdit: () => _editRule(original: _selectedRule),
@@ -234,14 +238,17 @@ class _RuleDetail extends StatelessWidget {
         Row(
           children: [
             Expanded(child: Text(rule.title.value, style: Theme.of(context).textTheme.titleLarge)),
-            IconButton(tooltip: 'Refinar (nova versão)', onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
+            IconButton(
+                tooltip: l10n.t('rule.refine'),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined)),
             PopupMenuButton<String>(
-              tooltip: 'Aposentar',
+              tooltip: l10n.t('common.retire'),
               icon: const Icon(Icons.delete_outline),
               onSelected: (v) => onRetire(v == 'hard'),
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'soft', child: Text('Aposentar (mantém auditoria)')),
-                PopupMenuItem(value: 'hard', child: Text('Apagar permanentemente')),
+              itemBuilder: (context) => [
+                PopupMenuItem(value: 'soft', child: Text(l10n.t('common.retireSoft'))),
+                PopupMenuItem(value: 'hard', child: Text(l10n.t('common.deleteHard'))),
               ],
             ),
           ],
@@ -252,12 +259,17 @@ class _RuleDetail extends StatelessWidget {
           runSpacing: 8,
           children: [
             MetaChip('key: ${rule.key}', icon: Icons.key),
-            MetaChip('escopo: ${rule.scope}', icon: Icons.crop_free),
+            MetaChip('${l10n.t('rule.scopeChip')}: ${rule.scope}', icon: Icons.crop_free),
             MetaChip(
-              rule.severity.code == 'required' ? 'obrigatória' : 'recomendada',
+              rule.severity.code == 'required'
+                  ? l10n.t('rule.required')
+                  : l10n.t('rule.recommended'),
               icon: rule.severity.code == 'required' ? Icons.gavel : Icons.tips_and_updates_outlined,
             ),
-            MetaChip(rule.projectId != null ? 'do projeto' : 'do produto (herdada)',
+            MetaChip(
+                rule.projectId != null
+                    ? l10n.t('rule.fromProject')
+                    : l10n.t('rule.fromProduct'),
                 icon: Icons.account_tree_outlined),
             MetaChip(fmtDateTime(rule.createdAt), icon: Icons.schedule),
             for (final t in rule.tags) MetaChip('#$t'),
@@ -265,7 +277,7 @@ class _RuleDetail extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Row(children: [
-          const Text('Prioridade'),
+          Text(l10n.t('rule.priority')),
           Expanded(
             child: Slider(
               value: rule.priority.toDouble(),
@@ -284,7 +296,7 @@ class _RuleDetail extends StatelessWidget {
                 context: context,
                 builder: (context) => StatefulBuilder(
                   builder: (context, setState) => AlertDialog(
-                    title: const Text('Re-ranquear regra'),
+                    title: Text(l10n.t('rule.rerank')),
                     content: Row(mainAxisSize: MainAxisSize.min, children: [
                       SizedBox(
                         width: 320,
@@ -301,17 +313,17 @@ class _RuleDetail extends StatelessWidget {
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancelar')),
+                          child: Text(l10n.t('common.cancel'))),
                       FilledButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Aplicar')),
+                          child: Text(l10n.t('common.apply'))),
                     ],
                   ),
                 ),
               );
               if (apply == true) onPriority(p);
             },
-            child: const Text('Ajustar'),
+            child: Text(l10n.t('rule.adjust')),
           ),
         ]),
         const Divider(height: 32),

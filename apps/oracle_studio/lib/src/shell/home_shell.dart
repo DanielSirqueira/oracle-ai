@@ -4,7 +4,9 @@ import 'package:oracle_memory/oracle_memory.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/brand.dart';
 import '../core/daemon_host.dart';
+import '../core/l10n.dart';
 import '../core/oracle_connection.dart';
 import '../features/backup/backup_page.dart';
 import '../features/dashboard/dashboard_page.dart';
@@ -46,12 +48,12 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
   Future<void> _initTray() async {
     await windowManager.setPreventClose(true);
     await trayManager.setIcon('assets/tray_icon.ico');
-    await trayManager.setToolTip('Oracle Studio — banco de memória');
+    await trayManager.setToolTip(l10n.t('tray.tooltip'));
     await trayManager.setContextMenu(Menu(items: [
-      MenuItem(key: 'open', label: 'Abrir o Oracle Studio'),
-      MenuItem(key: 'backup', label: 'Fazer backup agora'),
+      MenuItem(key: 'open', label: l10n.t('tray.open')),
+      MenuItem(key: 'backup', label: l10n.t('tray.backup')),
       MenuItem.separator(),
-      MenuItem(key: 'quit', label: 'Encerrar'),
+      MenuItem(key: 'quit', label: l10n.t('tray.quit')),
     ]));
   }
 
@@ -106,29 +108,43 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
     super.dispose();
   }
 
-  static const _destinations = [
-    NavigationRailDestination(
-        icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Visão geral')),
-    NavigationRailDestination(
-        icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: Text('Buscar')),
-    NavigationRailDestination(
-        icon: Icon(Icons.psychology_outlined), selectedIcon: Icon(Icons.psychology), label: Text('Memórias')),
-    NavigationRailDestination(
-        icon: Icon(Icons.rule_outlined), selectedIcon: Icon(Icons.rule), label: Text('Regras')),
-    NavigationRailDestination(
-        icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: Text('Skills')),
-    NavigationRailDestination(
-        icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: Text('Sessões')),
-    NavigationRailDestination(
-        icon: Icon(Icons.save_outlined), selectedIcon: Icon(Icons.save), label: Text('Backup')),
-    NavigationRailDestination(
-        icon: Icon(Icons.settings_outlined),
-        selectedIcon: Icon(Icons.settings),
-        label: Text('Config')),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final destinations = [
+      NavigationRailDestination(
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: Text(l10n.t('nav.dashboard'))),
+      NavigationRailDestination(
+          icon: const Icon(Icons.search_outlined),
+          selectedIcon: const Icon(Icons.search),
+          label: Text(l10n.t('nav.search'))),
+      NavigationRailDestination(
+          icon: const Icon(Icons.psychology_outlined),
+          selectedIcon: const Icon(Icons.psychology),
+          label: Text(l10n.t('nav.memories'))),
+      NavigationRailDestination(
+          icon: const Icon(Icons.rule_outlined),
+          selectedIcon: const Icon(Icons.rule),
+          label: Text(l10n.t('nav.rules'))),
+      NavigationRailDestination(
+          icon: const Icon(Icons.school_outlined),
+          selectedIcon: const Icon(Icons.school),
+          label: Text(l10n.t('nav.skills'))),
+      NavigationRailDestination(
+          icon: const Icon(Icons.forum_outlined),
+          selectedIcon: const Icon(Icons.forum),
+          label: Text(l10n.t('nav.sessions'))),
+      NavigationRailDestination(
+          icon: const Icon(Icons.save_outlined),
+          selectedIcon: const Icon(Icons.save),
+          label: Text(l10n.t('nav.backup'))),
+      NavigationRailDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: Text(l10n.t('nav.settings'))),
+    ];
+
     final pages = <Widget>[
       DashboardPage(connection: widget.connection),
       SearchPage(project: _selected),
@@ -148,10 +164,10 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
             onDestinationSelected: (i) => setState(() => _index = i),
             labelType: NavigationRailLabelType.all,
             leading: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Icon(Icons.auto_awesome, size: 28),
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: OracleLogo(size: 40),
             ),
-            destinations: _destinations,
+            destinations: destinations,
           ),
           const VerticalDivider(width: 1),
           Expanded(
@@ -181,19 +197,27 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            OracleBrand.violet.withValues(alpha: 0.10),
+            OracleBrand.blue.withValues(alpha: 0.06),
+          ],
+        ),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          Text('Oracle Studio', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(width: 24),
+          const GradientTitle('Oracle Studio', style: TextStyle(fontSize: 18)),
+          const SizedBox(width: 28),
           const Icon(Icons.folder_outlined, size: 18),
           const SizedBox(width: 8),
           ValueListenableBuilder(
             valueListenable: selected,
             builder: (context, value, _) => DropdownButton<ProjectEntity>(
               value: value,
-              hint: const Text('Projeto'),
+              hint: Text(l10n.t('shell.project')),
               underline: const SizedBox.shrink(),
               items: [
                 for (final p in projects)
@@ -204,11 +228,17 @@ class _TopBar extends StatelessWidget {
           ),
           const Spacer(),
           Tooltip(
-            message: envPath == null ? 'Sem .env (defaults)' : envPath!,
+            message: envPath ?? l10n.t('shell.noEnvTip'),
             child: Row(children: [
-              const Icon(Icons.check_circle, size: 16, color: Colors.greenAccent),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                    color: Color(0xFF4ADE80), shape: BoxShape.circle),
+              ),
               const SizedBox(width: 6),
-              Text('Conectado', style: Theme.of(context).textTheme.bodySmall),
+              Text(l10n.t('shell.connected'),
+                  style: Theme.of(context).textTheme.bodySmall),
             ]),
           ),
         ],

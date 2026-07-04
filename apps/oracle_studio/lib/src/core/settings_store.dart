@@ -9,12 +9,14 @@ class SettingsStore {
   bool backupEnabled;
   int backupEveryHours;
   int backupKeep;
+  String language;
 
   SettingsStore({
     this.hostHooks = true,
     this.backupEnabled = false,
     this.backupEveryHours = 24,
     this.backupKeep = 7,
+    this.language = 'pt',
   });
 
   static String _path() {
@@ -34,6 +36,7 @@ class SettingsStore {
         backupEnabled: json['backupEnabled'] as bool? ?? false,
         backupEveryHours: json['backupEveryHours'] as int? ?? 24,
         backupKeep: json['backupKeep'] as int? ?? 7,
+        language: json['language'] as String? ?? 'pt',
       );
     } catch (_) {
       return SettingsStore(); // corrupt settings never brick the app
@@ -48,6 +51,7 @@ class SettingsStore {
       'backupEnabled': backupEnabled,
       'backupEveryHours': backupEveryHours,
       'backupKeep': backupKeep,
+      'language': language,
     }));
   }
 }

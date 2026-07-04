@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'core/brand.dart';
 import 'core/daemon_host.dart';
+import 'core/l10n.dart';
 import 'core/oracle_connection.dart';
 import 'core/settings_store.dart';
 import 'shell/home_shell.dart';
 
-/// Root widget: dark "studio" theme + the connection gate that leads to the
-/// shell once the database is reachable.
+/// Root widget: brand theme + the connection gate that leads to the shell once
+/// the database is reachable. Rebuilds on language change ([l10n]).
 class OracleStudioApp extends StatefulWidget {
   const OracleStudioApp({super.key});
 
@@ -22,27 +24,21 @@ class _OracleStudioAppState extends State<OracleStudioApp> {
   void initState() {
     super.initState();
     // The daemon side self-starts once the connection is up (per settings).
-    _daemon = DaemonHost(connection: _connection, settings: SettingsStore.load());
+    final settings = SettingsStore.load();
+    l10n.code = settings.language;
+    _daemon = DaemonHost(connection: _connection, settings: settings);
     _connection.connect();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Oracle Studio',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF7C6CF0),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        visualDensity: VisualDensity.comfortable,
-      ),
-      home: AnimatedBuilder(
-        animation: _connection,
-        builder: (context, _) => switch (_connection.status) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_connection, l10n]),
+      builder: (context, _) => MaterialApp(
+        title: 'Oracle Studio',
+        debugShowCheckedModeBanner: false,
+        theme: OracleBrand.theme(),
+        home: switch (_connection.status) {
           OracleConnectionStatus.connected =>
             HomeShell(connection: _connection, daemon: _daemon),
           OracleConnectionStatus.error => _ErrorScreen(connection: _connection),
@@ -58,14 +54,19 @@ class _ConnectingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Conectando ao banco de memória…'),
+            const OracleLogo(size: 96),
+            const SizedBox(height: 24),
+            const SizedBox(
+              width: 160,
+              child: LinearProgressIndicator(minHeight: 3),
+            ),
+            const SizedBox(height: 16),
+            Text(l10n.t('app.connecting')),
           ],
         ),
       ),
@@ -87,28 +88,24 @@ class _ErrorScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.cloud_off, size: 48),
+              const OracleLogo(size: 64),
               const SizedBox(height: 16),
-              Text('Não foi possível conectar',
-                  style: Theme.of(context).textTheme.headlineSmall),
+              GradientTitle(l10n.t('app.connectFailTitle')),
               const SizedBox(height: 8),
-              Text(
-                connection.error ?? 'Erro desconhecido',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text(connection.error ?? '—',
+                  style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 8),
               Text(
                 connection.envPath == null
-                    ? 'Nenhum .env encontrado — usando defaults (localhost:5432). '
-                        'Defina ORACLE_ENV_PATH ou coloque um .env na raiz do projeto.'
-                    : 'Configuração: ${connection.envPath}',
+                    ? l10n.t('app.noEnv')
+                    : '${l10n.t('app.config')}: ${connection.envPath}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: connection.connect,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Tentar novamente'),
+                label: Text(l10n.t('app.retry')),
               ),
             ],
           ),

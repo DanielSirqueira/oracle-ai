@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_server/oracle_server.dart';
 
+import 'core/l10n.dart';
+
 enum DbMode { existing, docker, portable }
 
 /// The wizard's brain: holds every choice and performs the installation using
@@ -94,17 +96,17 @@ class SetupState extends ChangeNotifier {
     final bundled = File('$exeDir${Platform.pathSeparator}payload'
         '${Platform.pathSeparator}$fileName');
     if (bundled.existsSync()) {
-      _log('Usando payload embutido: $fileName');
+      _log('${l10n.t('log.payload')}: $fileName');
       return bundled.path;
     }
     final dest = File('$installBase${Platform.pathSeparator}downloads'
         '${Platform.pathSeparator}$fileName');
     if (dest.existsSync() && dest.lengthSync() > 0) {
-      _log('Já baixado: $fileName');
+      _log('${l10n.t('log.cached')}: $fileName');
       return dest.path;
     }
     await dest.parent.create(recursive: true);
-    _log('Baixando $fileName…');
+    _log('${l10n.t('log.downloading')} $fileName…');
     final client = HttpClient();
     try {
       var request = await client.getUrl(Uri.parse(url));
@@ -130,7 +132,8 @@ class SetupState extends ChangeNotifier {
         }
       }
       await sink.close();
-      _log('Baixado: $fileName (${(received / (1024 * 1024)).toStringAsFixed(0)} MB)');
+      _log('${l10n.t('log.downloaded')}: $fileName '
+          '(${(received / (1024 * 1024)).toStringAsFixed(0)} MB)');
       return dest.path;
     } finally {
       client.close();
@@ -161,10 +164,10 @@ class SetupState extends ChangeNotifier {
       dbUser = 'postgres';
       dbPassword = password;
       portableReady = true;
-      _log('Banco local pronto (sem Docker) em localhost:${result.port}.');
+      _log('${l10n.t('log.dbReady')} localhost:${result.port}.');
     } catch (e) {
       error = '$e';
-      _log('FALHA: $e');
+      _log('${l10n.t('log.fail')}: $e');
     } finally {
       busy = false;
       notifyListeners();
@@ -218,15 +221,15 @@ class SetupState extends ChangeNotifier {
       if (envFile.existsSync()) {
         final backup = '${envFile.path}.bak';
         await envFile.copy(backup);
-        _log('.env existente preservado em $backup');
+        _log('${l10n.t('log.envKept')} $backup');
       }
       await envFile.writeAsString(buildEnv(), flush: true);
-      _log('.env gravado em ${envFile.path}');
+      _log('${l10n.t('log.envWritten')} ${envFile.path}');
 
-      _log('Criando/migrando o banco…');
+      _log(l10n.t('log.migrating'));
       final env = loadEnv(path: envFile.path);
       database = await Bootstrap.fromEnv(env).start(ensureDatabase: true);
-      _log('Migrations aplicadas.');
+      _log(l10n.t('log.migrated'));
 
       if (restoreSeed) {
         final seed = File('${envFile.parent.path}${Platform.pathSeparator}backups'
@@ -234,17 +237,17 @@ class SetupState extends ChangeNotifier {
         if (seed.existsSync()) {
           final report = await DbBackupService(database).restore(seed.path);
           _log(report.restored
-              ? 'Seed restaurado: ${report.rows} linhas.'
-              : 'Seed não restaurado (${report.reason}).');
+              ? '${l10n.t('log.seedRestored')}: ${report.rows} ${l10n.t('log.rows')}.'
+              : '${l10n.t('log.seedSkipped')} (${report.reason}).');
         } else {
-          _log('Nenhum seed em backups/oracle_seed.sql — pulado.');
+          _log(l10n.t('log.seedMissing'));
         }
       }
       installed = true;
-      _log('Instalação concluída.');
+      _log(l10n.t('log.done'));
     } catch (e) {
       error = e is SystemFailure ? e.errorMessage : '$e';
-      _log('FALHA: $error');
+      _log('${l10n.t('log.fail')}: $error');
     } finally {
       await database?.dispose();
       busy = false;

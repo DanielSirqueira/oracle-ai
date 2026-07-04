@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 
+import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 
 class _GlobalResults {
@@ -69,7 +70,8 @@ class _SearchPageState extends State<SearchPage> {
           child: SingleChildScrollView(child: SelectableText(body)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: Text(l10n.t('common.close'))),
         ],
       ),
     );
@@ -84,10 +86,10 @@ class _SearchPageState extends State<SearchPage> {
           child: TextField(
             controller: _query,
             autofocus: true,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Buscar em todo o banco de memória (memórias, regras e skills)…',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              hintText: l10n.t('search.hint'),
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
             onSubmitted: (_) => _search(),
@@ -95,17 +97,17 @@ class _SearchPageState extends State<SearchPage> {
         ),
         Expanded(
           child: _future == null
-              ? const Center(child: Text('Digite e pressione Enter para buscar em tudo.'))
+              ? Center(child: Text(l10n.t('search.prompt')))
               : AsyncView<_GlobalResults>(
                   future: _future!,
                   builder: (context, data) => data.isEmpty
-                      ? const Center(child: Text('Nada encontrado.'))
+                      ? Center(child: Text(l10n.t('search.empty')))
                       : ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
                             if (data.memories.isNotEmpty) ...[
-                              _SectionHeader('Memórias', Icons.psychology_outlined,
-                                  data.memories.length),
+                              _SectionHeader(l10n.t('search.memories'),
+                                  Icons.psychology_outlined, data.memories.length),
                               for (final h in data.memories)
                                 _HitTile(
                                   icon: Icons.psychology_outlined,
@@ -118,7 +120,8 @@ class _SearchPageState extends State<SearchPage> {
                               const SizedBox(height: 16),
                             ],
                             if (data.rules.isNotEmpty) ...[
-                              _SectionHeader('Regras', Icons.rule_outlined, data.rules.length),
+                              _SectionHeader(
+                                  l10n.t('search.rules'), Icons.rule_outlined, data.rules.length),
                               for (final h in data.rules)
                                 _HitTile(
                                   icon: Icons.rule_outlined,
@@ -131,7 +134,8 @@ class _SearchPageState extends State<SearchPage> {
                               const SizedBox(height: 16),
                             ],
                             if (data.skills.isNotEmpty) ...[
-                              _SectionHeader('Skills', Icons.school_outlined, data.skills.length),
+                              _SectionHeader(
+                                  l10n.t('search.skills'), Icons.school_outlined, data.skills.length),
                               for (final h in data.skills)
                                 _HitTile(
                                   icon: Icons.school_outlined,

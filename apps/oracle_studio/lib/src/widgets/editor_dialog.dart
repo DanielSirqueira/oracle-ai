@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../core/l10n.dart';
+
 /// Shared building blocks for the curation dialogs.
 
 Future<bool> confirmAction(
   BuildContext context, {
   required String title,
   required String message,
-  String okLabel = 'Confirmar',
+  String? okLabel,
   bool destructive = false,
 }) async {
   final result = await showDialog<bool>(
@@ -15,7 +17,9 @@ Future<bool> confirmAction(
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.t('common.cancel'))),
         FilledButton(
           style: destructive
               ? FilledButton.styleFrom(
@@ -24,7 +28,7 @@ Future<bool> confirmAction(
                 )
               : null,
           onPressed: () => Navigator.pop(context, true),
-          child: Text(okLabel),
+          child: Text(okLabel ?? l10n.t('common.confirm')),
         ),
       ],
     ),
@@ -110,7 +114,7 @@ Future<bool?> showEditorDialog(
           actions: [
             TextButton(
                 onPressed: saving ? null : () => Navigator.pop(context, false),
-                child: const Text('Cancelar')),
+                child: Text(l10n.t('common.cancel'))),
             FilledButton(
               onPressed: saving
                   ? null
@@ -126,7 +130,7 @@ Future<bool?> showEditorDialog(
                         });
                       }
                     },
-              child: Text(saving ? 'Salvando…' : 'Salvar'),
+              child: Text(saving ? l10n.t('common.saving') : l10n.t('common.save')),
             ),
           ],
         ),

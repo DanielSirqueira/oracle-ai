@@ -3,6 +3,7 @@ import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 
 import '../../core/fmt.dart';
+import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 
 /// Capture browser: sessions → user demands (requests) → agent work (messages).
@@ -70,7 +71,7 @@ class _SessionsPageState extends State<SessionsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_sessions == null) return const Center(child: Text('Selecione um projeto.'));
+    if (_sessions == null) return Center(child: Text(l10n.t('common.selectProject')));
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -100,7 +101,7 @@ class _SessionsPageState extends State<SessionsPage> {
         Expanded(
           flex: 3,
           child: _requests == null
-              ? const Center(child: Text('Selecione uma sessão.'))
+              ? Center(child: Text(l10n.t('sess.selectSession')))
               : AsyncView<List<RequestEntity>>(
                   future: _requests!,
                   builder: (context, requests) => ListView.builder(
@@ -124,7 +125,7 @@ class _SessionsPageState extends State<SessionsPage> {
         Expanded(
           flex: 4,
           child: _messages == null
-              ? const Center(child: Text('Selecione uma demanda.'))
+              ? Center(child: Text(l10n.t('sess.selectRequest')))
               : AsyncView<List<MessageEntity>>(
                   future: _messages!,
                   builder: (context, messages) => ListView.builder(

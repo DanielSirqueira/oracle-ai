@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:oracle_server/oracle_server.dart';
 
+import '../../core/brand.dart';
 import '../../core/fmt.dart';
+import '../../core/l10n.dart';
 import '../../core/oracle_connection.dart';
 
-/// Backup control: run a portable data-seed backup now. (Scheduling arrives in
-/// Phase 3, when the Studio hosts the daemon.)
+/// Backup control: run a portable data-seed backup now. Scheduling lives in
+/// Settings (the Studio's background daemon runs it).
 class BackupPage extends StatefulWidget {
   final OracleConnection connection;
   const BackupPage({super.key, required this.connection});
@@ -45,14 +47,9 @@ class _BackupPageState extends State<BackupPage> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('Backup do banco de memória', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Text(
-          'Gera um seed .sql portátil com TODOS os dados (embeddings inclusos, snapshot '
-          'consistente). Restaure em um banco vazio com `oracle_ai restore-db`, ou deixe o '
-          '`docker compose up` restaurar automaticamente em um volume novo.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
+        BrandHeader(l10n.t('bk.title')),
+        const SizedBox(height: 12),
+        Text(l10n.t('bk.explain'), style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 16),
         Card(
           child: Padding(
@@ -64,7 +61,7 @@ class _BackupPageState extends State<BackupPage> {
                   children: [
                     const Icon(Icons.description_outlined, size: 18),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('Destino: $_defaultPath')),
+                    Expanded(child: Text('${l10n.t('bk.target')}: $_defaultPath')),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -74,11 +71,11 @@ class _BackupPageState extends State<BackupPage> {
                       ? const SizedBox(
                           width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.save),
-                  label: Text(_running ? 'Gerando backup…' : 'Fazer backup agora'),
+                  label: Text(_running ? l10n.t('bk.running') : l10n.t('bk.run')),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text('Falha: $_error',
+                  Text('${l10n.t('common.failure')}: $_error',
                       style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ],
               ],
@@ -94,12 +91,13 @@ class _BackupPageState extends State<BackupPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    const Icon(Icons.check_circle, color: Colors.greenAccent, size: 18),
+                    const Icon(Icons.check_circle, color: Color(0xFF4ADE80), size: 18),
                     const SizedBox(width: 8),
-                    Text('Backup concluído', style: Theme.of(context).textTheme.titleMedium),
+                    Text(l10n.t('bk.done'), style: Theme.of(context).textTheme.titleMedium),
                   ]),
                   const SizedBox(height: 8),
-                  Text('${_lastReport!.rows} linhas · ${fmtBytes(_lastReport!.bytes)}'),
+                  Text('${_lastReport!.rows} ${l10n.t('bk.rows')} · '
+                      '${fmtBytes(_lastReport!.bytes)}'),
                   Text(_lastReport!.path, style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 12),
                   Wrap(
@@ -119,11 +117,7 @@ class _BackupPageState extends State<BackupPage> {
           ),
         ],
         const SizedBox(height: 16),
-        Text(
-          'Agendamento de backups (intervalo/diário) chega na Fase 3, quando o Studio '
-          'passa a hospedar o daemon em segundo plano.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        Text(l10n.t('bk.scheduleNote'), style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }

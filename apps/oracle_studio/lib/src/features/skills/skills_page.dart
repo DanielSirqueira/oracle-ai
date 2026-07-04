@@ -4,6 +4,7 @@ import 'package:oracle_memory/oracle_memory.dart';
 import 'package:oracle_server/oracle_server.dart';
 
 import '../../core/fmt.dart';
+import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
 
@@ -57,29 +58,28 @@ class _SkillsPageState extends State<SkillsPage> {
     final saved = await showEditorDialog(
       context,
       width: 760,
-      title: original == null ? 'Nova skill' : 'Editar skill (nova versão)',
+      title: original == null ? l10n.t('skill.newTitle') : l10n.t('skill.editTitle'),
       fields: (context, setState) => [
-        FieldRow('Key (slug estável, kebab-case — vira o nome da pasta)', key,
-            enabled: original == null),
-        FieldRow('Nome', name),
-        FieldRow('Descrição (o gatilho do recall: o que faz + quando usar)', description,
-            maxLines: 3),
-        FieldRow('Conteúdo (markdown, estilo SKILL.md)', content, maxLines: 14),
-        FieldRow('Tags (separadas por vírgula)', tags),
+        FieldRow(l10n.t('skill.fieldKey'), key, enabled: original == null),
+        FieldRow(l10n.t('skill.fieldName'), name),
+        FieldRow(l10n.t('skill.fieldDesc'), description, maxLines: 3),
+        FieldRow(l10n.t('skill.fieldContent'), content, maxLines: 14),
+        FieldRow(l10n.t('common.tags'), tags),
         if (original == null)
           DropdownButtonFormField<bool>(
             initialValue: scopeToProject,
-            decoration: const InputDecoration(
-                labelText: 'Escopo', border: OutlineInputBorder(), isDense: true),
+            decoration: InputDecoration(
+                labelText: l10n.t('skill.scope'),
+                border: const OutlineInputBorder(),
+                isDense: true),
             items: [
-              const DropdownMenuItem(
-                  value: false, child: Text('Global (todos os projetos e agentes)')),
+              DropdownMenuItem(value: false, child: Text(l10n.t('skill.scopeGlobal'))),
               DropdownMenuItem(
                 value: true,
                 enabled: project != null,
                 child: Text(project == null
-                    ? 'Deste projeto (selecione um projeto)'
-                    : 'Deste projeto (${project.name.value})'),
+                    ? l10n.t('skill.scopeSelectProject')
+                    : '${l10n.t('skill.scopeProject')} (${project.name.value})'),
               ),
             ],
             onChanged: (v) => scopeToProject = v ?? scopeToProject,
@@ -101,7 +101,7 @@ class _SkillsPageState extends State<SkillsPage> {
       },
     );
     if (saved == true && mounted) {
-      showSnack(context, original == null ? 'Skill criada.' : 'Skill atualizada (nova versão).');
+      showSnack(context, original == null ? l10n.t('skill.created') : l10n.t('skill.updated'));
       _reload();
     }
   }
@@ -109,11 +109,10 @@ class _SkillsPageState extends State<SkillsPage> {
   Future<void> _retireSkill(SkillEntity skill, {required bool hard}) async {
     final ok = await confirmAction(
       context,
-      title: hard ? 'Apagar permanentemente?' : 'Aposentar skill?',
-      message: hard
-          ? 'A skill "${skill.name.value}" será APAGADA para sempre.'
-          : 'A skill "${skill.name.value}" sai da biblioteca, mas é mantida para auditoria.',
-      okLabel: hard ? 'Apagar' : 'Aposentar',
+      title: hard ? l10n.t('skill.deleteQ') : l10n.t('skill.retireQ'),
+      message: '"${skill.name.value}" '
+          '${hard ? l10n.t('skill.deleteMsg') : l10n.t('skill.retireMsg')}',
+      okLabel: hard ? l10n.t('common.delete') : l10n.t('common.retire'),
       destructive: true,
     );
     if (!ok) return;
@@ -122,10 +121,10 @@ class _SkillsPageState extends State<SkillsPage> {
     if (!mounted) return;
     result.fold(
       (_) {
-        showSnack(context, hard ? 'Skill apagada.' : 'Skill aposentada.');
+        showSnack(context, hard ? l10n.t('skill.deleted') : l10n.t('skill.retired'));
         _reload();
       },
-      (f) => showSnack(context, 'Falha: ${f.errorMessage}'),
+      (f) => showSnack(context, '${l10n.t('common.failure')}: ${f.errorMessage}'),
     );
   }
 
@@ -137,10 +136,11 @@ class _SkillsPageState extends State<SkillsPage> {
       final report = await const SkillSyncService().sync();
       if (mounted) {
         showSnack(context,
-            'Sincronizado: ${report.synced} skill(s) → ${report.dir} (${report.pruned} removidas).');
+            '${l10n.t('skill.synced')}: ${report.synced} skill(s) → ${report.dir} '
+            '(${report.pruned} ${l10n.t('skill.pruned')}).');
       }
     } catch (e) {
-      if (mounted) showSnack(context, 'Falha no sync: $e');
+      if (mounted) showSnack(context, '${l10n.t('skill.syncFail')}: $e');
     } finally {
       if (mounted) setState(() => _syncing = false);
     }
@@ -154,12 +154,10 @@ class _SkillsPageState extends State<SkillsPage> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
-              Text('Biblioteca central de skills',
-                  style: Theme.of(context).textTheme.titleMedium),
+              Text(l10n.t('skill.header'), style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(width: 12),
               Tooltip(
-                message: 'Uma única fonte para todos os agentes (MCP). "Sincronizar" materializa\n'
-                    'em ~/.claude/skills para descoberta nativa do Claude Code.',
+                message: l10n.t('skill.headerTip'),
                 child: Icon(Icons.info_outline,
                     size: 18, color: Theme.of(context).colorScheme.outline),
               ),
@@ -170,16 +168,19 @@ class _SkillsPageState extends State<SkillsPage> {
                     ? const SizedBox(
                         width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.sync),
-                label: Text(_syncing ? 'Sincronizando…' : 'Sincronizar p/ disco'),
+                label: Text(_syncing ? l10n.t('skill.syncing') : l10n.t('skill.sync')),
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: () => _editSkill(),
                 icon: const Icon(Icons.add),
-                label: const Text('Nova skill'),
+                label: Text(l10n.t('skill.new')),
               ),
               const SizedBox(width: 8),
-              IconButton(tooltip: 'Atualizar', onPressed: _reload, icon: const Icon(Icons.refresh)),
+              IconButton(
+                  tooltip: l10n.t('common.refresh'),
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh)),
             ],
           ),
         ),
@@ -187,21 +188,23 @@ class _SkillsPageState extends State<SkillsPage> {
           child: AsyncView<List<SkillEntity>>(
             future: _future ?? Future.value(const []),
             builder: (context, skills) => skills.isEmpty
-                ? const Center(
-                    child: Text(
-                        'Nenhuma skill ainda — crie aqui ou deixe os agentes salvarem com oracle_skill_save.'))
+                ? Center(child: Text(l10n.t('skill.empty')))
                 : MasterDetail(
                     master: ListView.builder(
                       itemCount: skills.length,
                       itemBuilder: (context, i) {
                         final s = skills[i];
                         final scope = s.projectId != null
-                            ? 'projeto'
-                            : (s.productId != null ? 'produto' : 'global');
+                            ? l10n.t('skill.project')
+                            : (s.productId != null
+                                ? l10n.t('skill.product')
+                                : l10n.t('skill.global'));
                         return ListTile(
                           selected: _selectedSkill?.id.value == s.id.value,
                           leading: Icon(
-                            scope == 'global' ? Icons.public : Icons.folder_outlined,
+                            s.projectId == null && s.productId == null
+                                ? Icons.public
+                                : Icons.folder_outlined,
                             size: 20,
                           ),
                           title: Text(s.name.value, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -212,7 +215,7 @@ class _SkillsPageState extends State<SkillsPage> {
                       },
                     ),
                     detail: _selectedSkill == null
-                        ? const Center(child: Text('Selecione uma skill.'))
+                        ? Center(child: Text(l10n.t('skill.selectOne')))
                         : _SkillDetail(
                             skill: _selectedSkill!,
                             onEdit: () => _editSkill(original: _selectedSkill),
@@ -234,23 +237,27 @@ class _SkillDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isGlobal = skill.projectId == null && skill.productId == null;
     final scope = skill.projectId != null
-        ? 'projeto'
-        : (skill.productId != null ? 'produto' : 'global');
+        ? l10n.t('skill.project')
+        : (skill.productId != null ? l10n.t('skill.product') : l10n.t('skill.global'));
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         Row(
           children: [
             Expanded(child: Text(skill.name.value, style: Theme.of(context).textTheme.titleLarge)),
-            IconButton(tooltip: 'Editar (nova versão)', onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
+            IconButton(
+                tooltip: l10n.t('common.editVersion'),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined)),
             PopupMenuButton<String>(
-              tooltip: 'Aposentar',
+              tooltip: l10n.t('common.retire'),
               icon: const Icon(Icons.delete_outline),
               onSelected: (v) => onRetire(v == 'hard'),
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'soft', child: Text('Aposentar (mantém auditoria)')),
-                PopupMenuItem(value: 'hard', child: Text('Apagar permanentemente')),
+              itemBuilder: (context) => [
+                PopupMenuItem(value: 'soft', child: Text(l10n.t('common.retireSoft'))),
+                PopupMenuItem(value: 'hard', child: Text(l10n.t('common.deleteHard'))),
               ],
             ),
           ],
@@ -263,7 +270,7 @@ class _SkillDetail extends StatelessWidget {
           runSpacing: 8,
           children: [
             MetaChip('key: ${skill.key}', icon: Icons.key),
-            MetaChip(scope, icon: scope == 'global' ? Icons.public : Icons.folder_outlined),
+            MetaChip(scope, icon: isGlobal ? Icons.public : Icons.folder_outlined),
             MetaChip(fmtDateTime(skill.createdAt), icon: Icons.schedule),
             for (final t in skill.tags) MetaChip('#$t'),
           ],

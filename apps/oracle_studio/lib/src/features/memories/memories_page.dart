@@ -3,6 +3,7 @@ import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 
 import '../../core/fmt.dart';
+import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
 
@@ -69,23 +70,25 @@ class _MemoriesPageState extends State<MemoriesPage> {
 
     final saved = await showEditorDialog(
       context,
-      title: original == null ? 'Nova memória' : 'Editar memória (nova versão)',
+      title: original == null ? l10n.t('mem.newTitle') : l10n.t('mem.editTitle'),
       fields: (context, setState) => [
-        FieldRow('Título', title),
-        FieldRow('Conteúdo', body, maxLines: 10),
-        FieldRow('Key (opcional — identidade estável p/ atualizações)', key),
-        FieldRow('Tags (separadas por vírgula)', tags),
+        FieldRow(l10n.t('mem.fieldTitle'), title),
+        FieldRow(l10n.t('mem.fieldBody'), body, maxLines: 10),
+        FieldRow(l10n.t('mem.fieldKey'), key),
+        FieldRow(l10n.t('common.tags'), tags),
         Row(children: [
           Expanded(
             child: DropdownButtonFormField<String>(
               initialValue: kind,
-              decoration: const InputDecoration(
-                  labelText: 'Tipo', border: OutlineInputBorder(), isDense: true),
+              decoration: InputDecoration(
+                  labelText: l10n.t('mem.kind'),
+                  border: const OutlineInputBorder(),
+                  isDense: true),
               items: const [
-                DropdownMenuItem(value: 'fact', child: Text('fato')),
-                DropdownMenuItem(value: 'decision', child: Text('decisão')),
+                DropdownMenuItem(value: 'fact', child: Text('fact')),
+                DropdownMenuItem(value: 'decision', child: Text('decision')),
                 DropdownMenuItem(value: 'gotcha', child: Text('gotcha')),
-                DropdownMenuItem(value: 'rule', child: Text('regra')),
+                DropdownMenuItem(value: 'rule', child: Text('rule')),
               ],
               onChanged: (v) => kind = v ?? kind,
             ),
@@ -94,11 +97,13 @@ class _MemoriesPageState extends State<MemoriesPage> {
           Expanded(
             child: DropdownButtonFormField<String>(
               initialValue: tier,
-              decoration: const InputDecoration(
-                  labelText: 'Camada', border: OutlineInputBorder(), isDense: true),
+              decoration: InputDecoration(
+                  labelText: l10n.t('mem.tier'),
+                  border: const OutlineInputBorder(),
+                  isDense: true),
               items: const [
-                DropdownMenuItem(value: 'semantic', child: Text('semântica')),
-                DropdownMenuItem(value: 'episodic', child: Text('episódica')),
+                DropdownMenuItem(value: 'semantic', child: Text('semantic')),
+                DropdownMenuItem(value: 'episodic', child: Text('episodic')),
                 DropdownMenuItem(value: 'procedural', child: Text('procedural')),
               ],
               onChanged: (v) => tier = v ?? tier,
@@ -108,7 +113,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
         const SizedBox(height: 12),
         StatefulBuilder(
           builder: (context, setSlider) => Row(children: [
-            const Text('Importância'),
+            Text(l10n.t('mem.importance')),
             Expanded(
               child: Slider(
                 value: importance,
@@ -142,7 +147,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
       },
     );
     if (saved == true && mounted) {
-      showSnack(context, original == null ? 'Memória criada.' : 'Nova versão salva.');
+      showSnack(context, original == null ? l10n.t('mem.created') : l10n.t('mem.versionSaved'));
       _reload();
     }
   }
@@ -150,11 +155,10 @@ class _MemoriesPageState extends State<MemoriesPage> {
   Future<void> _forgetMemory(MemoryEntity memory, {required bool hard}) async {
     final ok = await confirmAction(
       context,
-      title: hard ? 'Apagar permanentemente?' : 'Esquecer memória?',
-      message: hard
-          ? 'A memória "${memory.title.value}" será APAGADA para sempre (sem auditoria).'
-          : 'A memória "${memory.title.value}" sai do recall, mas é mantida para auditoria.',
-      okLabel: hard ? 'Apagar' : 'Esquecer',
+      title: hard ? l10n.t('mem.deleteQ') : l10n.t('mem.forgetQ'),
+      message: '"${memory.title.value}" '
+          '${hard ? l10n.t('mem.deleteMsg') : l10n.t('mem.forgetMsg')}',
+      okLabel: hard ? l10n.t('common.delete') : l10n.t('mem.forget'),
       destructive: true,
     );
     if (!ok) return;
@@ -163,17 +167,17 @@ class _MemoriesPageState extends State<MemoriesPage> {
     if (!mounted) return;
     result.fold(
       (_) {
-        showSnack(context, hard ? 'Memória apagada.' : 'Memória esquecida.');
+        showSnack(context, hard ? l10n.t('mem.deleted') : l10n.t('mem.forgotten'));
         _reload();
       },
-      (f) => showSnack(context, 'Falha: ${f.errorMessage}'),
+      (f) => showSnack(context, '${l10n.t('common.failure')}: ${f.errorMessage}'),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_future == null) {
-      return const Center(child: Text('Selecione um projeto.'));
+      return Center(child: Text(l10n.t('common.selectProject')));
     }
     return Column(
       children: [
@@ -186,7 +190,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
                   controller: _query,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search),
-                    hintText: 'Buscar memórias (híbrido: semântico + texto)…',
+                    hintText: l10n.t('mem.searchHint'),
                     border: const OutlineInputBorder(),
                     isDense: true,
                     suffixIcon: IconButton(
@@ -204,7 +208,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
               FilledButton.icon(
                 onPressed: () => _editMemory(),
                 icon: const Icon(Icons.add),
-                label: const Text('Nova memória'),
+                label: Text(l10n.t('mem.new')),
               ),
             ],
           ),
@@ -222,7 +226,8 @@ class _MemoriesPageState extends State<MemoriesPage> {
                     leading: _KindBadge(m.kind.code),
                     title: Text(m.title.value, maxLines: 1, overflow: TextOverflow.ellipsis),
                     subtitle: Text(
-                      '${m.tier.code} · importância ${m.importance.toStringAsFixed(2)}'
+                      '${m.tier.code} · ${l10n.t('mem.importance').toLowerCase()} '
+                      '${m.importance.toStringAsFixed(2)}'
                       '${m.key == null ? '' : ' · ${m.key}'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -232,7 +237,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
                 },
               ),
               detail: _selectedMemory == null
-                  ? const Center(child: Text('Selecione uma memória.'))
+                  ? Center(child: Text(l10n.t('mem.selectOne')))
                   : _MemoryDetail(
                       memory: _selectedMemory!,
                       onEdit: () => _editMemory(original: _selectedMemory),
@@ -278,14 +283,17 @@ class _MemoryDetail extends StatelessWidget {
             Expanded(
               child: Text(memory.title.value, style: Theme.of(context).textTheme.titleLarge),
             ),
-            IconButton(tooltip: 'Editar (nova versão)', onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
+            IconButton(
+                tooltip: l10n.t('common.editVersion'),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined)),
             PopupMenuButton<String>(
-              tooltip: 'Esquecer',
+              tooltip: l10n.t('mem.forget'),
               icon: const Icon(Icons.delete_outline),
               onSelected: (v) => onForget(v == 'hard'),
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'soft', child: Text('Esquecer (mantém auditoria)')),
-                PopupMenuItem(value: 'hard', child: Text('Apagar permanentemente')),
+              itemBuilder: (context) => [
+                PopupMenuItem(value: 'soft', child: Text(l10n.t('mem.forgetSoft'))),
+                PopupMenuItem(value: 'hard', child: Text(l10n.t('common.deleteHard'))),
               ],
             ),
           ],
@@ -297,7 +305,8 @@ class _MemoryDetail extends StatelessWidget {
           children: [
             MetaChip(memory.kind.code, icon: Icons.category_outlined),
             MetaChip(memory.tier.code, icon: Icons.layers_outlined),
-            MetaChip('importância ${memory.importance.toStringAsFixed(2)}'),
+            MetaChip(
+                '${l10n.t('mem.importance').toLowerCase()} ${memory.importance.toStringAsFixed(2)}'),
             if (memory.key != null) MetaChip('key: ${memory.key}', icon: Icons.key),
             if (memory.embeddingModel != null)
               MetaChip(memory.embeddingModel!, icon: Icons.memory),

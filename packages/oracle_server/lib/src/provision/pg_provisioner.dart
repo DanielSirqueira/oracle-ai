@@ -76,23 +76,23 @@ class PgProvisioner {
     final pgRoot = Directory('$installDir${Platform.pathSeparator}pgsql');
     final binDir = '${pgRoot.path}${Platform.pathSeparator}bin';
     if (!File('$binDir${Platform.pathSeparator}pg_ctl.exe').existsSync()) {
-      step('Extraindo PostgreSQL portátil…');
+      step('Extracting portable PostgreSQL…');
       await extractFileToDisk(pgZip, installDir);
       if (!File('$binDir${Platform.pathSeparator}pg_ctl.exe').existsSync()) {
-        throw PgProvisionFailure('pg_ctl.exe não encontrado após extrair $pgZip');
+        throw PgProvisionFailure('pg_ctl.exe not found after extracting $pgZip');
       }
     }
 
     // 2) pgvector: vector.dll -> lib/, vector.control + vector--*.sql ->
     //    share/extension/. Release zips vary in layout, so route by filename.
-    step('Instalando pgvector…');
+    step('Installing pgvector…');
     await _installPgvector(pgvectorZip, pgRoot.path);
 
     // 3) initdb (skip when the cluster already exists).
     final data = Directory(dataDir);
     final pgVersionFile = File('$dataDir${Platform.pathSeparator}PG_VERSION');
     if (!pgVersionFile.existsSync()) {
-      step('Inicializando o banco (initdb)…');
+      step('Initializing the cluster (initdb)…');
       await data.create(recursive: true);
       final pwFile = File('$installDir${Platform.pathSeparator}.pw.tmp');
       await pwFile.writeAsString(password, flush: true);
@@ -121,10 +121,10 @@ class PgProvisioner {
       final pidFile = File('$dataDir${Platform.pathSeparator}postmaster.pid');
       final lines = await pidFile.readAsLines();
       chosenPort = int.parse(lines[3].trim()); // line 4 of postmaster.pid = port
-      step('Cluster já em execução — adotando a porta $chosenPort.');
+      step('Cluster already running — adopting port $chosenPort.');
     } else {
       chosenPort = port ?? await findFreePort();
-      step('Configurando porta $chosenPort…');
+      step('Configuring port $chosenPort…');
       final conf = File('$dataDir${Platform.pathSeparator}postgresql.conf');
       var text = await conf.readAsString();
       text = text.replaceAll(
@@ -132,7 +132,7 @@ class PgProvisioner {
       if (!text.contains('port = $chosenPort')) text = '$text\nport = $chosenPort\n';
       await conf.writeAsString(text, flush: true);
 
-      step('Subindo o PostgreSQL…');
+      step('Starting PostgreSQL…');
       await _run(binDir, 'pg_ctl.exe', [
         'start',
         '-D', dataDir,
@@ -151,9 +151,9 @@ class PgProvisioner {
     );
     if (!await canConnect(config)) {
       throw PgProvisionFailure(
-          'PostgreSQL subiu mas não respondeu em localhost:$chosenPort');
+          'PostgreSQL started but did not answer at localhost:$chosenPort');
     }
-    step('PostgreSQL pronto em localhost:$chosenPort.');
+    step('PostgreSQL ready at localhost:$chosenPort.');
     return PgProvisionResult(binDir: binDir, dataDir: dataDir, port: chosenPort);
   }
 

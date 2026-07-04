@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'src/core/brand.dart';
 import 'src/wizard.dart';
 
 Future<void> main() async {
@@ -27,16 +28,9 @@ class OracleSetupApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Oracle AI — Instalação',
+      title: 'Oracle AI Setup',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF7C6CF0),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: OracleBrand.theme(),
       home: const SetupWizard(),
     );
   }
