@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:launch_at_startup/launch_at_startup.dart';
 import 'package:oracle_server/oracle_server.dart' as server;
 
 import '../../core/daemon_host.dart';
@@ -23,6 +24,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _envController;
   bool _envDirty = false;
+  bool _autostart = false;
 
   @override
   void initState() {
@@ -32,6 +34,23 @@ class _SettingsPageState extends State<SettingsPage> {
         (path != null && File(path).existsSync()) ? File(path).readAsStringSync() : '';
     _envController = TextEditingController(text: content)
       ..addListener(() => setState(() => _envDirty = true));
+    launchAtStartup.isEnabled().then((v) {
+      if (mounted) setState(() => _autostart = v);
+    });
+  }
+
+  Future<void> _setAutostart(bool enable) async {
+    if (enable) {
+      await launchAtStartup.enable();
+    } else {
+      await launchAtStartup.disable();
+    }
+    final actual = await launchAtStartup.isEnabled();
+    if (mounted) {
+      setState(() => _autostart = actual);
+      showSnack(context,
+          actual ? 'O Studio iniciará com o Windows.' : 'Autostart desativado.');
+    }
   }
 
   @override
@@ -103,6 +122,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       settings.hostHooks = v;
                       daemon.applySettings();
                     },
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Iniciar com o Windows'),
+                    subtitle: const Text(
+                        'Abre o Studio (na bandeja) no login — hooks e backups sempre ativos.'),
+                    value: _autostart,
+                    onChanged: _setAutostart,
                   ),
                 ],
               ),
