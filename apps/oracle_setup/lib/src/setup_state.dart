@@ -14,7 +14,8 @@ enum DbMode { existing, docker, portable }
 /// DbBackupService) — the wizard is only a UI over proven pieces.
 class SetupState extends ChangeNotifier {
   // ── database ──
-  DbMode dbMode = DbMode.existing;
+  // "Automatic" (bundled portable PG) is the default: zero configuration.
+  DbMode dbMode = DbMode.portable;
   String dbHost = 'localhost';
   int dbPort = 5432;
   String dbUser = 'postgres';
@@ -24,6 +25,7 @@ class SetupState extends ChangeNotifier {
   bool? existingOk; // null = not probed yet
   bool? dockerOk;
   bool portableReady = false;
+  bool dockerReady = false;
 
   // ── embedder ──
   String embedderProvider = 'local';
@@ -165,6 +167,73 @@ class SetupState extends ChangeNotifier {
       dbPassword = password;
       portableReady = true;
       _log('${l10n.t('log.dbReady')} localhost:${result.port}.');
+    } catch (e) {
+      error = '$e';
+      _log('${l10n.t('log.fail')}: $e');
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  /// One-click Docker path: writes a self-contained compose file (pgvector
+  /// image, loopback bind, named volume, generated password), runs
+  /// `docker compose up -d` and waits until the database answers.
+  Future<void> provisionDocker() async {
+    busy = true;
+    error = null;
+    notifyListeners();
+    try {
+      final rnd = Random.secure();
+      final password =
+          List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      final port = await PgProvisioner.findFreePort(start: 5432);
+      final sep = Platform.pathSeparator;
+      final composeFile = File('$installBase${sep}docker$sep' 'docker-compose.yml');
+      await composeFile.parent.create(recursive: true);
+      await composeFile.writeAsString('''
+name: oracle_ai
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: oracle-ai-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: $password
+      POSTGRES_DB: oracle_db
+    ports:
+      - "127.0.0.1:$port:5432"
+    volumes:
+      - oracle_ai_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+volumes:
+  oracle_ai_pgdata:
+''', flush: true);
+      _log('docker compose up -d …');
+      final result = await Process.run(
+          'docker', ['compose', '-f', composeFile.path, 'up', '-d'],
+          runInShell: true);
+      if (result.exitCode != 0) {
+        throw Exception('docker compose: ${result.stderr}');
+      }
+      // Wait for the server to answer (image pull + init can take a while).
+      final config = DatabaseConfig(
+          host: 'localhost', port: port, user: 'postgres', password: password, database: 'postgres');
+      var up = false;
+      for (var i = 0; i < 60; i++) {
+        if (await PgProvisioner.canConnect(config)) {
+          up = true;
+          break;
+        }
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      if (!up) throw Exception('container did not answer at localhost:$port');
+      dbHost = 'localhost';
+      dbPort = port;
+      dbUser = 'postgres';
+      dbPassword = password;
+      dockerReady = true;
+      _log('${l10n.t('log.dbReady')} localhost:$port (Docker).');
     } catch (e) {
       error = '$e';
       _log('${l10n.t('log.fail')}: $e');

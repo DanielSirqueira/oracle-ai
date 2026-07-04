@@ -93,6 +93,22 @@ const _pt = <String, String>{
   'log.seedMissing': 'Nenhum seed em backups/oracle_seed.sql — pulado.',
   'log.done': 'Instalação concluída.',
   'log.rows': 'linhas',
+  // db cards
+  'db.subtitle':
+      'Onde a memória vai viver. Escolha um caminho — nos modos automáticos você não configura nada: porta, senha e banco são criados sozinhos.',
+  'db.auto': 'Automático — banco embutido',
+  'db.autoDesc':
+      'O instalador traz o PostgreSQL + pgvector. Sem Docker, sem configuração: um clique instala, inicializa e liga o banco.',
+  'db.autoBadge': 'Recomendado',
+  'db.dockerCard': 'Docker',
+  'db.dockerCardDesc':
+      'Cria e sobe o contêiner do banco (pgvector) com um clique. Requer Docker Desktop em execução.',
+  'db.dockerRun': 'Subir banco no Docker',
+  'db.dockerRunning': 'Subindo contêiner…',
+  'db.existingCard': 'PostgreSQL existente',
+  'db.existingCardDesc':
+      'Já tem um PostgreSQL 14+ rodando? Aponte para ele e teste a conexão (a extensão pgvector é criada na migração).',
+  'db.ready': 'Pronto ✓',
 };
 
 const _en = <String, String>{
@@ -172,4 +188,19 @@ const _en = <String, String>{
   'log.seedMissing': 'No seed at backups/oracle_seed.sql — skipped.',
   'log.done': 'Installation complete.',
   'log.rows': 'rows',
+  'db.subtitle':
+      'Where the memory will live. Pick a path — in the automatic modes you configure nothing: port, password and database are created for you.',
+  'db.auto': 'Automatic — bundled database',
+  'db.autoDesc':
+      'The installer ships PostgreSQL + pgvector. No Docker, no configuration: one click installs, initializes and starts the database.',
+  'db.autoBadge': 'Recommended',
+  'db.dockerCard': 'Docker',
+  'db.dockerCardDesc':
+      'Creates and starts the database container (pgvector) in one click. Requires Docker Desktop running.',
+  'db.dockerRun': 'Start database on Docker',
+  'db.dockerRunning': 'Starting container…',
+  'db.existingCard': 'Existing PostgreSQL',
+  'db.existingCardDesc':
+      'Already run PostgreSQL 14+? Point at it and test the connection (the pgvector extension is created by the migration).',
+  'db.ready': 'Ready ✓',
 };

@@ -30,11 +30,11 @@ class _SetupWizardState extends State<SetupWizard> {
   ];
 
   bool get _canAdvance => switch (_step) {
-        1 => _state.dbMode == DbMode.existing
-            ? _state.existingOk == true
-            : _state.dbMode == DbMode.docker
-                ? _state.dockerOk == true
-                : _state.portableReady,
+        1 => switch (_state.dbMode) {
+            DbMode.existing => _state.existingOk == true,
+            DbMode.docker => _state.dockerReady,
+            DbMode.portable => _state.portableReady,
+          },
         4 => _state.installed,
         _ => true,
       };
@@ -161,68 +161,102 @@ class _SetupWizardState extends State<SetupWizard> {
 
   Widget _database(BuildContext context) {
     final s = _state;
-    return RadioGroup<DbMode>(
-      groupValue: s.dbMode,
-      onChanged: (v) => setState(() => s.dbMode = v!),
-      child: ListView(children: [
-        GradientTitle(l10n.t('db.title')),
-        const SizedBox(height: 8),
-        RadioListTile<DbMode>(
-          value: DbMode.existing,
-          title: Text(l10n.t('db.existing')),
-          subtitle: Text(s.existingOk == null
-              ? l10n.t('db.existingHint')
-              : (s.existingOk! ? l10n.t('db.connOk') : l10n.t('db.connFail'))),
-        ),
-        if (s.dbMode == DbMode.existing)
-          Padding(
-            padding: const EdgeInsets.only(left: 16, bottom: 8),
-            child: Wrap(spacing: 12, runSpacing: 12, children: [
-              _tf(l10n.t('db.host'), s.dbHost, (v) => s.dbHost = v, width: 200),
-              _tf(l10n.t('db.port'), '${s.dbPort}',
-                  (v) => s.dbPort = int.tryParse(v) ?? s.dbPort,
-                  width: 100),
-              _tf(l10n.t('db.user'), s.dbUser, (v) => s.dbUser = v, width: 160),
-              _tf(l10n.t('db.password'), s.dbPassword, (v) => s.dbPassword = v,
-                  width: 160, obscure: true),
-              _tf(l10n.t('db.name'), s.dbName, (v) => s.dbName = v, width: 160),
-              FilledButton.tonal(
-                onPressed: s.busy ? null : s.detect,
-                child: Text(s.busy ? l10n.t('db.testing') : l10n.t('db.test')),
-              ),
-            ]),
+    return ListView(children: [
+      GradientTitle(l10n.t('db.title')),
+      const SizedBox(height: 4),
+      Text(l10n.t('db.subtitle'), style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 16),
+
+      // ── mode cards ──
+      Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Expanded(
+          child: _ModeCard(
+            selected: s.dbMode == DbMode.portable,
+            icon: Icons.all_inclusive,
+            title: l10n.t('db.auto'),
+            description: l10n.t('db.autoDesc'),
+            badge: s.portableReady
+                ? StatusBadge(l10n.t('db.ready'))
+                : StatusBadge(l10n.t('db.autoBadge'), color: OracleBrand.violet),
+            onTap: () => setState(() => s.dbMode = DbMode.portable),
           ),
-        RadioListTile<DbMode>(
-          value: DbMode.docker,
-          title: Text(l10n.t('db.docker')),
-          subtitle: Text(s.dockerOk == null
-              ? l10n.t('db.dockerHint')
-              : (s.dockerOk! ? l10n.t('db.dockerOk') : l10n.t('db.dockerMissing'))),
         ),
-        RadioListTile<DbMode>(
-          value: DbMode.portable,
-          title: Text(l10n.t('db.portable')),
-          subtitle: Text(s.portableReady
-              ? '${l10n.t('db.portableReady')}${s.dbPort}'
-              : l10n.t('db.portableHint')),
-        ),
-        if (s.dbMode == DbMode.portable)
-          Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              FilledButton.icon(
-                onPressed: s.busy || s.portableReady ? null : s.provisionPortable,
-                icon: const Icon(Icons.download),
-                label: Text(s.busy
-                    ? l10n.t('db.installing')
-                    : (s.portableReady ? l10n.t('db.installed') : l10n.t('db.install'))),
-              ),
-              const SizedBox(height: 8),
-              _logBox(context),
-            ]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ModeCard(
+            selected: s.dbMode == DbMode.docker,
+            icon: Icons.directions_boat_outlined,
+            title: l10n.t('db.dockerCard'),
+            description: l10n.t('db.dockerCardDesc'),
+            badge: s.dockerReady ? StatusBadge(l10n.t('db.ready')) : null,
+            onTap: () => setState(() => s.dbMode = DbMode.docker),
           ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ModeCard(
+            selected: s.dbMode == DbMode.existing,
+            icon: Icons.storage_outlined,
+            title: l10n.t('db.existingCard'),
+            description: l10n.t('db.existingCardDesc'),
+            badge: s.existingOk == true ? StatusBadge(l10n.t('db.ready')) : null,
+            onTap: () => setState(() => s.dbMode = DbMode.existing),
+          ),
+        ),
       ]),
-    );
+      const SizedBox(height: 20),
+
+      // ── selected mode action ──
+      if (s.dbMode == DbMode.portable) ...[
+        FilledButton.icon(
+          onPressed: s.busy || s.portableReady ? null : s.provisionPortable,
+          icon: s.busy
+              ? const SizedBox(
+                  width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(s.portableReady ? Icons.check : Icons.auto_awesome),
+          label: Text(s.busy
+              ? l10n.t('db.installing')
+              : (s.portableReady
+                  ? '${l10n.t('db.installed')}  ·  localhost:${s.dbPort}'
+                  : l10n.t('db.install'))),
+        ),
+      ] else if (s.dbMode == DbMode.docker) ...[
+        FilledButton.icon(
+          onPressed: s.busy || s.dockerReady ? null : s.provisionDocker,
+          icon: s.busy
+              ? const SizedBox(
+                  width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(s.dockerReady ? Icons.check : Icons.play_arrow),
+          label: Text(s.busy
+              ? l10n.t('db.dockerRunning')
+              : (s.dockerReady
+                  ? '${l10n.t('db.ready')}  ·  localhost:${s.dbPort}'
+                  : l10n.t('db.dockerRun'))),
+        ),
+      ] else ...[
+        Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end, children: [
+          _tf(l10n.t('db.host'), s.dbHost, (v) => s.dbHost = v, width: 200),
+          _tf(l10n.t('db.port'), '${s.dbPort}',
+              (v) => s.dbPort = int.tryParse(v) ?? s.dbPort,
+              width: 100),
+          _tf(l10n.t('db.user'), s.dbUser, (v) => s.dbUser = v, width: 160),
+          _tf(l10n.t('db.password'), s.dbPassword, (v) => s.dbPassword = v,
+              width: 160, obscure: true),
+          _tf(l10n.t('db.name'), s.dbName, (v) => s.dbName = v, width: 160),
+          FilledButton(
+            onPressed: s.busy ? null : s.detect,
+            child: Text(s.busy ? l10n.t('db.testing') : l10n.t('db.test')),
+          ),
+          if (s.existingOk != null)
+            StatusBadge(
+              s.existingOk! ? l10n.t('db.connOk') : l10n.t('db.connFail'),
+              color: s.existingOk! ? OracleBrand.success : OracleBrand.error,
+            ),
+        ]),
+      ],
+      const SizedBox(height: 12),
+      _logBox(context),
+    ]);
   }
 
   Widget _embedder(BuildContext context) {
@@ -402,5 +436,62 @@ class _SetupWizardState extends State<SetupWizard> {
             style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
       ),
     ]);
+  }
+}
+
+/// Selectable installation-mode card (Untitled UI "radio card" pattern):
+/// icon, title, supporting text and an optional status badge; the selected
+/// card gets the brand border.
+class _ModeCard extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget? badge;
+  final VoidCallback onTap;
+  const _ModeCard({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.description,
+    this.badge,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? OracleBrand.violet.withValues(alpha: 0.08) : OracleBrand.gray900,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? OracleBrand.violet : OracleBrand.gray700,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(icon, size: 20,
+                  color: selected ? OracleBrand.violetSoft : OracleBrand.gray400),
+              const Spacer(),
+              if (badge != null) badge!,
+            ]),
+            const SizedBox(height: 12),
+            Text(title,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 6),
+            Text(description,
+                style: const TextStyle(fontSize: 12, color: OracleBrand.gray400, height: 1.5)),
+          ],
+        ),
+      ),
+    );
   }
 }
