@@ -16,6 +16,7 @@ workspace:
   - packages/oracle_memory
   - packages/oracle_server
   - apps/oracle_studio
+  - apps/oracle_setup
 
 dev_dependencies:
   lints: '>=4.0.0 <6.0.0'

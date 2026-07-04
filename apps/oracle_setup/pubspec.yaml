@@ -1,0 +1,32 @@
+name: oracle_setup
+description: >-
+  Oracle AI Setup — installation wizard: provisions the database (existing
+  PostgreSQL, Docker, or bundled portable PG + pgvector with no Docker),
+  configures the embedder and security, migrates/seeds, and wires the agents.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  oracle_core:
+    path: ../../packages/oracle_core
+  oracle_memory:
+    path: ../../packages/oracle_memory
+  oracle_migration:
+    path: ../../packages/oracle_migration
+  oracle_server:
+    path: ../../packages/oracle_server
+  window_manager: ^0.4.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

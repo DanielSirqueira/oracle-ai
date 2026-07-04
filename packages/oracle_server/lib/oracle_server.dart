@@ -4,6 +4,7 @@ library;
 export 'src/backup/db_backup_service.dart';
 export 'src/bootstrap.dart';
 export 'src/migrations/embedded_migrations.dart';
+export 'src/provision/pg_provisioner.dart';
 export 'src/hooks/hooks_server.dart';
 export 'src/install.dart';
 export 'src/maintenance_scheduler.dart';
