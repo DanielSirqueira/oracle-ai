@@ -1,0 +1,33 @@
+name: oracle_studio
+description: >-
+  Oracle Studio — desktop control center for the Oracle AI memory bank:
+  browse and curate memories/rules/skills/sessions, run backups, and keep
+  the daemon in the tray. Reuses the oracle_* Dart packages directly.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  oracle_core:
+    path: ../../packages/oracle_core
+  oracle_memory:
+    path: ../../packages/oracle_memory
+  oracle_server:
+    path: ../../packages/oracle_server
+  window_manager: ^0.4.3
+  tray_manager: ^0.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/tray_icon.ico
