@@ -150,6 +150,94 @@ class SetupState extends ChangeNotifier {
         workingDirectory: installRoot, mode: ProcessStartMode.detached);
   }
 
+  /// Version stamped into the Add/Remove Programs entry.
+  static const installVersion = '1.4.0';
+  static const _publisher = 'Daniel Sirqueira';
+
+  /// Escapes a value for a PowerShell single-quoted string.
+  String _psEsc(String s) => s.replaceAll("'", "''");
+
+  /// Registers the app with Windows like a proper installer: a Start Menu and
+  /// a Desktop shortcut (per-user, no admin) plus an "Oracle AI" entry under
+  /// Settings ▸ Apps / Add-Remove Programs, with a working uninstaller.
+  ///
+  /// Done via PowerShell's `WScript.Shell` (the standard, admin-free way to
+  /// author `.lnk` files) and `HKCU` registry writes. On non-Windows it is a
+  /// no-op. The uninstaller removes the program and its shortcuts but **keeps**
+  /// the database/memories under [installBase] — a memory bank must not silently
+  /// erase what it exists to protect.
+  Future<void> _registerWithWindows() async {
+    if (!Platform.isWindows) return;
+    final sep = Platform.pathSeparator;
+    await Directory(installBase).create(recursive: true);
+    final uninstallPs1 = '$installBase${sep}uninstall.ps1';
+    final registerPs1 = '$installBase${sep}_register.ps1';
+    await File(uninstallPs1).writeAsString(_uninstallScript(), flush: true);
+    await File(registerPs1).writeAsString(_registerScript(uninstallPs1), flush: true);
+    try {
+      final r = await Process.run('powershell', [
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+        '-File', registerPs1,
+      ]);
+      if (r.exitCode == 0) {
+        _log('  ✓ ${l10n.t('log.shortcuts')}');
+      } else {
+        _log('  ⚠ ${l10n.t('log.shortcutsFail')}: ${'${r.stderr}'.trim()}');
+      }
+    } catch (e) {
+      _log('  ⚠ ${l10n.t('log.shortcutsFail')}: $e');
+    } finally {
+      try {
+        await File(registerPs1).delete();
+      } catch (_) {/* best effort */}
+    }
+  }
+
+  /// PowerShell that creates the shortcuts and the Add/Remove Programs entry.
+  /// Folder paths are resolved at runtime with `GetFolderPath` so a
+  /// OneDrive-redirected Desktop/Start Menu still lands in the right place.
+  String _registerScript(String uninstallPs1) => r'''
+$ErrorActionPreference = 'Stop'
+$ws = New-Object -ComObject WScript.Shell
+$target = '@@STUDIO@@'
+$workdir = '@@ROOT@@'
+foreach ($dir in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) {
+  $lnk = Join-Path $dir 'Oracle AI.lnk'
+  $s = $ws.CreateShortcut($lnk)
+  $s.TargetPath = $target
+  $s.WorkingDirectory = $workdir
+  $s.IconLocation = '@@STUDIO@@,0'
+  $s.Description = 'Oracle AI - long-term memory for AI agents'
+  $s.Save()
+}
+$key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\OracleAI'
+New-Item -Path $key -Force | Out-Null
+Set-ItemProperty -Path $key -Name DisplayName -Value 'Oracle AI'
+Set-ItemProperty -Path $key -Name DisplayVersion -Value '@@VER@@'
+Set-ItemProperty -Path $key -Name Publisher -Value '@@PUB@@'
+Set-ItemProperty -Path $key -Name InstallLocation -Value '@@ROOT@@'
+Set-ItemProperty -Path $key -Name DisplayIcon -Value '@@STUDIO@@'
+Set-ItemProperty -Path $key -Name NoModify -Value 1 -Type DWord
+Set-ItemProperty -Path $key -Name NoRepair -Value 1 -Type DWord
+Set-ItemProperty -Path $key -Name UninstallString -Value 'powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "@@UNINST@@"'
+'''
+      .replaceAll('@@STUDIO@@', _psEsc(installedStudio))
+      .replaceAll('@@ROOT@@', _psEsc(installRoot))
+      .replaceAll('@@VER@@', installVersion)
+      .replaceAll('@@PUB@@', _psEsc(_publisher))
+      .replaceAll('@@UNINST@@', _psEsc(uninstallPs1));
+
+  /// The uninstaller: drops the shortcuts, the registry entry and the program
+  /// files. It deliberately leaves the data dir (database + memories) intact.
+  String _uninstallScript() => r'''
+$ErrorActionPreference = 'SilentlyContinue'
+Remove-Item (Join-Path ([Environment]::GetFolderPath('Programs')) 'Oracle AI.lnk') -Force
+Remove-Item (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Oracle AI.lnk') -Force
+Remove-Item 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\OracleAI' -Recurse -Force
+Remove-Item -Recurse -Force '@@ROOT@@'
+'''
+      .replaceAll('@@ROOT@@', _psEsc(installRoot));
+
   void generateToken() {
     final rnd = Random.secure();
     hookToken =
@@ -497,7 +585,12 @@ volumes:
             : '${l10n.t('log.seedSkipped')} (${report.reason}).');
       }
 
-      // 5) Final validation — nothing is "installed" until it all checks out.
+      // 5) OS integration: Start Menu + Desktop shortcuts and an
+      //    Add/Remove Programs entry (with an uninstaller) — what makes this a
+      //    real installer, not just a file copy.
+      await _registerWithWindows();
+
+      // 6) Final validation — nothing is "installed" until it all checks out.
       _log(l10n.t('log.validating'));
       final probe = await database.select(const SqlStatement(
           "SELECT count(*) AS n FROM information_schema.tables "
