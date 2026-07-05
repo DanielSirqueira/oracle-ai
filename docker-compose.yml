@@ -9,7 +9,10 @@ services:
       POSTGRES_PASSWORD: ${ORACLE_DB_PASSWORD:-postgres}
       POSTGRES_DB: ${ORACLE_DB_NAME:-oracle_ai}
     ports:
-      - "${ORACLE_DB_PORT:-5432}:5432"
+      # Publish to loopback only by default. Override ORACLE_DB_BIND=0.0.0.0 to
+      # expose on the LAN — but then set a strong ORACLE_DB_PASSWORD (the default
+      # `postgres` must not be reachable off-host).
+      - "${ORACLE_DB_BIND:-127.0.0.1}:${ORACLE_DB_PORT:-5432}:5432"
     volumes:
       - oracle_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -39,9 +42,22 @@ services:
       # Bind 0.0.0.0 INSIDE the container so the published port is reachable.
       ORACLE_HTTP_HOST: 0.0.0.0
       ORACLE_HTTP_PORT: "49500"
+      # The /hook endpoint can read AND write long-term memory. Set a shared
+      # secret so only callers with it can POST (required whenever the published
+      # port is not strictly loopback).
+      ORACLE_HOOK_TOKEN: ${ORACLE_HOOK_TOKEN:-}
       ORACLE_MAINTENANCE_INTERVAL_MINUTES: "30"
+      # On a fresh volume this daemon restores the data seed IF present (and the
+      # DB is empty), so the saved memory bank rehydrates on `up`. Produce the
+      # seed with `oracle_ai backup-db` or the oracle_maintenance_backup tool.
+      ORACLE_DB_SEED_PATH: /app/backups/oracle_seed.sql
+    volumes:
+      # Seed directory shared with the host (holds backups/oracle_seed.sql).
+      - ./backups:/app/backups
     ports:
-      - "49500:49500"               # agent hooks (host) -> this daemon
+      # Loopback-only by default; override ORACLE_HTTP_BIND=0.0.0.0 for LAN access
+      # (and then ORACLE_HOOK_TOKEN above becomes mandatory).
+      - "${ORACLE_HTTP_BIND:-127.0.0.1}:49500:49500"   # agent hooks (host) -> this daemon
     restart: unless-stopped
 
 volumes:

@@ -25,7 +25,7 @@ return `ResultDart<Success, Failure>` — errors are values, not exceptions, acr
 |---|---|
 | `oracle_core` | Pure-Dart base: `Database` (PostgreSQL connection pool), `SqlStatement` / `SqlValue` / `SqlVector` (pgvector), `DatabaseConfig`, DI (`injector`, `Module`), value objects (`IdVO`, `TextVO`), typed failures, and the embeddings service. Re-exports `result_dart`. |
 | `oracle_migration` | Versioned migration system ported to the project: discovers `v{semver}/{seq}_{name}/{seq}.sql`, checksums (SHA-256), an advisory lock with stale-takeover, transactional application, forward-fix. |
-| `oracle_memory` | The domain — **9 DDD feature slices**. |
+| `oracle_memory` | The domain — **10 DDD feature slices**. |
 | `oracle_server` | Process entrypoint, MCP server, hook receiver, recall service, maintenance scheduler, install generators. |
 
 ## Feature slices (`oracle_memory`)
@@ -71,7 +71,7 @@ flowchart LR
   MCP -. embeddings .-> EXT
 ```
 
-- **MCP server (stdio)** — the on-demand tool surface (32 tools). Advertises static MCP `instructions` that the
+- **MCP server (stdio)** — the on-demand tool surface (39 tools). Advertises static MCP `instructions` that the
   client auto-injects once at connect time.
 - **Hook receiver (HTTP)** — speaks the agent host's hook protocol: captures the session and injects recall
   (see [agent-integration.md](agent-integration.md)).

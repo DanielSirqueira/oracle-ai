@@ -12,8 +12,10 @@ abstract interface class LintUsecase {
 
 class LintUsecaseImpl implements LintUsecase {
   final MaintenanceRepository _repository;
-  const LintUsecaseImpl(this._repository);
+  final Embedder _embedder;
+  const LintUsecaseImpl(this._repository, this._embedder);
 
   @override
-  AsyncResultDart<LintReport, MaintenanceFailure> call() => _repository.lint();
+  AsyncResultDart<LintReport, MaintenanceFailure> call() =>
+      _repository.lint(_embedder.model);
 }

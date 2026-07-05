@@ -68,8 +68,13 @@ class RecallService {
   /// it here, avoiding a second embedding call). Null embedding → no recall.
   Future<String?> promptRecallFor(IdVO projectId, List<double>? embedding) async {
     if (embedding == null) return null;
-    final result =
-        await injector.get<MemoryRepository>().relevantMemories(projectId, embedding, 0.6, 3);
+    final result = await injector.get<MemoryRepository>().relevantMemories(
+          projectId,
+          embedding,
+          0.6,
+          3,
+          queryModel: injector.get<Embedder>().model,
+        );
     return _renderRecall(result.getOrNull() ?? const []);
   }
 

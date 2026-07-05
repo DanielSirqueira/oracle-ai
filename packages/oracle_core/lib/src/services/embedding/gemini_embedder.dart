@@ -26,6 +26,9 @@ class GeminiEmbedder implements Embedder {
   /// same symmetric space).
   final String taskType;
 
+  /// Hard cap on a single request (a slow provider must never hang the caller).
+  final Duration timeout;
+
   final http.Client _client;
 
   GeminiEmbedder({
@@ -34,27 +37,30 @@ class GeminiEmbedder implements Embedder {
     this.dim = 1024,
     this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta',
     this.taskType = 'SEMANTIC_SIMILARITY',
+    this.timeout = const Duration(seconds: 10),
     http.Client? client,
   }) : _client = client ?? http.Client();
 
   @override
   Future<List<double>> embed(String text) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/models/$model:embedContent'),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: jsonEncode({
-        'content': {
-          'parts': [
-            {'text': text}
-          ]
-        },
-        'outputDimensionality': dim,
-        'taskType': taskType,
-      }),
-    );
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/models/$model:embedContent'),
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: jsonEncode({
+            'content': {
+              'parts': [
+                {'text': text}
+              ]
+            },
+            'outputDimensionality': dim,
+            'taskType': taskType,
+          }),
+        )
+        .timeout(timeout);
     if (response.statusCode >= 400) {
       throw HttpEmbedderException('Gemini ${response.statusCode}: ${response.body}');
     }

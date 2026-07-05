@@ -5,6 +5,7 @@ library;
 export 'src/config/database_config.dart';
 export 'src/config/embedding_config.dart';
 export 'src/config/env.dart';
+export 'src/config/secret_protector.dart';
 
 // Embedding service
 export 'src/services/embedding/embedder.dart';
@@ -35,6 +36,9 @@ export 'src/domain/value_object/value_object.dart';
 // Failures
 export 'src/errors/database_failure.dart';
 export 'src/errors/system_failure.dart';
+
+// Runtime utilities
+export 'src/util/single_instance.dart';
 
 // Result pattern, re-exported for the domain/infra layers.
 export 'package:result_dart/result_dart.dart';

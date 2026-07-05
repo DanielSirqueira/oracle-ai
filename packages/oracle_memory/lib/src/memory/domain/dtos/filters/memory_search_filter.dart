@@ -26,6 +26,12 @@ class MemorySearchFilter {
   /// Query embedding (drives the semantic leg). Must match the index dimension.
   final List<double>? queryEmbedding;
 
+  /// Model that produced [queryEmbedding]. When set, the semantic leg only
+  /// compares against stored vectors from the SAME model — cross-model cosine
+  /// distances are meaningless, so this prevents garbage recall after a provider
+  /// switch (until the store is re-embedded).
+  final String? queryModel;
+
   final IdVO? projectId;
   final IdVO? productId;
   final List<MemoryTier> tiers;
@@ -36,6 +42,7 @@ class MemorySearchFilter {
   const MemorySearchFilter({
     this.query = '',
     this.queryEmbedding,
+    this.queryModel,
     this.projectId,
     this.productId,
     this.tiers = const [],
@@ -44,10 +51,11 @@ class MemorySearchFilter {
     this.limit = 10,
   });
 
-  MemorySearchFilter copyWith({List<double>? queryEmbedding}) {
+  MemorySearchFilter copyWith({List<double>? queryEmbedding, String? queryModel}) {
     return MemorySearchFilter(
       query: query,
       queryEmbedding: queryEmbedding ?? this.queryEmbedding,
+      queryModel: queryModel ?? this.queryModel,
       projectId: projectId,
       productId: productId,
       tiers: tiers,

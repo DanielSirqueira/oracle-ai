@@ -18,6 +18,10 @@ class HttpEmbedder implements Embedder {
 
   final String baseUrl;
   final String apiKey;
+
+  /// Hard cap on a single request (a slow provider must never hang the caller).
+  final Duration timeout;
+
   final http.Client _client;
 
   HttpEmbedder({
@@ -25,22 +29,25 @@ class HttpEmbedder implements Embedder {
     required this.apiKey,
     required this.model,
     required this.dim,
+    this.timeout = const Duration(seconds: 10),
     http.Client? client,
   }) : _client = client ?? http.Client();
 
   @override
   Future<List<double>> embed(String text) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/embeddings'),
-      headers: {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': model,
-        'input': [text],
-      }),
-    );
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/embeddings'),
+          headers: {
+            'Authorization': 'Bearer $apiKey',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'model': model,
+            'input': [text],
+          }),
+        )
+        .timeout(timeout);
     if (response.statusCode >= 400) {
       throw HttpEmbedderException('Embedding API ${response.statusCode}: ${response.body}');
     }

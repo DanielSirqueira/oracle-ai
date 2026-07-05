@@ -21,7 +21,10 @@ class SearchRulesUsecaseImpl implements SearchRulesUsecase {
         filter.query.trim().isNotEmpty &&
         filter.mode != RuleSearchMode.keyword) {
       try {
-        filter = filter.copyWith(queryEmbedding: await _embedder.embed(filter.query));
+        filter = filter.copyWith(
+          queryEmbedding: await _embedder.embed(filter.query),
+          queryModel: _embedder.model,
+        );
       } catch (_) {/* fall back to keyword */}
     }
     return _repository.searchRules(filter);

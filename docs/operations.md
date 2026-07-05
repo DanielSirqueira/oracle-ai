@@ -8,6 +8,11 @@
 - **Dart SDK ≥ 3.11** (to build; or use Docker only).
 - Optional: an embedding API key (Gemini / OpenAI / Voyage). Without one it runs the `local` offline embedder.
 
+> **Windows, zero terminal?** Run **`OracleAI-Setup.exe`** (see the README's *Desktop app & installer*): it
+> installs Oracle Studio + the CLI, can provision a **bundled portable PostgreSQL + pgvector with no Docker**,
+> writes the (DPAPI-encrypted) `.env`, migrates, and wires your agent — no steps below required. The sections
+> here are the manual / server / production path.
+
 ## 1. Start PostgreSQL + pgvector
 
 The `pgvector/pgvector:pg17` image is in `docker-compose.yml`. If port 5432 is taken, pick another via
@@ -60,7 +65,7 @@ Alternative without compiling: `dart run oracle_server:oracle_ai <args>` (slower
 ## 4. Initialize the database
 
 ```bash
-./build/oracle_ai migrate            # expect: migrations: applied=4 ... ok   (v1.0.0..v1.3.0)
+./build/oracle_ai migrate            # expect: migrations: applied=8 ... ok   (v1.0.0..v1.7.0)
 ```
 
 ## 5. Connect your agent
@@ -205,7 +210,49 @@ scheduler runs only in the daemon (one place, no per-agent duplication).
 - Automatic: `ORACLE_MAINTENANCE_ON_STARTUP=true` (once on boot) and/or `ORACLE_MAINTENANCE_INTERVAL_MINUTES=N`
   (timer). In multi-agent setups, prefer running this in the single daemon.
 
-## 9. Troubleshooting
+## 8.1 Bundled database (no Docker)
+
+The Setup wizard can provision a PORTABLE PostgreSQL 17 + pgvector with zero user
+configuration (payload bundled next to the installer, or downloaded once). It lives in
+`%LOCALAPPDATA%\OracleAI` and binds **127.0.0.1 only, on a non-standard port (54320+)**
+— deliberately far from the 5432-5439 family so it never conflicts with other local
+PostgreSQL installs. The one-click Docker path does the same at 54330+. Ports, password
+and `.env` wiring are generated automatically.
+
+## 9. Backup & restore
+
+Oracle ships a **portable, Dart-native backup** — no `pg_dump` needed on the host. A backup is a plain
+`.sql` **data seed** (all rows, embeddings included); the schema is owned by the migrations, so the seed
+restores into a freshly-migrated database. The file is small, inspectable, and safe to commit — the shared
+memory bank travels with the repo and restores identically anywhere.
+
+**Make a backup** (CLI or the `oracle_maintenance_backup` tool):
+
+```bash
+oracle_ai backup-db                       # writes backups/oracle_seed.sql
+oracle_ai backup-db path/to/seed.sql      # or a chosen path
+```
+
+**Restore** (only into an empty DB unless you force it — restore never truncates):
+
+```bash
+oracle_ai restore-db                      # backups/oracle_seed.sql -> empty DB
+oracle_ai restore-db path/to/seed.sql --force
+```
+
+**Auto-restore on `docker compose up`.** Set `ORACLE_DB_SEED_PATH` (the compose files default it to
+`/app/backups/oracle_seed.sql` and mount `./backups`). On a **fresh volume**, the boot-owning process
+(`serve-hooks` / all-in-one) restores the seed **if the DB is empty** — bringing the stack up rehydrates the
+saved memory. It never overwrites a populated database, and a per-agent `serve-mcp` never seeds (no
+cold-start race). `ORACLE_DB_SEED_ON_EMPTY=false` disables it.
+
+**Versioning a shared memory bank.** Seeds are git-ignored by default (they may hold sensitive content). To
+commit one intentionally: `git add -f backups/oracle_seed.sql`. A teammate who clones and runs
+`docker compose up` on a fresh volume gets the same memory.
+
+Typical loop: `oracle_ai backup-db` → commit the seed → colleague pulls → `docker compose up` restores it.
+
+## 10. Troubleshooting
 
 | Symptom | Cause / action |
 |---|---|
@@ -213,3 +260,38 @@ scheduler runs only in the daemon (one place, no per-agent duplication).
 | `migration lock held … retry` | Two processes starting together — it retries itself; a stale lock (crashed holder) is reclaimed after 2 min. |
 | `database "oracle_ai" not found` | Start with `ORACLE_DB_AUTO_CREATE=true`, or run `oracle_ai migrate`. |
 | Empty brief/recall on the first session | Normal — no handoff/rules/memories yet; populate via the tools. |
+
+## 11. Build the Windows installer
+
+The distributable `OracleAI-Setup.exe` is produced by one script that builds **everything** and packages it —
+reproducible from a clean clone.
+
+**Prerequisites (once):** Flutter (with Windows desktop) + Dart on PATH, and Inno Setup 6:
+
+```powershell
+winget install JRSoftware.InnoSetup
+```
+
+**Build:**
+
+```powershell
+pwsh apps/oracle_setup/installer/build_installer.ps1
+```
+
+What it does, in order: (1) downloads the offline database payload (PostgreSQL 17 + pgvector zips, ~315 MB —
+cached after the first run); (2) compiles the CLI (`oracle_ai.exe`); (3) builds Oracle Studio (Flutter
+release); (4) builds the setup wizard (Flutter release); (5) assembles the program bundle
+(`app\oracle_ai.exe` + `app\studio\`); (6) compiles `installer\oracle_ai_setup.iss` with ISCC →
+`dist\OracleAI-Setup.exe` (~342 MB, git-ignored).
+
+| Flag | Effect |
+|---|---|
+| *(none)* | Full **offline** installer (bundled database, no Docker needed at install time). |
+| `-Online` | Smaller **online** installer (~77 MB); the wizard downloads PostgreSQL at install time. |
+| `-SkipBuild` | Reuse the last Flutter/Dart build; only re-assemble + re-package (fast iteration on the `.iss`). |
+| `-SkipPayload` | Leave the `payload\` folder as-is (don't download). |
+
+The resulting installer is a thin launcher: it unpacks to a temp folder and runs the branded Flutter wizard
+(which performs the real per-user install — program to `%LOCALAPPDATA%\Programs\Oracle AI`, database
+provisioning, DPAPI-encrypted `.env`, Start Menu/Desktop shortcuts, Add/Remove Programs entry), then
+auto-cleans. See the wizard/packaging sources under `apps/oracle_setup/installer/`.

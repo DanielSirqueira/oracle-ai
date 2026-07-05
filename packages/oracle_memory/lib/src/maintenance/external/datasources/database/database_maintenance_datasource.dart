@@ -3,6 +3,7 @@ import 'package:oracle_core/oracle_core.dart';
 import '../../../domain/dtos/decay_policy.dart';
 import '../../../domain/dtos/lint_report.dart';
 import '../../../domain/dtos/maintenance_report.dart';
+import '../../../domain/dtos/reembed_target.dart';
 import '../../../domain/errors/maintenance_failure.dart';
 import '../../../infra/datasources/maintenance_datasource.dart';
 
@@ -94,21 +95,92 @@ class DatabaseMaintenanceDatasource implements MaintenanceDatasource {
   }
 
   @override
-  Future<LintReport> lint() async {
+  Future<LintReport> lint(String currentModel) async {
     try {
-      final result = await _database.select(const SqlStatement(
+      final result = await _database.select(SqlStatement(
         'SELECT '
         '(SELECT count(*) FROM memories WHERE is_latest AND embedding IS NULL) AS mem_no_emb, '
         '(SELECT count(*) FROM rules WHERE is_latest AND embedding IS NULL) AS rule_no_emb, '
         "(SELECT count(*) FROM requests r WHERE r.created_at < now() - interval '1 day' "
-        'AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.request_id = r.id)) AS empty_requests',
+        'AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.request_id = r.id)) AS empty_requests, '
+        '('
+        '(SELECT count(*) FROM memories WHERE is_latest AND embedding IS NOT NULL AND embedding_model IS DISTINCT FROM :cur) '
+        '+ (SELECT count(*) FROM rules WHERE is_latest AND embedding IS NOT NULL AND embedding_model IS DISTINCT FROM :cur) '
+        '+ (SELECT count(*) FROM architectures WHERE is_latest AND embedding IS NOT NULL AND embedding_model IS DISTINCT FROM :cur) '
+        '+ (SELECT count(*) FROM skills WHERE is_latest AND embedding IS NOT NULL AND embedding_model IS DISTINCT FROM :cur) '
+        '+ (SELECT count(*) FROM requests WHERE embedding IS NOT NULL AND embedding_model IS DISTINCT FROM :cur)'
+        ') AS stale_model',
+        {'cur': currentModel},
       ));
       final row = result.rows.first;
       return LintReport(
         memoriesWithoutEmbedding: row['mem_no_emb']?.toInt() ?? 0,
         rulesWithoutEmbedding: row['rule_no_emb']?.toInt() ?? 0,
         requestsWithoutMessages: row['empty_requests']?.toInt() ?? 0,
+        vectorsWithStaleModel: row['stale_model']?.toInt() ?? 0,
+        currentModel: currentModel,
       );
+    } on DatabaseFailure catch (error) {
+      throw DatasourceMaintenanceFailure(
+          errorMessage: error.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  /// The embedded tables and the exact text each one's save path embeds. Table
+  /// names here are compile-time constants (never caller input), so interpolating
+  /// them is safe — the same convention the rest of the codebase follows.
+  static const _reembedSources = <(String, String, bool)>[
+    // (table, text expression, hasIsLatest)
+    ('memories', "coalesce(title,'') || E'\\n' || coalesce(body,'')", true),
+    ('rules', "coalesce(title,'') || E'\\n' || coalesce(content,'')", true),
+    ('architectures', "coalesce(area,'') || E'\\n' || coalesce(content,'')", true),
+    ('skills', "coalesce(name,'') || E'\\n' || coalesce(description,'') || E'\\n' || coalesce(content,'')", true),
+    ('requests', "coalesce(user_text,'')", false),
+  ];
+
+  static const _reembedTables = {'memories', 'rules', 'architectures', 'skills', 'requests'};
+
+  @override
+  Future<List<ReembedTarget>> staleEmbeddingTargets(String currentModel, int limit) async {
+    try {
+      const stale = '(embedding IS NULL OR embedding_model IS DISTINCT FROM :cur)';
+      final legs = _reembedSources.map((s) {
+        final (table, textExpr, hasIsLatest) = s;
+        final latest = hasIsLatest ? 'is_latest AND ' : '';
+        return "SELECT '$table' AS t, id::text AS id, ($textExpr) AS txt "
+            'FROM $table WHERE $latest$stale';
+      });
+      final result = await _database.select(SqlStatement(
+        'SELECT t, id, txt FROM (${legs.join(' UNION ALL ')}) x ORDER BY t, id LIMIT :lim',
+        {'cur': currentModel, 'lim': limit},
+      ));
+      return result.rows
+          .map((r) => ReembedTarget(
+                table: r['t']?.toText() ?? '',
+                id: r['id']?.toText() ?? '',
+                text: r['txt']?.toText() ?? '',
+              ))
+          .toList();
+    } on DatabaseFailure catch (error) {
+      throw DatasourceMaintenanceFailure(
+          errorMessage: error.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  @override
+  Future<void> applyEmbedding(ReembedTarget target, List<double> vector, String model) async {
+    if (!_reembedTables.contains(target.table)) {
+      throw DatasourceMaintenanceFailure(
+          errorMessage: 'unknown re-embed table "${target.table}"', stackTrace: StackTrace.current);
+    }
+    // Only the curated tables carry updated_at; requests do not.
+    final touch = target.table == 'requests' ? '' : ', updated_at = now()';
+    try {
+      await _database.executeUpdate(SqlStatement(
+        'UPDATE ${target.table} SET embedding = :vec::vector(1024), embedding_model = :model$touch '
+        'WHERE id = :id::uuid',
+        {'vec': SqlVector(vector), 'model': model, 'id': target.id},
+      ));
     } on DatabaseFailure catch (error) {
       throw DatasourceMaintenanceFailure(
           errorMessage: error.errorMessage, stackTrace: StackTrace.current);

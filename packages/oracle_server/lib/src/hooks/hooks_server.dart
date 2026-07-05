@@ -42,6 +42,16 @@ class HooksServer {
   /// to A/B compare (e.g. `oracle` vs `baseline`).
   final bool metricsEnabled;
   final String metricsLabel;
+
+  /// Optional shared secret (`ORACLE_HOOK_TOKEN`). When set, every `/hook` POST
+  /// must carry `Authorization: Bearer <token>`. Since the endpoint can write and
+  /// read long-term memory, set this whenever the port is not strictly loopback.
+  final String? hookToken;
+
+  /// Hard cap on a hook request body. A hook payload is small; anything larger is
+  /// rejected before buffering, so one giant POST can't OOM the shared daemon.
+  static const _maxBodyBytes = 4 * 1024 * 1024;
+
   HttpServer? _server;
 
   HooksServer({
@@ -50,10 +60,15 @@ class HooksServer {
     RecallService recall = const RecallService(),
     bool? metricsEnabled,
     String? metricsLabel,
+    String? hookToken,
   })  : _recall = recall,
         metricsEnabled = metricsEnabled ??
             (Platform.environment['ORACLE_METRICS_ENABLED'] ?? 'true').toLowerCase() == 'true',
-        metricsLabel = metricsLabel ?? (Platform.environment['ORACLE_METRICS_LABEL'] ?? 'default');
+        metricsLabel = metricsLabel ?? (Platform.environment['ORACLE_METRICS_LABEL'] ?? 'default'),
+        hookToken = hookToken ??
+            (Platform.environment['ORACLE_HOOK_TOKEN']?.trim().isNotEmpty ?? false
+                ? Platform.environment['ORACLE_HOOK_TOKEN']!.trim()
+                : null);
 
   Future<void> start() async {
     final router = Router()
@@ -67,12 +82,53 @@ class HooksServer {
     _server = null;
   }
 
+  /// Reads the request body bytes, aborting (returns null) once they exceed
+  /// [_maxBodyBytes] — bounds even chunked/unknown-length uploads. Decoding is
+  /// left to the caller so a non-UTF-8 body surfaces as a 400, not silent U+FFFD.
+  Future<List<int>?> _readBounded(Request request) async {
+    final bytes = <int>[];
+    await for (final chunk in request.read()) {
+      bytes.addAll(chunk);
+      if (bytes.length > _maxBodyBytes) return null;
+    }
+    return bytes;
+  }
+
+  /// Length-independent string compare, to avoid leaking the token via timing.
+  static bool _secureEquals(String a, String b) {
+    if (a.length != b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) {
+      diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
+    }
+    return diff == 0;
+  }
+
   Future<Response> _handleHook(Request request) async {
+    // Auth: when a token is configured, require it. Constant-work compare.
+    if (hookToken != null) {
+      final auth = request.headers['authorization'] ?? '';
+      if (!_secureEquals(auth, 'Bearer $hookToken')) {
+        return Response.forbidden('unauthorized');
+      }
+    }
+
+    // Reject oversized bodies before buffering the whole thing into memory.
+    final declared = request.contentLength;
+    if (declared != null && declared > _maxBodyBytes) {
+      return Response(413, body: 'payload too large');
+    }
+
+    // Read (bounded) + decode + parse under ONE guard: a mid-body abort, non-UTF-8
+    // bytes, or malformed JSON must return 400 — never a 500 stack trace in the
+    // daemon log, and never lossily-decoded text persisted into long-term capture.
     Map<String, dynamic> p;
     try {
-      p = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final bytes = await _readBounded(request);
+      if (bytes == null) return Response(413, body: 'payload too large');
+      p = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
     } catch (_) {
-      return Response.badRequest(body: 'invalid json');
+      return Response.badRequest(body: 'invalid request body');
     }
 
     final event = '${p['hook_event_name'] ?? p['event'] ?? ''}';
@@ -163,13 +219,23 @@ class HooksServer {
         await _recordMetric(projectId, p, compactions: 1);
         final summary = '${p['compact_summary'] ?? ''}';
         if (summary.trim().isNotEmpty) {
+          // Key the summary by session so repeated compactions of the same
+          // session update ONE memory instead of piling up "Session summary
+          // (compacted)" duplicates. Keyless fallback when the session id is
+          // unknown (keeps the old append-only behavior rather than collapsing
+          // unrelated sessions under an empty key).
+          final sessionId = '${p['session_id'] ?? p['externalSessionId'] ?? ''}'.trim();
           await injector.get<SaveMemoryUsecase>()(MemoryEntity(
             id: const IdVO.empty(),
             projectId: projectId,
+            key: sessionId.isEmpty ? null : 'session-compaction:$sessionId',
             tier: MemoryTier.parse('episodic'),
             kind: MemoryKind.parse('fact'),
             title: const TextVO('Session summary (compacted)'),
             body: TextVO(summary),
+            // Low importance: a running compaction summary is context, not a
+            // durable learning — eligible for decay if never accessed.
+            importance: 0.2,
           ));
         }
       case 'message': // legacy: a turn-style payload → message under latest request

@@ -98,9 +98,11 @@ class CaptureRepositoryImpl implements CaptureRepository {
     IdVO projectId,
     List<double> queryEmbedding, {
     int limit = 10,
+    String? queryModel,
   }) async {
     try {
-      return Success(await _datasource.searchRequests(projectId, queryEmbedding, limit: limit));
+      return Success(await _datasource.searchRequests(projectId, queryEmbedding,
+          limit: limit, queryModel: queryModel));
     } on CaptureFailure catch (f) {
       return Failure(f);
     }

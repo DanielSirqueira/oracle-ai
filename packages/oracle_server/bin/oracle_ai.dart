@@ -13,11 +13,20 @@ import 'package:oracle_server/oracle_server.dart';
 ///   oracle_ai serve-mcp     # migrate + MCP (stdio) only — no hooks (the daemon owns them)
 ///   oracle_ai install-mcp [binary-path]   # print the .mcp.json snippet
 ///   oracle_ai install-hooks               # print the settings.json hooks snippet
+///   oracle_ai backup-db [path]            # write a portable data seed, then exit
+///   oracle_ai restore-db [path] [--force] # restore a data seed (only if empty, unless --force)
+///   oracle_ai sync-skills [dir]           # materialize the central skill library to
+///                                         # `dir/key/SKILL.md` (default ~/.claude/skills)
 ///
 /// Environment (see .env / .env.example): ORACLE_DB_*, ORACLE_MIGRATIONS_DIR,
 /// ORACLE_DB_AUTO_CREATE, ORACLE_HTTP_HOST/PORT, ORACLE_MAINTENANCE_*.
 Future<void> main(List<String> args) async {
-  final env = loadEnv();
+  // Config resolution: cwd .env (repo/dev flow) → .env NEXT TO THE BINARY
+  // (installed flow: agents spawn the MCP with cwd at THEIR project, while
+  // the installer writes .env beside oracle_ai.exe in the program folder).
+  final exeEnv = '${File(Platform.resolvedExecutable).parent.path}'
+      '${Platform.pathSeparator}.env';
+  final env = loadEnv(path: File('.env').existsSync() ? '.env' : exeEnv);
 
   // Config generators (no DB needed) — print client wiring and exit.
   if (args.contains('install-mcp')) {
@@ -29,17 +38,32 @@ Future<void> main(List<String> args) async {
     printInstallHooks(
       host: env['ORACLE_HTTP_HOST'] ?? '127.0.0.1',
       port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 49500,
+      token: env['ORACLE_HOOK_TOKEN'],
     );
     return;
   }
 
   final autoCreate = (env['ORACLE_DB_AUTO_CREATE'] ?? 'false').toLowerCase() == 'true';
+
+  // Backup / restore: DB ops that connect, run, and exit (no serving).
+  if (args.contains('backup-db') || args.contains('restore-db')) {
+    await _runBackupCli(args, env, autoCreate);
+    return;
+  }
+  if (args.contains('sync-skills')) {
+    await _runSyncSkills(args, env, autoCreate);
+    return;
+  }
+
   final mode = _mode(args);
+  // Only the boot-owning modes (daemon / all-in-one) may restore a seed on an
+  // empty DB; a per-agent `serve-mcp` never seeds (avoids a cold-start race).
+  final allowSeed = mode == _Mode.hooks || mode == _Mode.all;
 
   final bootstrap = Bootstrap.fromEnv(env);
   Database? database;
   try {
-    database = await bootstrap.start(ensureDatabase: autoCreate);
+    database = await bootstrap.start(ensureDatabase: autoCreate, allowSeed: allowSeed);
     if (mode == _Mode.migrate) {
       stderr.writeln('[oracle] migrate-only: done.');
       return;
@@ -54,6 +78,14 @@ Future<void> main(List<String> args) async {
       hooks = HooksServer(
         host: env['ORACLE_HTTP_HOST'] ?? '127.0.0.1',
         port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 49500,
+        // Config comes from the merged .env map (loadEnv), NOT Platform.environment
+        // — a `.env`-only ORACLE_HOOK_TOKEN would otherwise be silently ignored and
+        // the endpoint would accept unauthenticated writes while looking protected.
+        hookToken: env['ORACLE_HOOK_TOKEN'],
+        metricsEnabled: env['ORACLE_METRICS_ENABLED'] == null
+            ? null
+            : env['ORACLE_METRICS_ENABLED']!.toLowerCase() == 'true',
+        metricsLabel: env['ORACLE_METRICS_LABEL'],
       );
       try {
         await hooks.start();
@@ -85,6 +117,65 @@ Future<void> main(List<String> args) async {
     exitCode = 1;
   } finally {
     await database?.dispose();
+  }
+}
+
+/// Runs `backup-db` / `restore-db`: connect (migrate), perform the op, exit.
+Future<void> _runBackupCli(List<String> args, Map<String, String> env, bool autoCreate) async {
+  final isRestore = args.contains('restore-db');
+  final marker = isRestore ? 'restore-db' : 'backup-db';
+  final i = args.indexOf(marker);
+  final next = (i + 1 < args.length) ? args[i + 1] : null;
+  final path = (next != null && !next.startsWith('-'))
+      ? next
+      : (env['ORACLE_DB_SEED_PATH']?.trim().isNotEmpty ?? false)
+          ? env['ORACLE_DB_SEED_PATH']!.trim()
+          : 'backups/oracle_seed.sql';
+
+  final database = await Bootstrap.fromEnv(env).start(ensureDatabase: autoCreate);
+  try {
+    final service = DbBackupService(database);
+    if (isRestore) {
+      final report = await service.restore(path, force: args.contains('--force'));
+      stderr.writeln(report.restored
+          ? '[oracle] restored $path — ${report.rows} rows'
+          : '[oracle] restore skipped (${report.reason}) — $path');
+    } else {
+      final report = await service.backup(path);
+      stderr.writeln('[oracle] backup written: ${report.path} — '
+          '${report.rows} rows, ${report.bytes} bytes');
+    }
+  } on SystemFailure catch (failure) {
+    stderr.writeln('[oracle] ${isRestore ? "restore" : "backup"} failed: ${failure.errorMessage}');
+    exitCode = 1;
+  } finally {
+    await database.dispose();
+  }
+}
+
+/// Materializes the central skill library to `<dir>/<key>/SKILL.md` so agents
+/// with native skill discovery (e.g. Claude Code scanning ~/.claude/skills)
+/// pick them up without any per-agent duplication — the database stays the
+/// single source of truth; this just projects it onto disk.
+///
+/// Sync is safe by ownership: every file written carries a `managed-by:
+/// oracle-ai` frontmatter marker, and only folders bearing that marker are
+/// pruned when their skill disappears — hand-written skills are never touched.
+Future<void> _runSyncSkills(List<String> args, Map<String, String> env, bool autoCreate) async {
+  final i = args.indexOf('sync-skills');
+  final next = (i + 1 < args.length) ? args[i + 1] : null;
+  final dir = (next != null && !next.startsWith('-')) ? next : null;
+
+  final database = await Bootstrap.fromEnv(env).start(ensureDatabase: autoCreate);
+  try {
+    final report = await const SkillSyncService().sync(dir: dir);
+    stderr.writeln('[oracle] sync-skills: ${report.synced} skill(s) -> ${report.dir} '
+        '(pruned ${report.pruned} stale)');
+  } on SystemFailure catch (failure) {
+    stderr.writeln('[oracle] sync-skills failed: ${failure.errorMessage}');
+    exitCode = 1;
+  } finally {
+    await database.dispose();
   }
 }
 

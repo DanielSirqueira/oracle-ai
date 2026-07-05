@@ -6,11 +6,11 @@
 
 One PostgreSQL instance holds both the relational structure and the vector index. Embeddings are
 `vector(1024)`; recall is **hybrid** (vector + full-text) fused with Reciprocal Rank Fusion. The schema is
-defined by four **forward-only** migrations, which are **embedded in the binary** and applied automatically on
+defined by eight **forward-only** migrations, which are **embedded in the binary** and applied automatically on
 startup — Oracle checks the DB ledger and runs only what is missing, with no migrations folder or configuration
 needed. The default database is **`oracle_db`**.
 
-## Tables (11)
+## Tables (12)
 
 | Table | Purpose | Notable columns |
 |---|---|---|
@@ -25,6 +25,7 @@ needed. The default database is **`oracle_db`**.
 | `memories` | Consolidated memory | `product_id?`/`project_id?`, `tier`, `kind`, `title`, `body`, `importance`, `embedding`, `fts`, `is_latest`, `supersedes`, `superseded_at`, `access_count`, `last_accessed_at`, `retired_at`/`retired_reason` |
 | `handoffs` | Continuity baton | `project_id`, `summary`, `open_questions`/`next_steps`/`files_touched` (jsonb), `status` |
 | `session_metrics` | Measurement harness | `project_id`, `external_id`, `label`, token counters, `compactions`, `tool_uses`, `turns` |
+| `skills` | Central shared skill library | `product_id?`/`project_id?`, `key`, `name`, `description`, `content`, `embedding`, `fts`, `is_latest`, `supersedes`, `usage_count`, `retired_at`/`retired_reason` |
 
 Capture shape: a **session** is the agent's own session (keyed by `external_id`, no status); each user prompt
 opens a **request** (the demand, embedded for semantic search); **messages** are the agent's work and belong to
@@ -41,6 +42,10 @@ Enumerations are enforced by `CHECK` constraints: memory `tier` ∈ {episodic, s
 | `v1.1.0/001_mutation_layer` | `rules.priority`; `retired_at`/`retired_reason` on `rules`/`architectures`/`memories`. |
 | `v1.2.0/001_project_resolve` | unique index `uq_projects_repo_path` (race-safe cwd → project upsert). |
 | `v1.3.0/001_metrics` | `session_metrics` table + indexes. |
+| `v1.4.0/001_request_index` | composite `idx_requests_session (session_id, created_at DESC)` for the hot capture path. |
+| `v1.5.0/001_search_hygiene` | `requests.embedding_model`; a stored generated `fts` column + GIN on `architectures` (was an inline per-row tsvector). |
+| `v1.6.0/001_memory_key` | `memories.key` — the same stable-key identity rules have, so an agent can supersede a memory by key. |
+| `v1.7.0/001_skills` | `skills` table (central versioned skill library) + HNSW/GIN/partial-unique indexes. |
 
 The runner records applied migrations and checksums in `_migrations`, serializes with `_migrations_lock` (an
 advisory lock with a 2-minute stale-takeover), runs each migration transactionally, and is **forward-fix**

@@ -18,6 +18,7 @@ export 'src/project/project_module.dart';
 
 // --- memory ---
 export 'src/memory/domain/dtos/filters/memory_search_filter.dart';
+export 'src/memory/domain/dtos/memory_neighbor.dart';
 export 'src/memory/domain/dtos/memory_search_result.dart';
 export 'src/memory/domain/entities/memory_entity.dart';
 export 'src/memory/domain/enums/memory_kind.dart';
@@ -38,6 +39,7 @@ export 'src/memory/memory_module.dart';
 
 // --- rule ---
 export 'src/rule/domain/dtos/filters/rule_search_filter.dart';
+export 'src/rule/domain/dtos/rule_neighbor.dart';
 export 'src/rule/domain/dtos/rule_search_result.dart';
 export 'src/rule/domain/dtos/rules_for_task_query.dart';
 export 'src/rule/domain/entities/rule_entity.dart';
@@ -54,6 +56,23 @@ export 'src/rule/infra/repositories/rule_repository_impl.dart';
 export 'src/rule/external/datasources/database/database_rule_datasource.dart';
 export 'src/rule/external/mappers/database/database_rule_mapper.dart';
 export 'src/rule/rule_module.dart';
+
+// --- skill ---
+export 'src/skill/domain/dtos/filters/skill_search_filter.dart';
+export 'src/skill/domain/dtos/skill_search_result.dart';
+export 'src/skill/domain/entities/skill_entity.dart';
+export 'src/skill/domain/errors/skill_failure.dart';
+export 'src/skill/domain/repositories/skill_repository.dart';
+export 'src/skill/domain/usecases/get_skill_usecase.dart';
+export 'src/skill/domain/usecases/list_skills_usecase.dart';
+export 'src/skill/domain/usecases/retire_skill_usecase.dart';
+export 'src/skill/domain/usecases/save_skill_usecase.dart';
+export 'src/skill/domain/usecases/search_skills_usecase.dart';
+export 'src/skill/infra/datasources/skill_datasource.dart';
+export 'src/skill/infra/repositories/skill_repository_impl.dart';
+export 'src/skill/external/datasources/database/database_skill_datasource.dart';
+export 'src/skill/external/mappers/database/database_skill_mapper.dart';
+export 'src/skill/skill_module.dart';
 
 // --- product ---
 export 'src/product/domain/dtos/filters/product_filter.dart';
@@ -89,9 +108,12 @@ export 'src/architecture/architecture_module.dart';
 export 'src/maintenance/domain/dtos/decay_policy.dart';
 export 'src/maintenance/domain/dtos/lint_report.dart';
 export 'src/maintenance/domain/dtos/maintenance_report.dart';
+export 'src/maintenance/domain/dtos/reembed_report.dart';
+export 'src/maintenance/domain/dtos/reembed_target.dart';
 export 'src/maintenance/domain/errors/maintenance_failure.dart';
 export 'src/maintenance/domain/repositories/maintenance_repository.dart';
 export 'src/maintenance/domain/usecases/lint_usecase.dart';
+export 'src/maintenance/domain/usecases/reembed_usecase.dart';
 export 'src/maintenance/domain/usecases/run_maintenance_usecase.dart';
 export 'src/maintenance/infra/datasources/maintenance_datasource.dart';
 export 'src/maintenance/infra/repositories/maintenance_repository_impl.dart';

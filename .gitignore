@@ -4,6 +4,9 @@
 build/
 pubspec_overrides.yaml
 
+# Packaged installer output (large, built artifact)
+dist/
+
 # Coverage
 coverage/
 
@@ -30,6 +33,13 @@ id_ed25519*
 *.ppk
 secrets/
 *.secret
+
+# Database backups / seeds — may contain sensitive memory content, so ignored
+# by default. To version a shared memory bank intentionally, force-add it:
+#   git add -f backups/oracle_seed.sql
+backups/*.sql
+backups/*.sql.tmp
+!backups/.gitkeep
 
 # OS
 .DS_Store

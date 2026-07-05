@@ -1,6 +1,6 @@
 # MCP tools (reference)
 
-> The 32 tools exposed by the MCP server (stdio). Each is wired to a use case via DI; arguments map to the use
+> The 39 tools exposed by the MCP server (stdio). Each is wired to a use case via DI; arguments map to the use
 > case input, and the result is returned as JSON (errors carry `isError`).
 
 The server also advertises static MCP **`instructions`** that the client auto-injects once at connect time —
@@ -70,7 +70,23 @@ short standing guidance on how to use these tools. For the agent-facing operatin
 | Tool | Args | Description |
 |---|---|---|
 | `oracle_maintenance_run` | `dryRun?`, `decay?`, `dedup?`, `tiers?`, `staleDays?`, `minImportance?`, `minAccessCount?`, `dedupDistance?`, `limit?` | Deterministic sweep over memories (decay + dedup). `dryRun:true` previews. |
-| `oracle_maintenance_lint` | — | Read-only health check (memories/rules without embedding, old user demands with no agent work). |
+| `oracle_maintenance_lint` | — | Read-only health check (memories/rules without embedding, old user demands with no agent work, vectors with a stale embedding model). |
+| `oracle_maintenance_reembed` | `limit?` | Re-embed rows whose vector is missing or from a different model, using the configured embedder. Bounded per call; re-run while `mayHaveMore`. |
+| `oracle_maintenance_backup` | `path?` | Write a portable data seed (all rows + embeddings) to a `.sql` file. Restore with `oracle_ai restore-db` / auto on `docker up` (see operations §9). |
+
+## Skills (central shared library)
+
+One skill library for every agent — stored in the database, versioned by key, searched by context.
+No per-agent folder duplication; `oracle_ai sync-skills [dir]` materializes it to `dir/<key>/SKILL.md`
+(default `~/.claude/skills`) for agents with native skill discovery.
+
+| Tool | Args | Description |
+|---|---|---|
+| `oracle_skill_save` | `key`, `name`, `description`, `content`, `projectId?`, `productId?`, `tags?` | Create/refine a skill. Same key in the same scope supersedes; omit both ids for a GLOBAL skill. Unchanged re-save is a free no-op. |
+| `oracle_skill_search` | `query`, `projectId?`, `productId?`, `limit?` | Find skills by task context (hybrid RRF). Returns key+name+description (cheap); load with `oracle_skill_get`. |
+| `oracle_skill_get` | `id?` \| `key?`, `projectId?`, `productId?` | Full content. A key resolves project → product → global (override). Bumps usage. |
+| `oracle_skill_list` | `projectId?`, `productId?`, `limit?` | Inventory (global + scoped), name+description only. |
+| `oracle_skill_retire` | `id`, `reason?`, `hard?` | Soft retire (audit) or hard delete. |
 
 ## Measurement
 

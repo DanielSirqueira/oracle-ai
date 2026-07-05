@@ -32,6 +32,7 @@ abstract interface class CaptureDatasource {
     IdVO projectId,
     List<double> queryEmbedding, {
     int limit,
+    String? queryModel,
   });
 
   Future<List<SessionEntity>> recentSessions(IdVO projectId, {int limit});

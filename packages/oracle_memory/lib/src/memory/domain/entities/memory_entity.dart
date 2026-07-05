@@ -14,6 +14,12 @@ class MemoryEntity {
   final IdVO id;
   final IdVO? productId;
   final IdVO? projectId;
+
+  /// Optional stable identity. When set, re-saving a memory with the same
+  /// [key] in the same owner supersedes the previous version (like rules),
+  /// so an agent updates one memory instead of piling up near-duplicates.
+  /// Keyless memories keep the old free-form, append-only behavior.
+  final String? key;
   final MemoryTier tier;
   final MemoryKind kind;
   final TextVO title;
@@ -31,6 +37,7 @@ class MemoryEntity {
     required this.id,
     this.productId,
     this.projectId,
+    this.key,
     required this.tier,
     required this.kind,
     required this.title,
@@ -57,6 +64,7 @@ class MemoryEntity {
     IdVO? id,
     IdVO? productId,
     IdVO? projectId,
+    String? key,
     MemoryTier? tier,
     MemoryKind? kind,
     TextVO? title,
@@ -74,6 +82,7 @@ class MemoryEntity {
       id: id ?? this.id,
       productId: productId ?? this.productId,
       projectId: projectId ?? this.projectId,
+      key: key ?? this.key,
       tier: tier ?? this.tier,
       kind: kind ?? this.kind,
       title: title ?? this.title,
@@ -96,6 +105,7 @@ class MemoryEntity {
         other.id == id &&
         other.productId == productId &&
         other.projectId == projectId &&
+        other.key == key &&
         other.tier == tier &&
         other.kind == kind &&
         other.title == title &&
@@ -113,6 +123,7 @@ class MemoryEntity {
         id,
         productId,
         projectId,
+        key,
         tier,
         kind,
         title,

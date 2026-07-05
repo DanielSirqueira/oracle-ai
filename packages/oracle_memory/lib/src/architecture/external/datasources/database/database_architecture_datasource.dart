@@ -96,18 +96,23 @@ class DatabaseArchitectureDatasource implements ArchitectureDatasource {
         params['area'] = filter.area!.trim();
       }
 
-      // architectures has no fts column, so we build the tsvector inline.
+      // Uses the stored generated `fts` column (added in migration v1.5.0) so the
+      // lexical leg is served by a GIN index instead of a per-row inline tsvector.
       final ctes = <String>[
-        "scoped AS (SELECT id, embedding, "
-            "to_tsvector('english', coalesce(area,'') || ' ' || coalesce(content,'')) AS fts "
-            "FROM architectures m WHERE ${scope.join(' AND ')})",
+        'scoped AS (SELECT id, embedding, embedding_model, fts FROM architectures m '
+            'WHERE ${scope.join(' AND ')})',
       ];
       final fused = <String>[];
 
       if (mode == ArchitectureSearchMode.semantic || mode == ArchitectureSearchMode.hybrid) {
+        final semWhere = <String>['embedding IS NOT NULL'];
+        if (filter.queryModel != null && filter.queryModel!.isNotEmpty) {
+          semWhere.add('embedding_model = :qmodel');
+          params['qmodel'] = filter.queryModel;
+        }
         ctes.add(
           'semantic AS (SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> :qvec::vector(1024)) AS rnk '
-          'FROM scoped WHERE embedding IS NOT NULL LIMIT $_candidatePool)',
+          'FROM scoped WHERE ${semWhere.join(' AND ')} ORDER BY rnk LIMIT $_candidatePool)',
         );
         fused.add('SELECT id, 1.0/($_rrfK + rnk) AS s FROM semantic');
         params['qvec'] = SqlVector(filter.queryEmbedding!);
@@ -115,7 +120,7 @@ class DatabaseArchitectureDatasource implements ArchitectureDatasource {
       if (mode == ArchitectureSearchMode.keyword || mode == ArchitectureSearchMode.hybrid) {
         ctes.add(
           "lexical AS (SELECT id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(fts, websearch_to_tsquery('english', :q)) DESC) AS rnk "
-          "FROM scoped WHERE fts @@ websearch_to_tsquery('english', :q) LIMIT $_candidatePool)",
+          "FROM scoped WHERE fts @@ websearch_to_tsquery('english', :q) ORDER BY rnk LIMIT $_candidatePool)",
         );
         fused.add('SELECT id, 1.0/($_rrfK + rnk) AS s FROM lexical');
         params['q'] = filter.query.trim();

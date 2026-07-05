@@ -9,6 +9,11 @@ enum RuleSearchMode { keyword, semantic, hybrid }
 class RuleSearchFilter {
   final String query;
   final List<double>? queryEmbedding;
+
+  /// Model that produced [queryEmbedding]; when set, the semantic leg only
+  /// compares against same-model stored vectors (see MemorySearchFilter).
+  final String? queryModel;
+
   final IdVO? projectId;
   final IdVO? productId;
 
@@ -21,6 +26,7 @@ class RuleSearchFilter {
   const RuleSearchFilter({
     this.query = '',
     this.queryEmbedding,
+    this.queryModel,
     this.projectId,
     this.productId,
     this.scope,
@@ -29,10 +35,11 @@ class RuleSearchFilter {
     this.limit = 10,
   });
 
-  RuleSearchFilter copyWith({List<double>? queryEmbedding}) {
+  RuleSearchFilter copyWith({List<double>? queryEmbedding, String? queryModel}) {
     return RuleSearchFilter(
       query: query,
       queryEmbedding: queryEmbedding ?? this.queryEmbedding,
+      queryModel: queryModel ?? this.queryModel,
       projectId: projectId,
       productId: productId,
       scope: scope,

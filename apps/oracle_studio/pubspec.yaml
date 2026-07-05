@@ -1,0 +1,47 @@
+name: oracle_studio
+description: >-
+  Oracle Studio — desktop control center for the Oracle AI memory bank:
+  browse and curate memories/rules/skills/sessions, run backups, and keep
+  the daemon in the tray. Reuses the oracle_* Dart packages directly.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  oracle_core:
+    path: ../../packages/oracle_core
+  oracle_memory:
+    path: ../../packages/oracle_memory
+  oracle_server:
+    path: ../../packages/oracle_server
+  window_manager: ^0.4.3
+  tray_manager: ^0.3.2
+  launch_at_startup: ^0.5.1
+  file_selector: ^1.1.0
+  # Renders the markdown that agents write into rules/memories/skills/messages.
+  gpt_markdown: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
