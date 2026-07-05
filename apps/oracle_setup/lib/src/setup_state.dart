@@ -668,6 +668,10 @@ volumes:
   /// Agents point at the INSTALLED binary — the MCP lives with the program.
   String get mcpSnippet => mcpJson(command: installedCli);
 
+  /// Where each major agent (Claude Code, Cursor, Codex, Antigravity, …) keeps
+  /// its MCP config file — so the user knows where to paste the block above.
+  String get agentTargets => agentTargetsMarkdown(command: installedCli);
+
   /// Detailed instruction block to paste into the agent's CLAUDE.md/AGENTS.md.
   String get agentPrompt => agentProtocol().trim();
 

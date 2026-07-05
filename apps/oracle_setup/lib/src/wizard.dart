@@ -537,6 +537,8 @@ class _SetupWizardState extends State<SetupWizard> {
       const SizedBox(height: 12),
       _snippet(context, l10n.t('agents.mcp'), s.mcpSnippet),
       const SizedBox(height: 12),
+      _snippet(context, l10n.t('agents.targetsTitle'), s.agentTargets),
+      const SizedBox(height: 12),
       _snippet(context, l10n.t('agents.hooks'), s.hooksSnippet),
       const SizedBox(height: 12),
       Text(l10n.t('agents.promptIntro'),

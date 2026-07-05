@@ -214,6 +214,22 @@ oracle_ai install-mcp /path/to/oracle_ai   # prints the .mcp.json snippet
 oracle_ai install-hooks                     # prints the settings.json hooks block
 ```
 
+### Where each agent keeps its MCP config
+
+Paste the `mcpServers` block into your agent's config file — the wizard and Oracle Studio show this same
+table with your exact installed path:
+
+| Agent | Config file | Scope |
+|---|---|---|
+| Claude Code | `.mcp.json` at the project root — or `claude mcp add` | project / user |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` (macOS `~/Library/Application Support/Claude/`) | global |
+| Cursor | `.cursor/mcp.json` (project) · `~/.cursor/mcp.json` (global) | both |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | global |
+| Google Antigravity | `~/.gemini/config/mcp_config.json` (global) · `.agents/mcp_config.json` (workspace) | both |
+| Gemini CLI | `~/.gemini/settings.json` · `.gemini/settings.json` (project) | both |
+| VS Code (Copilot) | `.vscode/mcp.json` — top-level key is `servers`, not `mcpServers` | project |
+| OpenAI Codex CLI | `~/.codex/config.toml` — TOML: `[mcp_servers.oracle-ai]` | global |
+
 > **Cost-aware by design.** Recall is injected at a *stable* position (session start) or *gated* by relevance,
 > never as a per-turn-varying tail — so it does not trade a cheap cached prefix for expensive cache misses.
 

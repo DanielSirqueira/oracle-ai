@@ -74,6 +74,7 @@ const _pt = <String, String>{
   'inst.done': 'Instalado ✓',
   'agents.title': 'Conectar os agentes',
   'agents.mcp': '.mcp.json (na raiz de cada projeto do agente)',
+  'agents.targetsTitle': 'Onde configurar cada agente (Claude Code, Cursor, Codex, Antigravity…)',
   'agents.hooks': 'settings.json do Claude Code — bloco "hooks"',
   'agents.promptIntro':
       'Cole o protocolo abaixo no arquivo de instruções do agente (CLAUDE.md / AGENTS.md) para '
@@ -225,6 +226,7 @@ const _en = <String, String>{
   'inst.done': 'Installed ✓',
   'agents.title': 'Wire your agents',
   'agents.mcp': '.mcp.json (at each agent project root)',
+  'agents.targetsTitle': 'Where to configure each agent (Claude Code, Cursor, Codex, Antigravity…)',
   'agents.hooks': 'Claude Code settings.json — "hooks" block',
   'agents.promptIntro':
       "Paste the protocol below into your agent's instruction file (CLAUDE.md / AGENTS.md) to teach it "

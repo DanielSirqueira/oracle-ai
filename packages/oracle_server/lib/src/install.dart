@@ -18,6 +18,47 @@ String mcpJson({String? command}) {
   return const JsonEncoder.withIndent('  ').convert(entry);
 }
 
+/// Where each major agent keeps its MCP configuration file — so the user knows
+/// exactly where to paste the `oracle-ai` server block above. Single source of
+/// truth shared by the installer wizard and Oracle Studio.
+///
+/// [command] is the installed CLI path; it's only needed to render the one agent
+/// whose format differs enough that the JSON block won't paste as-is (Codex uses
+/// TOML). VS Code differs only by its top-level key (`servers`), noted below.
+String agentTargetsMarkdown({required String command}) {
+  // TOML *literal* string (single quotes) so Windows backslashes in the path are
+  // taken verbatim instead of being read as escape sequences.
+  final codexToml = "[mcp_servers.oracle-ai]\ncommand = '$command'\nargs = []";
+  return '''
+## Where to configure each agent
+
+Most agents read the JSON block above (top-level `mcpServers`). Paste it into that
+agent's MCP config file — typically one of these:
+
+| Agent | Config file (Windows) | Scope |
+| --- | --- | --- |
+| Claude Code | `.mcp.json` in the project root — or run `claude mcp add` | project / user |
+| Claude Desktop | `%APPDATA%\\Claude\\claude_desktop_config.json` | global |
+| Cursor | `.cursor\\mcp.json` (project) · `%USERPROFILE%\\.cursor\\mcp.json` (global) | project / global |
+| Windsurf | `%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json` | global |
+| Google Antigravity | `%USERPROFILE%\\.gemini\\config\\mcp_config.json` (global) · `.agents\\mcp_config.json` (workspace) | global / workspace |
+| Gemini CLI | `%USERPROFILE%\\.gemini\\settings.json` · `.gemini\\settings.json` (project) | global / project |
+
+On macOS/Linux replace `%USERPROFILE%` with `~`, and for Claude Desktop use
+`~/Library/Application Support/Claude/` (macOS) or `~/.config/Claude/` (Linux).
+
+**Two agents need a different shape:**
+
+- **VS Code (GitHub Copilot)** — file `.vscode\\mcp.json`; the top-level key is
+  `servers` (not `mcpServers`). Use the inner `"oracle-ai": { ... }` object under `servers`.
+- **OpenAI Codex CLI** — file `%USERPROFILE%\\.codex\\config.toml`, which is TOML, not JSON:
+
+```toml
+$codexToml
+```
+''';
+}
+
 String hooksJson({String host = '127.0.0.1', int port = 49500, String? token}) {
   final url = 'http://$host:$port/hook';
   final trimmedToken = token?.trim() ?? '';

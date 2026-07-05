@@ -15,6 +15,7 @@ import '../../core/l10n.dart';
 import '../../core/oracle_connection.dart';
 import '../../core/settings_store.dart';
 import '../../widgets/editor_dialog.dart';
+import '../../widgets/markdown_view.dart';
 
 /// Settings, Untitled-UI style: structured sections with label/description
 /// rows. The .env is edited through a FORM (merge-saved, comments preserved);
@@ -161,9 +162,12 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final daemon = widget.daemon;
     final settings = daemon.settings;
+    // The CLI binary sits NEXT TO the .env (installer puts oracle_ai.exe and .env
+    // together in the program root). No `build\` subfolder — that was the dev-tree
+    // layout and produced a path that doesn't exist in an install.
     final binPath = widget.connection.envDir == null
         ? 'oracle_ai.exe'
-        : '${widget.connection.envDir}${Platform.pathSeparator}build${Platform.pathSeparator}oracle_ai.exe';
+        : '${widget.connection.envDir}${Platform.pathSeparator}oracle_ai.exe';
     final mcpSnippet = server.mcpJson(command: binPath);
     final hooksSnippet = server.hooksJson(
       host: _httpHost.text.trim(),
@@ -455,12 +459,17 @@ class _SettingsPageState extends State<SettingsPage> {
           // ── agent integration ──
           SectionCard(
             title: l10n.t('set.agents'),
-            description: widget.connection.envPath,
+            description: l10n.t('set.agentsDesc'),
             children: [
               SettingRow(
                 label: l10n.t('set.mcpTitle'),
                 stacked: true,
                 control: _snippet(mcpSnippet, () => _copy(mcpSnippet, '.mcp.json')),
+              ),
+              SettingRow(
+                label: l10n.t('set.targetsTitle'),
+                stacked: true,
+                control: MarkdownView(server.agentTargetsMarkdown(command: binPath)),
               ),
               SettingRow(
                 label: l10n.t('set.hooksTitle'),
