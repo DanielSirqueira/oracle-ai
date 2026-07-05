@@ -1,6 +1,7 @@
 import 'package:oracle_core/oracle_core.dart';
 
 import '../../domain/dtos/filters/skill_search_filter.dart';
+import '../../domain/dtos/skill_neighbor.dart';
 import '../../domain/dtos/skill_search_result.dart';
 import '../../domain/entities/skill_entity.dart';
 
@@ -8,6 +9,18 @@ import '../../domain/entities/skill_entity.dart';
 /// the repository wraps them in a `ResultDart`.
 abstract interface class SkillDatasource {
   Future<SkillEntity> saveSkill(SkillEntity skill);
+
+  /// Latest skills near [embedding] in the same owner (same model), excluding
+  /// [excludeId] — the save-time near-duplicate signal.
+  Future<List<SkillNeighbor>> nearestByEmbedding({
+    IdVO? productId,
+    IdVO? projectId,
+    required List<double> embedding,
+    required String embeddingModel,
+    IdVO? excludeId,
+    double maxDistance,
+    int limit,
+  });
 
   /// The current (is_latest) skill with [key] in the given owner (project,
   /// product, or global when both ids are null), or null.

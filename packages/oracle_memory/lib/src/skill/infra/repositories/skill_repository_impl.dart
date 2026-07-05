@@ -1,6 +1,7 @@
 import 'package:oracle_core/oracle_core.dart';
 
 import '../../domain/dtos/filters/skill_search_filter.dart';
+import '../../domain/dtos/skill_neighbor.dart';
 import '../../domain/dtos/skill_search_result.dart';
 import '../../domain/entities/skill_entity.dart';
 import '../../domain/errors/skill_failure.dart';
@@ -17,6 +18,31 @@ class SkillRepositoryImpl implements SkillRepository {
       return Success(await _datasource.saveSkill(skill));
     } on SkillFailure catch (failure) {
       return Failure(failure);
+    }
+  }
+
+  @override
+  Future<List<SkillNeighbor>> nearestByEmbedding({
+    IdVO? productId,
+    IdVO? projectId,
+    required List<double> embedding,
+    required String embeddingModel,
+    IdVO? excludeId,
+    double maxDistance = 0.12,
+    int limit = 3,
+  }) async {
+    try {
+      return await _datasource.nearestByEmbedding(
+        productId: productId,
+        projectId: projectId,
+        embedding: embedding,
+        embeddingModel: embeddingModel,
+        excludeId: excludeId,
+        maxDistance: maxDistance,
+        limit: limit,
+      );
+    } on SkillFailure {
+      return const []; // non-critical signal — degrade to no neighbors
     }
   }
 

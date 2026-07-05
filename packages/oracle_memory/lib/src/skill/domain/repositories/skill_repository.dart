@@ -1,6 +1,7 @@
 import 'package:oracle_core/oracle_core.dart';
 
 import '../dtos/filters/skill_search_filter.dart';
+import '../dtos/skill_neighbor.dart';
 import '../dtos/skill_search_result.dart';
 import '../entities/skill_entity.dart';
 import '../errors/skill_failure.dart';
@@ -10,6 +11,19 @@ abstract interface class SkillRepository {
   /// Saves a skill, superseding any current version with the same key in the
   /// same owner (project, product, or global).
   AsyncResultDart<SkillEntity, SkillFailure> saveSkill(SkillEntity skill);
+
+  /// Latest skills near [embedding] (same owner + model), excluding [excludeId]
+  /// — the save-time near-duplicate signal. A failed lookup degrades to an empty
+  /// list, so it is a plain optional, not a Result.
+  Future<List<SkillNeighbor>> nearestByEmbedding({
+    IdVO? productId,
+    IdVO? projectId,
+    required List<double> embedding,
+    required String embeddingModel,
+    IdVO? excludeId,
+    double maxDistance,
+    int limit,
+  });
 
   /// The current (is_latest) skill with [key] in the given owner, or null when
   /// none exists. Used to short-circuit an unchanged re-save before embedding.

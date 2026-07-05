@@ -538,7 +538,8 @@ Capture is automatic — hooks record the session, each user request, and your w
           content: TextVO('${a['content'] ?? ''}'),
           tags: _stringList(a['tags']),
         ));
-        return result.fold((s) => _ok(_skillJson(s)), _err);
+        if (result.isError()) return _err(result.exceptionOrNull()!);
+        return _ok(await _skillJsonWithSimilar(result.getOrThrow()));
       },
     );
 
@@ -1258,6 +1259,33 @@ Capture is automatic — hooks record the session, each user request, and your w
           .toList();
       json['similarNote'] = 'A similar rule already exists. Prefer refining it (re-save with '
           'its key) over creating a near-duplicate rule.';
+    }
+    return json;
+  }
+
+  /// Skill JSON augmented with the same near-duplicate signal, so the agent
+  /// refines an existing skill (reuse its key) instead of creating a duplicate.
+  static Future<Map<String, dynamic>> _skillJsonWithSimilar(SkillEntity s) async {
+    final json = _skillJson(s);
+    if (s.embedding == null || s.embeddingModel == null) return json;
+    final near = await injector.get<SkillRepository>().nearestByEmbedding(
+          productId: s.productId,
+          projectId: s.projectId,
+          embedding: s.embedding!,
+          embeddingModel: s.embeddingModel!,
+          excludeId: s.id,
+        );
+    if (near.isNotEmpty) {
+      json['similar'] = near
+          .map((n) => {
+                'id': n.skill.id.value,
+                'key': n.skill.key,
+                'name': n.skill.name.value,
+                'distance': double.parse(n.distance.toStringAsFixed(3)),
+              })
+          .toList();
+      json['similarNote'] = 'A similar skill already exists. Prefer refining it (re-save with '
+          'its key) over creating a near-duplicate skill.';
     }
     return json;
   }

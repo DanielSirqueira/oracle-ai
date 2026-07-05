@@ -1,6 +1,7 @@
 import 'package:oracle_core/oracle_core.dart';
 
 import '../../../domain/dtos/filters/skill_search_filter.dart';
+import '../../../domain/dtos/skill_neighbor.dart';
 import '../../../domain/dtos/skill_search_result.dart';
 import '../../../domain/entities/skill_entity.dart';
 import '../../../domain/errors/skill_failure.dart';
@@ -72,6 +73,48 @@ class DatabaseSkillDatasource implements SkillDatasource {
         createdAt: row['created_at']?.toDateTime(),
         updatedAt: row['updated_at']?.toDateTime(),
       );
+    } on DatabaseFailure catch (error) {
+      throw DatasourceSkillFailure(errorMessage: error.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  @override
+  Future<List<SkillNeighbor>> nearestByEmbedding({
+    IdVO? productId,
+    IdVO? projectId,
+    required List<double> embedding,
+    required String embeddingModel,
+    IdVO? excludeId,
+    double? maxDistance,
+    int? limit,
+  }) async {
+    try {
+      final (owner, ownerParams) = _owner(projectId, productId);
+      final params = <String, Object?>{
+        'vec': SqlVector(embedding),
+        'model': embeddingModel,
+        // Tight default so the signal only fires on genuinely near-duplicate
+        // skills, not every thematically related one.
+        'maxd': maxDistance ?? 0.12,
+        'lim': limit ?? 3,
+        'xid': excludeId?.value,
+        ...ownerParams,
+      };
+      // Same-model only; excludes the just-saved row and retired skills.
+      final sql = 'SELECT $_columns, (embedding <=> :vec::vector(1024)) AS distance '
+          'FROM skills '
+          'WHERE is_latest AND retired_at IS NULL AND embedding IS NOT NULL '
+          'AND embedding_model = :model AND $owner '
+          'AND (:xid::uuid IS NULL OR id <> :xid::uuid) '
+          'AND (embedding <=> :vec::vector(1024)) < :maxd '
+          'ORDER BY distance LIMIT :lim';
+      final result = await _database.select(SqlStatement(sql, params));
+      return result.rows
+          .map((r) => SkillNeighbor(
+                skill: DatabaseSkillMapper.fromRow(r),
+                distance: r['distance']?.toDouble() ?? 1.0,
+              ))
+          .toList();
     } on DatabaseFailure catch (error) {
       throw DatasourceSkillFailure(errorMessage: error.errorMessage, stackTrace: StackTrace.current);
     }

@@ -59,6 +59,7 @@ export 'src/rule/rule_module.dart';
 
 // --- skill ---
 export 'src/skill/domain/dtos/filters/skill_search_filter.dart';
+export 'src/skill/domain/dtos/skill_neighbor.dart';
 export 'src/skill/domain/dtos/skill_search_result.dart';
 export 'src/skill/domain/entities/skill_entity.dart';
 export 'src/skill/domain/errors/skill_failure.dart';
