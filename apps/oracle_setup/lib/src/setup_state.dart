@@ -30,6 +30,13 @@ class SetupState extends ChangeNotifier {
   // ── embedder ──
   String embedderProvider = 'local';
   String embedderApiKey = '';
+  bool embedTested = false;
+  String? embedError;
+  int? embedDims;
+
+  // ── backup restore ──
+  String? backupFile;
+  bool? backupValid;
 
   // ── security ──
   String hookToken = '';
@@ -48,22 +55,26 @@ class SetupState extends ChangeNotifier {
   DatabaseConfig get dbConfig => DatabaseConfig(
       host: dbHost, port: dbPort, user: dbUser, password: dbPassword, database: dbName);
 
-  /// Where the configuration lives. Prefers an existing repo .env (dev run);
-  /// falls back to the per-user install dir (packaged run).
-  String get envTargetPath {
-    var dir = Directory.current;
-    for (var i = 0; i < 10; i++) {
-      if (File('${dir.path}${Platform.pathSeparator}.env').existsSync() ||
-          File('${dir.path}${Platform.pathSeparator}.env.example').existsSync()) {
-        return '${dir.path}${Platform.pathSeparator}.env';
-      }
-      if (dir.parent.path == dir.path) break;
-      dir = dir.parent;
-    }
+  /// Program install root, following the OS convention for per-user apps
+  /// (no admin needed): %LOCALAPPDATA%\Programs\Oracle AI on Windows — the
+  /// same pattern VS Code and Claude Desktop use. Binaries + .env live here.
+  String get installRoot {
+    final sep = Platform.pathSeparator;
     final base = Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path;
-    return '$base${Platform.pathSeparator}OracleAI${Platform.pathSeparator}.env';
+    return '$base${sep}Programs${sep}Oracle AI';
   }
 
+  /// Configuration lives WITH the installed program.
+  String get envTargetPath => '$installRoot${Platform.pathSeparator}.env';
+
+  /// The MCP/CLI binary's installed location — what agents point at.
+  String get installedCli => '$installRoot${Platform.pathSeparator}oracle_ai.exe';
+
+  /// The installed Studio executable.
+  String get installedStudio =>
+      '$installRoot${Platform.pathSeparator}studio${Platform.pathSeparator}oracle_studio.exe';
+
+  /// Database/data area (cluster, downloads) — app DATA, not program files.
   String get installBase {
     final base = Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path;
     return '$base${Platform.pathSeparator}OracleAI';
@@ -76,6 +87,66 @@ class SetupState extends ChangeNotifier {
     dockerOk = await PgProvisioner.dockerAvailable();
     busy = false;
     notifyListeners();
+  }
+
+  /// Validates the embedding provider FOR REAL: builds the embedder exactly as
+  /// the server will and embeds a probe text. A wrong/expired API key fails
+  /// here, in the wizard — not silently after install.
+  Future<void> testEmbedding() async {
+    busy = true;
+    embedError = null;
+    embedTested = false;
+    notifyListeners();
+    try {
+      final embedder = createEmbedder(EmbeddingConfig.fromEnv({
+        'ORACLE_EMBEDDING_PROVIDER': embedderProvider,
+        'GEMINI_API_KEY': embedderApiKey.trim(),
+        'OPENAI_API_KEY': embedderApiKey.trim(),
+        'VOYAGE_API_KEY': embedderApiKey.trim(),
+      }));
+      final vector = await embedder
+          .embed('hello world')
+          .timeout(const Duration(seconds: 25));
+      if (vector.isEmpty) throw Exception('empty vector');
+      embedDims = vector.length;
+      embedTested = true;
+      _log('${l10n.t('log.embedOk')} (${embedder.model}, $embedDims dims)');
+    } catch (e) {
+      embedError = '$e';
+      _log('${l10n.t('log.embedFail')}: $e');
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  /// Picks + validates a backup seed: must exist, be non-empty and look like
+  /// an Oracle seed (header or INSERT statements) before restore is allowed.
+  Future<void> validateBackupFile(String path) async {
+    backupFile = path;
+    try {
+      final file = File(path);
+      if (!file.existsSync() || file.lengthSync() == 0) {
+        backupValid = false;
+      } else {
+        final raf = file.openSync();
+        final head = String.fromCharCodes(raf.readSync(4096));
+        raf.closeSync();
+        backupValid = head.contains('Oracle AI') || head.contains('INSERT INTO');
+      }
+    } catch (_) {
+      backupValid = false;
+    }
+    _log(backupValid == true
+        ? '${l10n.t('log.seedValid')}: $path'
+        : '${l10n.t('log.seedInvalid')}: $path');
+    notifyListeners();
+  }
+
+  /// Opens the installed Studio (final wizard step).
+  Future<void> launchInstalled() async {
+    await Process.start(installedStudio, const [],
+        workingDirectory: installRoot, mode: ProcessStartMode.detached);
   }
 
   void generateToken() {
@@ -289,41 +360,92 @@ volumes:
     return b.toString();
   }
 
-  /// Writes the .env, creates/migrates the database and (optionally) restores
-  /// a seed found next to the config. Uses the exact same boot path the
-  /// server runs, so a wizard success == a working installation.
-  Future<void> apply({bool restoreSeed = false}) async {
+  /// Copies a directory tree (the Studio payload) into the install root.
+  Future<int> _copyTree(Directory from, Directory to) async {
+    var copied = 0;
+    await to.create(recursive: true);
+    await for (final entity in from.list(recursive: true)) {
+      final rel = entity.path.substring(from.path.length + 1);
+      final target = '${to.path}${Platform.pathSeparator}$rel';
+      if (entity is Directory) {
+        await Directory(target).create(recursive: true);
+      } else if (entity is File) {
+        await entity.copy(target);
+        copied++;
+      }
+    }
+    return copied;
+  }
+
+  /// The real installation: program files copied to the OS-recommended
+  /// per-user location, .env written next to them, database migrated, seed
+  /// restored (when picked + valid) and EVERYTHING verified before declaring
+  /// success.
+  Future<void> apply() async {
     busy = true;
     error = null;
     notifyListeners();
     Database? database;
     try {
+      final sep = Platform.pathSeparator;
+      await Directory(installRoot).create(recursive: true);
+
+      // 1) Program payload → %LOCALAPPDATA%\Programs\Oracle AI.
+      final exeDir = File(Platform.resolvedExecutable).parent.path;
+      final appPayload = Directory('$exeDir${sep}app');
+      if (appPayload.existsSync()) {
+        _log('${l10n.t('log.copying')} $installRoot');
+        final cli = File('${appPayload.path}${sep}oracle_ai.exe');
+        if (cli.existsSync()) await cli.copy(installedCli);
+        final studioSrc = Directory('${appPayload.path}${sep}studio');
+        if (studioSrc.existsSync()) {
+          final n = await _copyTree(studioSrc, Directory('$installRoot${sep}studio'));
+          _log('${l10n.t('log.copied')} ($n files)');
+        }
+      } else {
+        _log(l10n.t('log.noAppPayload'));
+      }
+
+      // 2) Configuration lives with the program.
       final envFile = File(envTargetPath);
-      await envFile.parent.create(recursive: true);
       if (envFile.existsSync()) {
-        final backup = '${envFile.path}.bak';
-        await envFile.copy(backup);
-        _log('${l10n.t('log.envKept')} $backup');
+        await envFile.copy('${envFile.path}.bak');
+        _log('${l10n.t('log.envKept')} ${envFile.path}.bak');
       }
       await envFile.writeAsString(buildEnv(), flush: true);
       _log('${l10n.t('log.envWritten')} ${envFile.path}');
 
+      // 3) Create + migrate the database.
       _log(l10n.t('log.migrating'));
       final env = loadEnv(path: envFile.path);
       database = await Bootstrap.fromEnv(env).start(ensureDatabase: true);
       _log(l10n.t('log.migrated'));
 
-      if (restoreSeed) {
-        final seed = File('${envFile.parent.path}${Platform.pathSeparator}backups'
-            '${Platform.pathSeparator}oracle_seed.sql');
-        if (seed.existsSync()) {
-          final report = await DbBackupService(database).restore(seed.path);
-          _log(report.restored
-              ? '${l10n.t('log.seedRestored')}: ${report.rows} ${l10n.t('log.rows')}.'
-              : '${l10n.t('log.seedSkipped')} (${report.reason}).');
-        } else {
-          _log(l10n.t('log.seedMissing'));
-        }
+      // 4) Optional validated backup restore.
+      if (backupFile != null && backupValid == true) {
+        final report = await DbBackupService(database).restore(backupFile!);
+        _log(report.restored
+            ? '${l10n.t('log.seedRestored')}: ${report.rows} ${l10n.t('log.rows')}.'
+            : '${l10n.t('log.seedSkipped')} (${report.reason}).');
+      }
+
+      // 5) Final validation — nothing is "installed" until it all checks out.
+      _log(l10n.t('log.validating'));
+      final probe = await database.select(const SqlStatement(
+          "SELECT count(*) AS n FROM information_schema.tables "
+          "WHERE table_name IN ('memories','skills','rules')", {}));
+      final tables = probe.rows.first['n']?.toInt() ?? 0;
+      if (tables < 3) throw Exception('schema incompleto ($tables/3 tabelas)');
+      _log('  ✓ ${l10n.t('log.vSchema')}');
+      if (File(installedCli).existsSync()) {
+        _log('  ✓ MCP: $installedCli');
+      } else {
+        _log('  ⚠ ${l10n.t('log.vNoCli')}');
+      }
+      if (File(installedStudio).existsSync()) {
+        _log('  ✓ Studio: $installedStudio');
+      } else {
+        _log('  ⚠ ${l10n.t('log.vNoStudio')}');
       }
       installed = true;
       _log(l10n.t('log.done'));
@@ -339,15 +461,8 @@ volumes:
 
   // ── agent wiring ──
 
-  String get mcpSnippet {
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-    final devBin = File('${File(envTargetPath).parent.path}'
-        '${Platform.pathSeparator}build${Platform.pathSeparator}oracle_ai.exe');
-    final bin = devBin.existsSync()
-        ? devBin.path
-        : '$exeDir${Platform.pathSeparator}oracle_ai.exe';
-    return mcpJson(command: bin);
-  }
+  /// Agents point at the INSTALLED binary — the MCP lives with the program.
+  String get mcpSnippet => mcpJson(command: installedCli);
 
   String get hooksSnippet =>
       hooksJson(host: '127.0.0.1', port: 49500, token: hookToken.isEmpty ? null : hookToken);

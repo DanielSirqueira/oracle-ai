@@ -21,7 +21,12 @@ import 'package:oracle_server/oracle_server.dart';
 /// Environment (see .env / .env.example): ORACLE_DB_*, ORACLE_MIGRATIONS_DIR,
 /// ORACLE_DB_AUTO_CREATE, ORACLE_HTTP_HOST/PORT, ORACLE_MAINTENANCE_*.
 Future<void> main(List<String> args) async {
-  final env = loadEnv();
+  // Config resolution: cwd .env (repo/dev flow) → .env NEXT TO THE BINARY
+  // (installed flow: agents spawn the MCP with cwd at THEIR project, while
+  // the installer writes .env beside oracle_ai.exe in the program folder).
+  final exeEnv = '${File(Platform.resolvedExecutable).parent.path}'
+      '${Platform.pathSeparator}.env';
+  final env = loadEnv(path: File('.env').existsSync() ? '.env' : exeEnv);
 
   // Config generators (no DB needed) — print client wiring and exit.
   if (args.contains('install-mcp')) {

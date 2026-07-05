@@ -1,3 +1,4 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -30,12 +31,16 @@ class _SetupWizardState extends State<SetupWizard> {
   /// Why "Avançar" is blocked on the database step — shown next to the button
   /// so the user always knows the missing action.
   String? get _blockedHint {
-    if (_step != 2 || _canAdvance) return null;
-    return switch (_state.dbMode) {
-      DbMode.portable => l10n.t('db.hintPortable'),
-      DbMode.docker => l10n.t('db.hintDocker'),
-      DbMode.existing => l10n.t('db.hintExisting'),
-    };
+    if (_canAdvance) return null;
+    if (_step == 2) {
+      return switch (_state.dbMode) {
+        DbMode.portable => l10n.t('db.hintPortable'),
+        DbMode.docker => l10n.t('db.hintDocker'),
+        DbMode.existing => l10n.t('db.hintExisting'),
+      };
+    }
+    if (_step == 3) return l10n.t('embed.testHint');
+    return null;
   }
 
   static const _stepKeys = [
@@ -56,6 +61,8 @@ class _SetupWizardState extends State<SetupWizard> {
             DbMode.docker => _state.dockerReady,
             DbMode.portable => _state.portableReady,
           },
+        // API providers must pass the real "hello world" embedding test.
+        3 => _state.embedderProvider == 'local' || _state.embedTested,
         5 => _state.installed,
         _ => true,
       };
@@ -343,12 +350,40 @@ class _SetupWizardState extends State<SetupWizard> {
           const DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
           const DropdownMenuItem(value: 'voyage', child: Text('Voyage')),
         ],
-        onChanged: (v) => setState(() => s.embedderProvider = v ?? 'local'),
+        onChanged: (v) => setState(() {
+          s.embedderProvider = v ?? 'local';
+          s.embedTested = false;
+          s.embedError = null;
+        }),
       ),
       const SizedBox(height: 12),
-      if (s.embedderProvider != 'local')
-        _tf(l10n.t('embed.key'), s.embedderApiKey, (v) => s.embedderApiKey = v,
-            width: 480, obscure: true),
+      if (s.embedderProvider != 'local') ...[
+        _tf(l10n.t('embed.key'), s.embedderApiKey, (v) {
+          s.embedderApiKey = v;
+          s.embedTested = false;
+        }, width: 480, obscure: true),
+        const SizedBox(height: 12),
+        Row(children: [
+          FilledButton.icon(
+            onPressed: s.busy ? null : s.testEmbedding,
+            icon: s.busy
+                ? const SizedBox(
+                    width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.bolt, size: 16),
+            label: Text(s.busy ? l10n.t('embed.testing') : l10n.t('embed.test')),
+          ),
+          const SizedBox(width: 12),
+          if (s.embedTested)
+            StatusBadge('${l10n.t('embed.tested')}  ·  ${s.embedDims} dims'),
+          if (s.embedError != null)
+            Expanded(
+              child: Text(s.embedError!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: OracleBrand.error, fontSize: 12)),
+            ),
+        ]),
+      ],
     ]);
   }
 
@@ -380,38 +415,104 @@ class _SetupWizardState extends State<SetupWizard> {
 
   Widget _install(BuildContext context) {
     final s = _state;
-    var restoreSeed = false;
-    return StatefulBuilder(
-      builder: (context, setLocal) => ListView(children: [
-        GradientTitle(l10n.t('inst.title')),
-        const SizedBox(height: 8),
-        Text('${l10n.t('inst.target')}: ${s.envTargetPath}'),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: SelectableText(s.buildEnv(),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-          ),
+    Widget row(IconData icon, String label, String value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(icon, size: 16, color: OracleBrand.gray400),
+            const SizedBox(width: 10),
+            SizedBox(
+                width: 210,
+                child: Text(label,
+                    style: const TextStyle(fontSize: 12, color: OracleBrand.gray400))),
+            Expanded(
+                child: SelectableText(value, style: const TextStyle(fontSize: 12))),
+          ]),
+        );
+    return ListView(children: [
+      GradientTitle(l10n.t('inst.title')),
+      const SizedBox(height: 4),
+      Text(l10n.t('inst.summary'), style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 16),
+      // Human summary — no raw .env; the file is written automatically.
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            row(Icons.folder_special_outlined, l10n.t('inst.location'), s.installRoot),
+            row(Icons.storage_outlined, l10n.t('inst.dbSummary'),
+                '${s.dbHost}:${s.dbPort} · ${s.dbName}'),
+            row(Icons.bolt_outlined, l10n.t('inst.embedSummary'),
+                s.embedderProvider == 'local'
+                    ? 'local (offline)'
+                    : '${s.embedderProvider} · ${l10n.t('embed.tested')}'),
+            row(Icons.terminal, l10n.t('inst.mcpSummary'), s.installedCli),
+          ]),
         ),
-        const SizedBox(height: 8),
-        CheckboxListTile(
-          value: restoreSeed,
-          onChanged: (v) => setLocal(() => restoreSeed = v ?? false),
-          title: Text(l10n.t('inst.seed')),
-          controlAffinity: ListTileControlAffinity.leading,
+      ),
+      const SizedBox(height: 12),
+      // Optional validated backup restore.
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(l10n.t('inst.pickBackup'),
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(l10n.t('inst.pickBackupDesc'),
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            Row(children: [
+              OutlinedButton.icon(
+                onPressed: s.busy
+                    ? null
+                    : () async {
+                        final file = await openFile(acceptedTypeGroups: [
+                          const XTypeGroup(label: 'SQL', extensions: ['sql'])
+                        ]);
+                        if (file != null) await s.validateBackupFile(file.path);
+                      },
+                icon: const Icon(Icons.folder_open, size: 16),
+                label: Text(l10n.t('inst.selectFile')),
+              ),
+              const SizedBox(width: 12),
+              if (s.backupFile != null)
+                Expanded(
+                  child: Row(children: [
+                    Flexible(
+                      child: Text(s.backupFile!,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12, color: OracleBrand.gray400)),
+                    ),
+                    const SizedBox(width: 8),
+                    StatusBadge(
+                      s.backupValid == true
+                          ? l10n.t('inst.backupOk')
+                          : l10n.t('inst.backupBad'),
+                      color: s.backupValid == true
+                          ? OracleBrand.success
+                          : OracleBrand.error,
+                    ),
+                  ]),
+                ),
+            ]),
+          ]),
         ),
-        FilledButton.icon(
-          onPressed: s.busy || s.installed ? null : () => s.apply(restoreSeed: restoreSeed),
-          icon: const Icon(Icons.rocket_launch),
-          label: Text(s.busy
-              ? l10n.t('inst.running')
-              : (s.installed ? l10n.t('inst.done') : l10n.t('inst.run'))),
-        ),
-        const SizedBox(height: 8),
-        _logBox(context),
-      ]),
-    );
+      ),
+      const SizedBox(height: 16),
+      FilledButton.icon(
+        onPressed: s.busy || s.installed ? null : s.apply,
+        icon: s.busy
+            ? const SizedBox(
+                width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+            : Icon(s.installed ? Icons.check : Icons.rocket_launch),
+        label: Text(s.busy
+            ? l10n.t('inst.running')
+            : (s.installed ? l10n.t('inst.done') : l10n.t('inst.installNow'))),
+      ),
+      const SizedBox(height: 8),
+      _logBox(context),
+    ]);
   }
 
   Widget _agents(BuildContext context) {
@@ -435,6 +536,14 @@ class _SetupWizardState extends State<SetupWizard> {
         Center(child: GradientTitle(l10n.t('finish.title'))),
         const SizedBox(height: 16),
         Text(l10n.t('finish.body')),
+        const SizedBox(height: 24),
+        Center(
+          child: FilledButton.icon(
+            onPressed: _state.launchInstalled,
+            icon: const Icon(Icons.rocket_launch),
+            label: Text(l10n.t('finish.open')),
+          ),
+        ),
       ]);
 
   // ── helpers ──
