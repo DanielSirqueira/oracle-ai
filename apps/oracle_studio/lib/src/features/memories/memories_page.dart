@@ -73,10 +73,12 @@ class _MemoriesPageState extends State<MemoriesPage> {
       context,
       title: original == null ? l10n.t('mem.newTitle') : l10n.t('mem.editTitle'),
       fields: (context, setState) => [
-        FieldRow(l10n.t('mem.fieldTitle'), title),
-        FieldRow(l10n.t('mem.fieldBody'), body, maxLines: 10),
-        FieldRow(l10n.t('mem.fieldKey'), key),
-        FieldRow(l10n.t('common.tags'), tags),
+        FieldRow(l10n.t('mem.fieldTitle'), title,
+            description: l10n.t('mem.fieldTitleDesc')),
+        FieldRow(l10n.t('mem.fieldBody'), body,
+            maxLines: 10, description: l10n.t('mem.fieldBodyDesc')),
+        FieldRow(l10n.t('mem.fieldKey'), key, description: l10n.t('mem.fieldKeyDesc')),
+        FieldRow(l10n.t('common.tags'), tags, description: l10n.t('common.tagsDesc')),
         Row(children: [
           Expanded(
             child: DropdownButtonFormField<String>(

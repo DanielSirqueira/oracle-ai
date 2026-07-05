@@ -62,11 +62,14 @@ class _RulesPageState extends State<RulesPage> {
       context,
       title: original == null ? l10n.t('rule.newTitle') : l10n.t('rule.editTitle'),
       fields: (context, setState) => [
-        FieldRow(l10n.t('rule.fieldKey'), key, enabled: original == null),
-        FieldRow(l10n.t('rule.fieldScope'), scope),
+        FieldRow(l10n.t('rule.fieldKey'), key,
+            enabled: original == null, description: l10n.t('rule.fieldKeyDesc')),
+        FieldRow(l10n.t('rule.fieldScope'), scope,
+            description: l10n.t('rule.fieldScopeDesc')),
         FieldRow(l10n.t('rule.fieldTitle'), title),
-        FieldRow(l10n.t('rule.fieldContent'), content, maxLines: 10),
-        FieldRow(l10n.t('common.tags'), tags),
+        FieldRow(l10n.t('rule.fieldContent'), content,
+            maxLines: 10, description: l10n.t('rule.fieldContentDesc')),
+        FieldRow(l10n.t('common.tags'), tags, description: l10n.t('common.tagsDesc')),
         Row(children: [
           Expanded(
             child: DropdownButtonFormField<String>(

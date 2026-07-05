@@ -42,11 +42,17 @@ void showSnack(BuildContext context, String message) {
     ..showSnackBar(SnackBar(content: Text(message)));
 }
 
+/// Untitled UI form field: a label (and optional helper text) ABOVE the input,
+/// not a floating label — clearer and more explanatory.
 class FieldRow extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final int maxLines;
   final String? hint;
+
+  /// Explanatory helper text shown under the label — use it to say what the
+  /// field is for, so the form documents itself.
+  final String? description;
   final bool enabled;
   const FieldRow(
     this.label,
@@ -54,23 +60,34 @@ class FieldRow extends StatelessWidget {
     super.key,
     this.maxLines = 1,
     this.hint,
+    this.description,
     this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        enabled: enabled,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          border: const OutlineInputBorder(),
-          isDense: true,
-        ),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w500)),
+          if (description != null) ...[
+            const SizedBox(height: 2),
+            Text(description!, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            maxLines: maxLines,
+            enabled: enabled,
+            decoration: InputDecoration(hintText: hint, isDense: true),
+          ),
+        ],
       ),
     );
   }
