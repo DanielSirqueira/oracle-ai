@@ -82,12 +82,18 @@ function Get-Payload($url, $name, $dir) {
 }
 
 # ── 1. database payload ──
+# ONLINE: don't bundle the DB (a /DONLINE define makes the .iss omit the payload
+# and name the output OracleAI-Setup-online.exe) — the payload cache is left
+# untouched. OFFLINE: ensure the zips are present (download once, then cached).
 $payload = Join-Path $rel 'payload'
+$isccDefines = @()
+$outName = 'OracleAI-Setup.exe'
 if ($Online) {
-  Step 'Online installer — leaving the DB payload OUT'
-  if (Test-Path $payload) { Remove-Item (Join-Path $payload '*') -Force -Recurse -ErrorAction SilentlyContinue }
+  Step 'Online installer — DB NOT bundled (wizard downloads it at install time)'
+  $isccDefines += '/DONLINE'
+  $outName = 'OracleAI-Setup-online.exe'
 } elseif ($SkipPayload) {
-  Step 'Skipping payload (using what is already in payload\)'
+  Step 'Skipping payload prep (using what is already in payload\)'
 } else {
   Step 'Preparing offline database payload (download if missing)'
   Get-Payload $PG_URL  $PG_ZIP  $payload
@@ -131,9 +137,9 @@ if (-not $iscc) {
 
 Step 'Compiling installer'
 New-Item -ItemType Directory -Force (Join-Path $repo 'dist') | Out-Null
-& $iscc (Join-Path $PSScriptRoot 'oracle_ai_setup.iss')
+& $iscc @isccDefines (Join-Path $PSScriptRoot 'oracle_ai_setup.iss')
 
-$out = Join-Path $repo 'dist\OracleAI-Setup.exe'
-if (-not (Test-Path $out)) { throw 'Inno Setup did not produce dist\OracleAI-Setup.exe' }
+$out = Join-Path $repo "dist\$outName"
+if (-not (Test-Path $out)) { throw "Inno Setup did not produce dist\$outName" }
 $mb = [math]::Round((Get-Item $out).Length / 1MB)
 Write-Host "OK: $out ($mb MB)" -ForegroundColor Green

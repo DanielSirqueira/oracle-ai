@@ -30,7 +30,13 @@ PrivilegesRequired=lowest
 CreateAppDir=no
 Uninstallable=no
 OutputDir=..\..\..\dist
+; Define ONLINE (ISCC /DONLINE) to build the smaller installer that downloads the
+; database at install time; otherwise the PostgreSQL payload is bundled (offline).
+#ifdef ONLINE
+OutputBaseFilename=OracleAI-Setup-online
+#else
 OutputBaseFilename=OracleAI-Setup
+#endif
 SetupIconFile=..\windows\runner\resources\app_icon.ico
 WizardStyle=modern
 ; The payload is already zip-compressed, so recompressing gains almost nothing
@@ -46,10 +52,15 @@ DisableReadyPage=yes
 DisableFinishedPage=yes
 
 [Files]
-; Already-compressed PostgreSQL / pgvector zips — don't recompress.
+#ifndef ONLINE
+; Already-compressed PostgreSQL / pgvector zips — don't recompress. (Offline only;
+; the ONLINE build omits these and the wizard downloads them at install time.)
 Source: "{#ReleaseDir}\payload\*"; DestDir: "{tmp}\OracleAISetup\payload"; \
     Flags: recursesubdirs ignoreversion nocompression
-; The wizard runtime + the app bundle (CLI + Studio) — these compress well.
+#endif
+; The wizard runtime + the app bundle (CLI + Studio) — these compress well. The
+; payload folder is excluded here so it is never double-bundled (or bundled at all
+; in the ONLINE build).
 Source: "{#ReleaseDir}\*"; DestDir: "{tmp}\OracleAISetup"; Excludes: "payload\*"; \
     Flags: recursesubdirs ignoreversion
 

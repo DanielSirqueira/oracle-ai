@@ -335,7 +335,7 @@ The script: downloads the DB payload if missing → compiles the CLI → builds 
 | Flag | Effect |
 |---|---|
 | *(none)* | Full offline installer (~342 MB) with the bundled database. |
-| `-Online` | Smaller installer (~77 MB) that downloads PostgreSQL at install time. |
+| `-Online` | Smaller installer (~27 MB, `OracleAI-Setup-online.exe`) that downloads PostgreSQL at install time. |
 | `-SkipBuild` | Reuse the last Flutter/Dart build — just re-assemble + re-package. |
 | `-SkipPayload` | Don't touch the payload folder (assume the zips are present). |
 

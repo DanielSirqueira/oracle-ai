@@ -287,7 +287,7 @@ release); (4) builds the setup wizard (Flutter release); (5) assembles the progr
 | Flag | Effect |
 |---|---|
 | *(none)* | Full **offline** installer (bundled database, no Docker needed at install time). |
-| `-Online` | Smaller **online** installer (~77 MB); the wizard downloads PostgreSQL at install time. |
+| `-Online` | Smaller **online** installer (~27 MB, `OracleAI-Setup-online.exe`); the wizard downloads PostgreSQL at install time. |
 | `-SkipBuild` | Reuse the last Flutter/Dart build; only re-assemble + re-package (fast iteration on the `.iss`). |
 | `-SkipPayload` | Leave the `payload\` folder as-is (don't download). |
 
