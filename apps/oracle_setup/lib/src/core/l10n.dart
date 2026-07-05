@@ -18,6 +18,8 @@ class L10n extends ChangeNotifier {
 const _pt = <String, String>{
   'step.welcome': 'Bem-vindo',
   'step.db': 'Banco de dados',
+  'step.dbSetup': 'Instalar banco',
+  'dbs.subtitle': 'Agora vamos deixar o banco escolhido pronto para uso.',
   'step.embed': 'Embeddings',
   'step.security': 'Segurança',
   'step.install': 'Instalar',
@@ -118,6 +120,8 @@ const _pt = <String, String>{
 const _en = <String, String>{
   'step.welcome': 'Welcome',
   'step.db': 'Database',
+  'step.dbSetup': 'Set up database',
+  'dbs.subtitle': 'Now let\'s get your chosen database ready to use.',
   'step.embed': 'Embeddings',
   'step.security': 'Security',
   'step.install': 'Install',

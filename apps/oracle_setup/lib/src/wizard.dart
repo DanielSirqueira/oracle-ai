@@ -30,7 +30,7 @@ class _SetupWizardState extends State<SetupWizard> {
   /// Why "Avançar" is blocked on the database step — shown next to the button
   /// so the user always knows the missing action.
   String? get _blockedHint {
-    if (_step != 1 || _canAdvance) return null;
+    if (_step != 2 || _canAdvance) return null;
     return switch (_state.dbMode) {
       DbMode.portable => l10n.t('db.hintPortable'),
       DbMode.docker => l10n.t('db.hintDocker'),
@@ -41,6 +41,7 @@ class _SetupWizardState extends State<SetupWizard> {
   static const _stepKeys = [
     'step.welcome',
     'step.db',
+    'step.dbSetup',
     'step.embed',
     'step.security',
     'step.install',
@@ -49,12 +50,13 @@ class _SetupWizardState extends State<SetupWizard> {
   ];
 
   bool get _canAdvance => switch (_step) {
-        1 => switch (_state.dbMode) {
+        // Step 1 is the CHOICE only; the action lives in step 2 (dbSetup).
+        2 => switch (_state.dbMode) {
             DbMode.existing => _state.existingOk == true,
             DbMode.docker => _state.dockerReady,
             DbMode.portable => _state.portableReady,
           },
-        4 => _state.installed,
+        5 => _state.installed,
         _ => true,
       };
 
@@ -123,10 +125,11 @@ class _SetupWizardState extends State<SetupWizard> {
                       child: switch (_step) {
                         0 => _welcome(context),
                         1 => _database(context),
-                        2 => _embedder(context),
-                        3 => _security(context),
-                        4 => _install(context),
-                        5 => _agents(context),
+                        2 => _dbSetup(context),
+                        3 => _embedder(context),
+                        4 => _security(context),
+                        5 => _install(context),
+                        6 => _agents(context),
                         _ => _finish(context),
                       },
                     ),
@@ -191,101 +194,131 @@ class _SetupWizardState extends State<SetupWizard> {
         Text(l10n.t('welcome.body')),
       ]);
 
+  /// Step 1: CHOICE ONLY — stacked full-width cards, no actions here.
   Widget _database(BuildContext context) {
     final s = _state;
+    Widget card(DbMode mode, IconData icon, String title, String desc, {Widget? badge}) =>
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _ModeCard(
+            selected: s.dbMode == mode,
+            icon: icon,
+            title: title,
+            description: desc,
+            badge: badge,
+            onTap: () => setState(() => s.dbMode = mode),
+          ),
+        );
     return ListView(children: [
       GradientTitle(l10n.t('db.title')),
       const SizedBox(height: 4),
       Text(l10n.t('db.subtitle'), style: Theme.of(context).textTheme.bodySmall),
       const SizedBox(height: 16),
+      card(DbMode.portable, Icons.all_inclusive, l10n.t('db.auto'), l10n.t('db.autoDesc'),
+          badge: s.portableReady
+              ? StatusBadge(l10n.t('db.ready'))
+              : StatusBadge(l10n.t('db.autoBadge'), color: OracleBrand.violet)),
+      card(DbMode.docker, Icons.directions_boat_outlined, l10n.t('db.dockerCard'),
+          l10n.t('db.dockerCardDesc'),
+          badge: s.dockerReady
+              ? StatusBadge(l10n.t('db.ready'))
+              : (s.dockerOk == false
+                  ? StatusBadge(l10n.t('db.dockerMissing'), color: OracleBrand.warning)
+                  : null)),
+      card(DbMode.existing, Icons.storage_outlined, l10n.t('db.existingCard'),
+          l10n.t('db.existingCardDesc'),
+          badge: s.existingOk == true ? StatusBadge(l10n.t('db.ready')) : null),
+    ]);
+  }
 
-      // ── mode cards ──
-      Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Expanded(
-          child: _ModeCard(
-            selected: s.dbMode == DbMode.portable,
-            icon: Icons.all_inclusive,
-            title: l10n.t('db.auto'),
-            description: l10n.t('db.autoDesc'),
-            badge: s.portableReady
-                ? StatusBadge(l10n.t('db.ready'))
-                : StatusBadge(l10n.t('db.autoBadge'), color: OracleBrand.violet),
-            onTap: () => setState(() => s.dbMode = DbMode.portable),
-          ),
+  /// Step 2: the chosen mode's ACTION, big and unmissable.
+  Widget _dbSetup(BuildContext context) {
+    final s = _state;
+    final ready = switch (s.dbMode) {
+      DbMode.portable => s.portableReady,
+      DbMode.docker => s.dockerReady,
+      DbMode.existing => s.existingOk == true,
+    };
+    final (icon, title) = switch (s.dbMode) {
+      DbMode.portable => (Icons.all_inclusive, l10n.t('db.auto')),
+      DbMode.docker => (Icons.directions_boat_outlined, l10n.t('db.dockerCard')),
+      DbMode.existing => (Icons.storage_outlined, l10n.t('db.existingCard')),
+    };
+    return ListView(children: [
+      GradientTitle(l10n.t('step.dbSetup')),
+      const SizedBox(height: 4),
+      Text(l10n.t('dbs.subtitle'), style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 16),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: OracleBrand.violet.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 22, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
+              if (ready)
+                StatusBadge('${l10n.t('db.ready')}  localhost:${s.dbPort}'),
+            ]),
+            const SizedBox(height: 20),
+            if (s.dbMode == DbMode.portable)
+              FilledButton.icon(
+                onPressed: s.busy || s.portableReady ? null : s.provisionPortable,
+                icon: s.busy
+                    ? const SizedBox(
+                        width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(s.portableReady ? Icons.check : Icons.auto_awesome),
+                label: Text(s.busy
+                    ? l10n.t('db.installing')
+                    : (s.portableReady ? l10n.t('db.installed') : l10n.t('db.install'))),
+              )
+            else if (s.dbMode == DbMode.docker)
+              FilledButton.icon(
+                onPressed: s.busy || s.dockerReady ? null : s.provisionDocker,
+                icon: s.busy
+                    ? const SizedBox(
+                        width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(s.dockerReady ? Icons.check : Icons.play_arrow),
+                label: Text(s.busy
+                    ? l10n.t('db.dockerRunning')
+                    : (s.dockerReady ? l10n.t('db.ready') : l10n.t('db.dockerRun'))),
+              )
+            else
+              Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  children: [
+                    _tf(l10n.t('db.host'), s.dbHost, (v) => s.dbHost = v, width: 200),
+                    _tf(l10n.t('db.port'), '${s.dbPort}',
+                        (v) => s.dbPort = int.tryParse(v) ?? s.dbPort,
+                        width: 100),
+                    _tf(l10n.t('db.user'), s.dbUser, (v) => s.dbUser = v, width: 160),
+                    _tf(l10n.t('db.password'), s.dbPassword, (v) => s.dbPassword = v,
+                        width: 160, obscure: true),
+                    _tf(l10n.t('db.name'), s.dbName, (v) => s.dbName = v, width: 160),
+                    FilledButton(
+                      onPressed: s.busy ? null : s.detect,
+                      child: Text(s.busy ? l10n.t('db.testing') : l10n.t('db.test')),
+                    ),
+                    if (s.existingOk != null)
+                      StatusBadge(
+                        s.existingOk! ? l10n.t('db.connOk') : l10n.t('db.connFail'),
+                        color: s.existingOk! ? OracleBrand.success : OracleBrand.error,
+                      ),
+                  ]),
+          ]),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ModeCard(
-            selected: s.dbMode == DbMode.docker,
-            icon: Icons.directions_boat_outlined,
-            title: l10n.t('db.dockerCard'),
-            description: l10n.t('db.dockerCardDesc'),
-            badge: s.dockerReady ? StatusBadge(l10n.t('db.ready')) : null,
-            onTap: () => setState(() => s.dbMode = DbMode.docker),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ModeCard(
-            selected: s.dbMode == DbMode.existing,
-            icon: Icons.storage_outlined,
-            title: l10n.t('db.existingCard'),
-            description: l10n.t('db.existingCardDesc'),
-            badge: s.existingOk == true ? StatusBadge(l10n.t('db.ready')) : null,
-            onTap: () => setState(() => s.dbMode = DbMode.existing),
-          ),
-        ),
-      ]),
-      const SizedBox(height: 20),
-
-      // ── selected mode action ──
-      if (s.dbMode == DbMode.portable) ...[
-        FilledButton.icon(
-          onPressed: s.busy || s.portableReady ? null : s.provisionPortable,
-          icon: s.busy
-              ? const SizedBox(
-                  width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-              : Icon(s.portableReady ? Icons.check : Icons.auto_awesome),
-          label: Text(s.busy
-              ? l10n.t('db.installing')
-              : (s.portableReady
-                  ? '${l10n.t('db.installed')}  ·  localhost:${s.dbPort}'
-                  : l10n.t('db.install'))),
-        ),
-      ] else if (s.dbMode == DbMode.docker) ...[
-        FilledButton.icon(
-          onPressed: s.busy || s.dockerReady ? null : s.provisionDocker,
-          icon: s.busy
-              ? const SizedBox(
-                  width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-              : Icon(s.dockerReady ? Icons.check : Icons.play_arrow),
-          label: Text(s.busy
-              ? l10n.t('db.dockerRunning')
-              : (s.dockerReady
-                  ? '${l10n.t('db.ready')}  ·  localhost:${s.dbPort}'
-                  : l10n.t('db.dockerRun'))),
-        ),
-      ] else ...[
-        Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end, children: [
-          _tf(l10n.t('db.host'), s.dbHost, (v) => s.dbHost = v, width: 200),
-          _tf(l10n.t('db.port'), '${s.dbPort}',
-              (v) => s.dbPort = int.tryParse(v) ?? s.dbPort,
-              width: 100),
-          _tf(l10n.t('db.user'), s.dbUser, (v) => s.dbUser = v, width: 160),
-          _tf(l10n.t('db.password'), s.dbPassword, (v) => s.dbPassword = v,
-              width: 160, obscure: true),
-          _tf(l10n.t('db.name'), s.dbName, (v) => s.dbName = v, width: 160),
-          FilledButton(
-            onPressed: s.busy ? null : s.detect,
-            child: Text(s.busy ? l10n.t('db.testing') : l10n.t('db.test')),
-          ),
-          if (s.existingOk != null)
-            StatusBadge(
-              s.existingOk! ? l10n.t('db.connOk') : l10n.t('db.connFail'),
-              color: s.existingOk! ? OracleBrand.success : OracleBrand.error,
-            ),
-        ]),
-      ],
+      ),
       const SizedBox(height: 12),
       _logBox(context),
     ]);
@@ -517,58 +550,62 @@ class _ModeCard extends StatelessWidget {
                 ]
               : const [],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(children: [
-              // Featured icon in a tinted square (Untitled UI pattern).
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? OracleBrand.violet.withValues(alpha: 0.30)
-                      : OracleBrand.gray800,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 20,
-                    color: selected ? Colors.white : OracleBrand.gray400),
+            // Featured icon in a tinted square (Untitled UI pattern).
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: selected
+                    ? OracleBrand.violet.withValues(alpha: 0.30)
+                    : OracleBrand.gray800,
+                borderRadius: BorderRadius.circular(8),
               ),
-              const Spacer(),
-              // Explicit radio indicator — no ambiguity about the selection.
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? OracleBrand.violet : Colors.transparent,
-                  border: Border.all(
-                    color: selected ? OracleBrand.violetSoft : OracleBrand.gray500,
-                    width: 2,
-                  ),
-                ),
-                child: selected
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
-                    : null,
+              child: Icon(icon, size: 22,
+                  color: selected ? Colors.white : OracleBrand.gray400),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: selected ? Colors.white : OracleBrand.gray100)),
+                    if (badge != null) ...[const SizedBox(width: 10), badge!],
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(description,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: selected ? OracleBrand.gray100 : OracleBrand.gray400,
+                          height: 1.5)),
+                ],
               ),
-            ]),
-            const SizedBox(height: 12),
-            Text(title,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: selected ? Colors.white : OracleBrand.gray100)),
-            const SizedBox(height: 6),
-            Text(description,
-                style: TextStyle(
-                    fontSize: 12,
-                    color: selected ? OracleBrand.gray100 : OracleBrand.gray400,
-                    height: 1.5)),
-            if (badge != null) ...[
-              const SizedBox(height: 10),
-              badge!,
-            ],
+            ),
+            const SizedBox(width: 14),
+            // Explicit radio indicator — no ambiguity about the selection.
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? OracleBrand.violet : Colors.transparent,
+                border: Border.all(
+                  color: selected ? OracleBrand.violetSoft : OracleBrand.gray500,
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
           ],
         ),
       ),
