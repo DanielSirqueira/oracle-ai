@@ -231,8 +231,12 @@ class PgProvisioner {
   Future<void> _run(String binDir, String exe, List<String> args) async {
     final process = await Process.start('$binDir${Platform.pathSeparator}$exe', args);
     final output = StringBuffer();
-    process.stdout.transform(utf8.decoder).listen(output.write);
-    process.stderr.transform(utf8.decoder).listen(output.write);
+    // Lenient decoding: PG tools localize their output in the OS codepage
+    // (e.g. CP850 on pt-BR Windows), which is NOT valid UTF-8 — a strict
+    // decoder would throw mid-stream and kill the whole provisioning.
+    const decoder = Utf8Decoder(allowMalformed: true);
+    process.stdout.transform(decoder).listen(output.write);
+    process.stderr.transform(decoder).listen(output.write);
     final code = await process.exitCode;
     if (code != 0) {
       // Give late pipe chunks a beat to land before reporting.

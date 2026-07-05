@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -222,6 +223,39 @@ class SetupState extends ChangeNotifier {
     }
   }
 
+  /// The bundled instance's credentials, persisted after a successful init so
+  /// EVERY later run (reinstall, re-run of the wizard) reuses the same
+  /// password — adopting an already-running cluster only works when we still
+  /// know its password.
+  File get _credentialsFile =>
+      File('$installBase${Platform.pathSeparator}pg-credentials.json');
+
+  String _loadOrCreatePassword() {
+    try {
+      if (_credentialsFile.existsSync()) {
+        final creds =
+            jsonDecode(_credentialsFile.readAsStringSync()) as Map<String, dynamic>;
+        final saved = creds['password'] as String?;
+        if (saved != null && saved.isNotEmpty) {
+          _log(l10n.t('log.credsReused'));
+          return saved;
+        }
+      }
+    } catch (_) {/* corrupt file → new password */}
+    final rnd = Random.secure();
+    return List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  Future<void> _saveCredentials(String password, int port) async {
+    await _credentialsFile.parent.create(recursive: true);
+    await _credentialsFile.writeAsString(const JsonEncoder.withIndent('  ').convert({
+      'user': 'postgres',
+      'password': password,
+      'port': port,
+    }), flush: true);
+    _log(l10n.t('log.credsSaved'));
+  }
+
   Future<void> provisionPortable() async {
     busy = true;
     error = null;
@@ -230,17 +264,44 @@ class SetupState extends ChangeNotifier {
       final pgZip = await _ensureArtifact(_pgUrl, 'postgresql-17.6-1-windows-x64-binaries.zip');
       final vecZip = await _ensureArtifact(_pgvectorUrl, 'vector.v0.8.3-pg17.zip');
       final sep = Platform.pathSeparator;
-      final rnd = Random.secure();
-      final password =
-          List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-      final result = await const PgProvisioner().provisionPortable(
-        installDir: '$installBase${sep}pg',
-        dataDir: '$installBase${sep}pgdata',
-        pgZip: pgZip,
-        pgvectorZip: vecZip,
-        password: password,
-        onStep: _log,
-      );
+      const provisioner = PgProvisioner();
+      final installDir = '$installBase${sep}pg';
+      final dataDir = '$installBase${sep}pgdata';
+
+      var password = _loadOrCreatePassword();
+      PgProvisionResult result;
+      try {
+        result = await provisioner.provisionPortable(
+          installDir: installDir,
+          dataDir: dataDir,
+          pgZip: pgZip,
+          pgvectorZip: vecZip,
+          password: password,
+          onStep: _log,
+        );
+      } on PgProvisionFailure catch (e) {
+        // Self-heal: an adopted cluster that refuses OUR credentials is
+        // unusable by anyone (lost password from an interrupted install) —
+        // stop it, wipe the data dir and rebuild once from scratch.
+        if (!e.message.contains('did not answer')) rethrow;
+        _log(l10n.t('log.selfHeal'));
+        await provisioner.stop(
+            binDir: '$installDir${sep}pgsql${sep}bin', dataDir: dataDir);
+        final stale = Directory(dataDir);
+        if (stale.existsSync()) await stale.delete(recursive: true);
+        final rnd = Random.secure();
+        password = List.generate(
+            16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+        result = await provisioner.provisionPortable(
+          installDir: installDir,
+          dataDir: dataDir,
+          pgZip: pgZip,
+          pgvectorZip: vecZip,
+          password: password,
+          onStep: _log,
+        );
+      }
+      await _saveCredentials(password, result.port);
       // Explicit IPv4: the bundled server listens on 127.0.0.1 only, and
       // 'localhost' resolves to ::1 first on Windows.
       dbHost = '127.0.0.1';

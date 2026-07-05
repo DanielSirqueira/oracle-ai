@@ -147,6 +147,11 @@ const _pt = <String, String>{
   'log.vNoStudio': 'Studio não copiado (payload ausente)',
   // finish
   'finish.open': 'Abrir o Oracle Studio',
+  // credentials / self-heal
+  'log.credsReused': 'Reusando credenciais salvas do banco embutido.',
+  'log.credsSaved': 'Credenciais do banco embutido salvas.',
+  'log.selfHeal':
+      'O banco embutido não aceitou as credenciais (instalação anterior interrompida) — recriando do zero…',
 };
 
 const _en = <String, String>{
@@ -275,4 +280,8 @@ const _en = <String, String>{
   'log.vNoCli': 'oracle_ai.exe not copied (payload missing)',
   'log.vNoStudio': 'Studio not copied (payload missing)',
   'finish.open': 'Open Oracle Studio',
+  'log.credsReused': 'Reusing saved credentials of the bundled database.',
+  'log.credsSaved': 'Bundled database credentials saved.',
+  'log.selfHeal':
+      'The bundled database rejected the credentials (interrupted previous install) — rebuilding from scratch…',
 };
