@@ -103,11 +103,15 @@ class SetupState extends ChangeNotifier {
     }
     final dest = File('$installBase${Platform.pathSeparator}downloads'
         '${Platform.pathSeparator}$fileName');
+    // Only a COMPLETED download carries the final name (partials live in
+    // .part and are discarded) — an interrupted run can never poison the cache.
     if (dest.existsSync() && dest.lengthSync() > 0) {
       _log('${l10n.t('log.cached')}: $fileName');
       return dest.path;
     }
     await dest.parent.create(recursive: true);
+    final part = File('${dest.path}.part');
+    if (part.existsSync()) await part.delete();
     _log('${l10n.t('log.downloading')} $fileName…');
     final client = HttpClient();
     try {
@@ -119,7 +123,7 @@ class SetupState extends ChangeNotifier {
         throw PgProvisionFailure('download $fileName falhou: HTTP ${response.statusCode}');
       }
       final total = response.contentLength;
-      final sink = dest.openWrite();
+      final sink = part.openWrite();
       var received = 0;
       var lastPct = -10;
       await for (final chunk in response) {
@@ -134,6 +138,11 @@ class SetupState extends ChangeNotifier {
         }
       }
       await sink.close();
+      if (total > 0 && received != total) {
+        throw PgProvisionFailure(
+            'download $fileName incompleto ($received de $total bytes)');
+      }
+      await part.rename(dest.path);
       _log('${l10n.t('log.downloaded')}: $fileName '
           '(${(received / (1024 * 1024)).toStringAsFixed(0)} MB)');
       return dest.path;
@@ -161,7 +170,9 @@ class SetupState extends ChangeNotifier {
         password: password,
         onStep: _log,
       );
-      dbHost = 'localhost';
+      // Explicit IPv4: the bundled server listens on 127.0.0.1 only, and
+      // 'localhost' resolves to ::1 first on Windows.
+      dbHost = '127.0.0.1';
       dbPort = result.port;
       dbUser = 'postgres';
       dbPassword = password;
@@ -187,7 +198,9 @@ class SetupState extends ChangeNotifier {
       final rnd = Random.secure();
       final password =
           List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-      final port = await PgProvisioner.findFreePort(start: 5432);
+      // Off the beaten path (like the bundled instance) so the container never
+      // conflicts with other local PostgreSQL installs.
+      final port = await PgProvisioner.findFreePort(start: 54330);
       final sep = Platform.pathSeparator;
       final composeFile = File('$installBase${sep}docker$sep' 'docker-compose.yml');
       await composeFile.parent.create(recursive: true);
@@ -218,7 +231,7 @@ volumes:
       }
       // Wait for the server to answer (image pull + init can take a while).
       final config = DatabaseConfig(
-          host: 'localhost', port: port, user: 'postgres', password: password, database: 'postgres');
+          host: '127.0.0.1', port: port, user: 'postgres', password: password, database: 'postgres');
       var up = false;
       for (var i = 0; i < 60; i++) {
         if (await PgProvisioner.canConnect(config)) {
@@ -227,8 +240,8 @@ volumes:
         }
         await Future<void>.delayed(const Duration(seconds: 2));
       }
-      if (!up) throw Exception('container did not answer at localhost:$port');
-      dbHost = 'localhost';
+      if (!up) throw Exception('container did not answer at 127.0.0.1:$port');
+      dbHost = '127.0.0.1';
       dbPort = port;
       dbUser = 'postgres';
       dbPassword = password;

@@ -205,6 +205,15 @@ scheduler runs only in the daemon (one place, no per-agent duplication).
 - Automatic: `ORACLE_MAINTENANCE_ON_STARTUP=true` (once on boot) and/or `ORACLE_MAINTENANCE_INTERVAL_MINUTES=N`
   (timer). In multi-agent setups, prefer running this in the single daemon.
 
+## 8.1 Bundled database (no Docker)
+
+The Setup wizard can provision a PORTABLE PostgreSQL 17 + pgvector with zero user
+configuration (payload bundled next to the installer, or downloaded once). It lives in
+`%LOCALAPPDATA%\OracleAI` and binds **127.0.0.1 only, on a non-standard port (54320+)**
+— deliberately far from the 5432-5439 family so it never conflicts with other local
+PostgreSQL installs. The one-click Docker path does the same at 54330+. Ports, password
+and `.env` wiring are generated automatically.
+
 ## 9. Backup & restore
 
 Oracle ships a **portable, Dart-native backup** — no `pg_dump` needed on the host. A backup is a plain

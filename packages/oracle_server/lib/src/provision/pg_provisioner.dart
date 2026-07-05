@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
@@ -44,7 +45,9 @@ class PgProvisioner {
   }
 
   /// First free TCP port at/after [start] (checked by binding on loopback).
-  static Future<int> findFreePort({int start = 5433}) async {
+  /// Default deliberately far from the PostgreSQL family (5432-5439) so the
+  /// bundled instance never fights other local databases.
+  static Future<int> findFreePort({int start = 54320}) async {
     for (var port = start; port < start + 200; port++) {
       try {
         final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
@@ -77,7 +80,7 @@ class PgProvisioner {
     final binDir = '${pgRoot.path}${Platform.pathSeparator}bin';
     if (!File('$binDir${Platform.pathSeparator}pg_ctl.exe').existsSync()) {
       step('Extracting portable PostgreSQL…');
-      await extractFileToDisk(pgZip, installDir);
+      await _extractZip(pgZip, installDir);
       if (!File('$binDir${Platform.pathSeparator}pg_ctl.exe').existsSync()) {
         throw PgProvisionFailure('pg_ctl.exe not found after extracting $pgZip');
       }
@@ -88,10 +91,16 @@ class PgProvisioner {
     step('Installing pgvector…');
     await _installPgvector(pgvectorZip, pgRoot.path);
 
-    // 3) initdb (skip when the cluster already exists).
+    // 3) initdb (skip when the cluster already exists). An INTERRUPTED initdb
+    //    leaves a half-written dir without PG_VERSION — initdb refuses a
+    //    non-empty target, so wipe the debris and start clean.
     final data = Directory(dataDir);
     final pgVersionFile = File('$dataDir${Platform.pathSeparator}PG_VERSION');
     if (!pgVersionFile.existsSync()) {
+      if (data.existsSync() && data.listSync().isNotEmpty) {
+        step('Cleaning up an interrupted initialization…');
+        await data.delete(recursive: true);
+      }
       step('Initializing the cluster (initdb)…');
       await data.create(recursive: true);
       final pwFile = File('$installDir${Platform.pathSeparator}.pw.tmp');
@@ -130,6 +139,14 @@ class PgProvisioner {
       text = text.replaceAll(
           RegExp(r'^#?port\s*=\s*\d+', multiLine: true), 'port = $chosenPort');
       if (!text.contains('port = $chosenPort')) text = '$text\nport = $chosenPort\n';
+      // IPv4 loopback only: the default 'localhost' also tries ::1 and logs a
+      // scary (harmless) bind warning when another service holds the v6 port.
+      text = text.replaceAll(
+          RegExp(r"^#?listen_addresses\s*=\s*'[^']*'", multiLine: true),
+          "listen_addresses = '127.0.0.1'");
+      if (!text.contains("listen_addresses = '127.0.0.1'")) {
+        text = "$text\nlisten_addresses = '127.0.0.1'\n";
+      }
       await conf.writeAsString(text, flush: true);
 
       step('Starting PostgreSQL…');
@@ -141,9 +158,11 @@ class PgProvisioner {
       ]);
     }
 
-    // 6) Verify it answers.
+    // 6) Verify it answers. HOST MUST BE THE EXPLICIT IPv4 LOOPBACK: the
+    //    server listens on 127.0.0.1 only, while 'localhost' resolves to ::1
+    //    first on Windows — probing it can hang in the driver's retry.
     final config = DatabaseConfig(
-      host: 'localhost',
+      host: '127.0.0.1',
       port: chosenPort,
       user: superuser,
       password: password,
@@ -151,9 +170,9 @@ class PgProvisioner {
     );
     if (!await canConnect(config)) {
       throw PgProvisionFailure(
-          'PostgreSQL started but did not answer at localhost:$chosenPort');
+          'PostgreSQL started but did not answer at 127.0.0.1:$chosenPort');
     }
-    step('PostgreSQL ready at localhost:$chosenPort.');
+    step('PostgreSQL ready at 127.0.0.1:$chosenPort.');
     return PgProvisionResult(binDir: binDir, dataDir: dataDir, port: chosenPort);
   }
 
@@ -163,13 +182,25 @@ class PgProvisioner {
         ['stop', '-D', dataDir, '-m', 'fast', '-w', '-t', '30']);
   }
 
+  /// Extracts a zip. Prefers the native bsdtar every Windows 10+ ships
+  /// (seconds for a 330 MB archive) and falls back to the pure-Dart extractor
+  /// (minutes) when tar is unavailable.
+  Future<void> _extractZip(String zipPath, String destDir) async {
+    await Directory(destDir).create(recursive: true);
+    try {
+      final result = await Process.run('tar', ['-xf', zipPath, '-C', destDir]);
+      if (result.exitCode == 0) return;
+    } catch (_) {/* no tar on PATH — fall through */}
+    await extractFileToDisk(zipPath, destDir);
+  }
+
   /// Copies pgvector artifacts out of [zipPath] into the PG tree, routing each
   /// file by name so any release layout works.
   Future<void> _installPgvector(String zipPath, String pgRoot) async {
     final sep = Platform.pathSeparator;
     final tmp = Directory('$pgRoot$sep.pgvector.tmp');
     if (await tmp.exists()) await tmp.delete(recursive: true);
-    await extractFileToDisk(zipPath, tmp.path);
+    await _extractZip(zipPath, tmp.path);
 
     var dll = 0, control = 0, sql = 0;
     await for (final f in tmp.list(recursive: true)) {
@@ -193,11 +224,20 @@ class PgProvisioner {
     }
   }
 
+  /// Runs a PG binary and waits for its EXIT CODE — never for its stdio pipes.
+  /// `pg_ctl start` hands its stdout/stderr handles to the spawned postgres,
+  /// which keeps them open forever; `Process.run` (which awaits pipe close)
+  /// would hang there even though pg_ctl itself exited long ago.
   Future<void> _run(String binDir, String exe, List<String> args) async {
-    final result = await Process.run('$binDir${Platform.pathSeparator}$exe', args);
-    if (result.exitCode != 0) {
-      throw PgProvisionFailure(
-          '$exe falhou (${result.exitCode}): ${result.stderr}\n${result.stdout}');
+    final process = await Process.start('$binDir${Platform.pathSeparator}$exe', args);
+    final output = StringBuffer();
+    process.stdout.transform(utf8.decoder).listen(output.write);
+    process.stderr.transform(utf8.decoder).listen(output.write);
+    final code = await process.exitCode;
+    if (code != 0) {
+      // Give late pipe chunks a beat to land before reporting.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      throw PgProvisionFailure('$exe falhou ($code): $output');
     }
   }
 }
