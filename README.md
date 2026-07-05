@@ -316,11 +316,28 @@ exact same Dart engine (no HTTP layer, one source of truth for business logic).
   account, decryptable by both the app and the CLI, never plaintext on disk.
 - Validates everything end-to-end (embedding key, restored backup, migrated schema) before finishing.
 
-Build the installer yourself:
+### Build the installer
+
+One command builds **everything** and produces `dist/OracleAI-Setup.exe` — reproducible from a clean clone
+(it downloads the PostgreSQL + pgvector payload the first time, then caches it):
 
 ```powershell
-pwsh apps/oracle_setup/installer/build_installer.ps1   # → dist/OracleAI-Setup.exe
+# Prerequisites (once): Flutter with Windows desktop + Dart on PATH, and Inno Setup 6
+winget install JRSoftware.InnoSetup
+
+# Build + package the single-file installer  ->  dist\OracleAI-Setup.exe
+pwsh apps/oracle_setup/installer/build_installer.ps1
 ```
+
+The script: downloads the DB payload if missing → compiles the CLI → builds Oracle Studio + the wizard
+(Flutter release) → assembles the program bundle → compiles the Inno Setup script. Flags:
+
+| Flag | Effect |
+|---|---|
+| *(none)* | Full offline installer (~342 MB) with the bundled database. |
+| `-Online` | Smaller installer (~77 MB) that downloads PostgreSQL at install time. |
+| `-SkipBuild` | Reuse the last Flutter/Dart build — just re-assemble + re-package. |
+| `-SkipPayload` | Don't touch the payload folder (assume the zips are present). |
 
 > The desktop layer is **Windows-first**; macOS/Linux adaptation (Keychain / Secret Service, native
 > shortcuts, packaging) is on the roadmap. The CLI/MCP server is cross-platform today.

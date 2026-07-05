@@ -260,3 +260,38 @@ Typical loop: `oracle_ai backup-db` → commit the seed → colleague pulls → 
 | `migration lock held … retry` | Two processes starting together — it retries itself; a stale lock (crashed holder) is reclaimed after 2 min. |
 | `database "oracle_ai" not found` | Start with `ORACLE_DB_AUTO_CREATE=true`, or run `oracle_ai migrate`. |
 | Empty brief/recall on the first session | Normal — no handoff/rules/memories yet; populate via the tools. |
+
+## 11. Build the Windows installer
+
+The distributable `OracleAI-Setup.exe` is produced by one script that builds **everything** and packages it —
+reproducible from a clean clone.
+
+**Prerequisites (once):** Flutter (with Windows desktop) + Dart on PATH, and Inno Setup 6:
+
+```powershell
+winget install JRSoftware.InnoSetup
+```
+
+**Build:**
+
+```powershell
+pwsh apps/oracle_setup/installer/build_installer.ps1
+```
+
+What it does, in order: (1) downloads the offline database payload (PostgreSQL 17 + pgvector zips, ~315 MB —
+cached after the first run); (2) compiles the CLI (`oracle_ai.exe`); (3) builds Oracle Studio (Flutter
+release); (4) builds the setup wizard (Flutter release); (5) assembles the program bundle
+(`app\oracle_ai.exe` + `app\studio\`); (6) compiles `installer\oracle_ai_setup.iss` with ISCC →
+`dist\OracleAI-Setup.exe` (~342 MB, git-ignored).
+
+| Flag | Effect |
+|---|---|
+| *(none)* | Full **offline** installer (bundled database, no Docker needed at install time). |
+| `-Online` | Smaller **online** installer (~77 MB); the wizard downloads PostgreSQL at install time. |
+| `-SkipBuild` | Reuse the last Flutter/Dart build; only re-assemble + re-package (fast iteration on the `.iss`). |
+| `-SkipPayload` | Leave the `payload\` folder as-is (don't download). |
+
+The resulting installer is a thin launcher: it unpacks to a temp folder and runs the branded Flutter wizard
+(which performs the real per-user install — program to `%LOCALAPPDATA%\Programs\Oracle AI`, database
+provisioning, DPAPI-encrypted `.env`, Start Menu/Desktop shortcuts, Add/Remove Programs entry), then
+auto-cleans. See the wizard/packaging sources under `apps/oracle_setup/installer/`.
