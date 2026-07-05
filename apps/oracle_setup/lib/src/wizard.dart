@@ -1,6 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'core/brand.dart';
 import 'core/l10n.dart';
@@ -171,6 +172,14 @@ class _SetupWizardState extends State<SetupWizard> {
                                 ? () => setState(() => _step++)
                                 : null,
                             child: Text(l10n.t('nav.next')),
+                          )
+                        else
+                          // Last step: "Concluir" opens the installed system
+                          // and closes the installer.
+                          FilledButton.icon(
+                            onPressed: _state.busy ? null : _finishAndClose,
+                            icon: const Icon(Icons.check, size: 18),
+                            label: Text(l10n.t('nav.finish')),
                           ),
                       ],
                     ),
@@ -182,6 +191,12 @@ class _SetupWizardState extends State<SetupWizard> {
         ),
       ),
     );
+  }
+
+  /// "Concluir": launch the installed Studio, then close the installer window.
+  Future<void> _finishAndClose() async {
+    await _state.launchInstalled();
+    await windowManager.destroy();
   }
 
   // ── steps ──
@@ -536,6 +551,27 @@ class _SetupWizardState extends State<SetupWizard> {
         Center(child: GradientTitle(l10n.t('finish.title'))),
         const SizedBox(height: 16),
         Text(l10n.t('finish.body')),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: OracleBrand.gray900,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: OracleBrand.gray700),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.shield_outlined,
+                size: 18, color: OracleBrand.success),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                l10n.t('finish.security'),
+                style: const TextStyle(
+                    fontSize: 12, color: OracleBrand.gray400, height: 1.4),
+              ),
+            ),
+          ]),
+        ),
         const SizedBox(height: 24),
         Center(
           child: FilledButton.icon(

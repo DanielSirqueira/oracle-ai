@@ -27,6 +27,7 @@ const _pt = <String, String>{
   'step.finish': 'Concluir',
   'nav.back': 'Voltar',
   'nav.next': 'Avançar',
+  'nav.finish': 'Concluir',
   'welcome.title': 'Bem-vindo ao Oracle AI',
   'welcome.body':
       'Este assistente instala e configura o banco de memória de longo prazo para os seus agentes de código (Claude Code, Codex, Cursor…).\n\nO que será feito:\n  1. Banco de dados (PostgreSQL + pgvector) — usa o seu, o Docker, ou instala um PostgreSQL portátil sem Docker;\n  2. Provedor de embeddings (local ou API);\n  3. Token de segurança dos hooks;\n  4. Migração do schema (e restauração de backup, se houver);\n  5. Configuração dos agentes (MCP + hooks).',
@@ -79,6 +80,8 @@ const _pt = <String, String>{
   'finish.title': 'Tudo pronto! 🎉',
   'finish.body':
       'O Oracle AI está instalado e migrado.\n\nPróximos passos:\n  • Abra o Oracle Studio e ative "Iniciar com o Windows" (aba Config) — ele mantém hooks, manutenção e backups na bandeja;\n  • Cole os snippets da etapa anterior nos seus agentes;\n  • A primeira sessão de agente já grava memória compartilhada.',
+  'finish.security':
+      'Senha do banco e chave da LLM ficam criptografadas em disco (Windows DPAPI, vinculadas à sua conta) — só este usuário, nesta máquina, consegue lê-las.',
   // setup_state log lines
   'log.payload': 'Usando payload embutido',
   'log.cached': 'Já baixado',
@@ -166,6 +169,7 @@ const _en = <String, String>{
   'step.finish': 'Finish',
   'nav.back': 'Back',
   'nav.next': 'Next',
+  'nav.finish': 'Finish',
   'welcome.title': 'Welcome to Oracle AI',
   'welcome.body':
       'This wizard installs and configures the long-term memory bank for your coding agents (Claude Code, Codex, Cursor…).\n\nWhat happens next:\n  1. Database (PostgreSQL + pgvector) — use yours, Docker, or install a portable PostgreSQL with no Docker;\n  2. Embedding provider (local or API);\n  3. Hook security token;\n  4. Schema migration (and backup restore, if present);\n  5. Agent wiring (MCP + hooks).',
@@ -218,6 +222,8 @@ const _en = <String, String>{
   'finish.title': 'All set! 🎉',
   'finish.body':
       'Oracle AI is installed and migrated.\n\nNext steps:\n  • Open Oracle Studio and enable "Start with Windows" (Settings tab) — it keeps hooks, maintenance and backups in the tray;\n  • Paste the snippets from the previous step into your agents;\n  • The first agent session already writes shared memory.',
+  'finish.security':
+      'Your database password and LLM API key are encrypted on disk (Windows DPAPI, tied to your account) — only this user, on this machine, can read them.',
   'log.payload': 'Using bundled payload',
   'log.cached': 'Already downloaded',
   'log.downloading': 'Downloading',

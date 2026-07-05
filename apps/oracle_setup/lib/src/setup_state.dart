@@ -238,7 +238,7 @@ class SetupState extends ChangeNotifier {
         final saved = creds['password'] as String?;
         if (saved != null && saved.isNotEmpty) {
           _log(l10n.t('log.credsReused'));
-          return saved;
+          return SecretProtector.unprotect(saved);
         }
       }
     } catch (_) {/* corrupt file → new password */}
@@ -250,7 +250,8 @@ class SetupState extends ChangeNotifier {
     await _credentialsFile.parent.create(recursive: true);
     await _credentialsFile.writeAsString(const JsonEncoder.withIndent('  ').convert({
       'user': 'postgres',
-      'password': password,
+      // DPAPI-encrypted at rest; _loadOrCreatePassword decrypts on read.
+      'password': SecretProtector.protect(password),
       'port': port,
     }), flush: true);
     _log(l10n.t('log.credsSaved'));
@@ -396,7 +397,9 @@ volumes:
       ..writeln('ORACLE_DB_HOST=$dbHost')
       ..writeln('ORACLE_DB_PORT=$dbPort')
       ..writeln('ORACLE_DB_USER=$dbUser')
-      ..writeln('ORACLE_DB_PASSWORD=$dbPassword')
+      // Secrets at rest are DPAPI-encrypted (enc:v1:…); loadEnv decrypts them
+      // transparently for the CLI/MCP and for our own migrate step below.
+      ..writeln('ORACLE_DB_PASSWORD=${SecretProtector.protect(dbPassword)}')
       ..writeln('ORACLE_DB_NAME=$dbName')
       ..writeln('ORACLE_DB_AUTO_CREATE=true')
       ..writeln()
@@ -408,13 +411,17 @@ volumes:
         'voyage' => 'VOYAGE_API_KEY',
         _ => null,
       };
-      if (keyVar != null) b.writeln('$keyVar=${embedderApiKey.trim()}');
+      if (keyVar != null) {
+        b.writeln('$keyVar=${SecretProtector.protect(embedderApiKey.trim())}');
+      }
     }
     b
       ..writeln()
       ..writeln('ORACLE_HTTP_HOST=127.0.0.1')
       ..writeln('ORACLE_HTTP_PORT=49500');
-    if (hookToken.isNotEmpty) b.writeln('ORACLE_HOOK_TOKEN=$hookToken');
+    if (hookToken.isNotEmpty) {
+      b.writeln('ORACLE_HOOK_TOKEN=${SecretProtector.protect(hookToken)}');
+    }
     b
       ..writeln('ORACLE_METRICS_ENABLED=true')
       ..writeln('ORACLE_MAINTENANCE_INTERVAL_MINUTES=30');

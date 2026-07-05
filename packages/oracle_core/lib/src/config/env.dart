@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'secret_protector.dart';
+
 /// Loads environment variables, merging a `.env` file (if present) with the
 /// process environment.
 ///
@@ -27,7 +29,11 @@ Map<String, String> loadEnv({String path = '.env'}) {
               (value.startsWith("'") && value.endsWith("'")))) {
         value = value.substring(1, value.length - 1);
       }
-      merged[key] = value;
+      // Secrets are stored as `enc:v1:<base64>` (DPAPI). Decrypt transparently
+      // on read so every consumer — CLI, MCP, installer — gets plaintext and
+      // never has to know a value was protected. Non-encrypted values pass
+      // through untouched.
+      merged[key] = SecretProtector.unprotect(value);
     }
   }
 

@@ -5,6 +5,7 @@ library;
 export 'src/config/database_config.dart';
 export 'src/config/embedding_config.dart';
 export 'src/config/env.dart';
+export 'src/config/secret_protector.dart';
 
 // Embedding service
 export 'src/services/embedding/embedder.dart';
