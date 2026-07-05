@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.png" alt="Oracle AI" width="150" />
+
 # Oracle AI
 
 **A long-term memory bank for AI coding agents — backed by PostgreSQL + pgvector, exposed over MCP.**
@@ -31,6 +33,7 @@ model reads from and writes to, so knowledge **accumulates** instead of evaporat
 - [MCP tool surface](#mcp-tool-surface)
 - [Agent integration (Claude Code / Codex)](#agent-integration-claude-code--codex)
 - [Teaching your agent to use Oracle](#teaching-your-agent-to-use-oracle)
+- [Desktop app & installer](#desktop-app--installer)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [Run modes & production](#run-modes--production)
@@ -120,16 +123,18 @@ flowchart LR
 
 ## Project structure
 
-A Dart workspace of four packages:
+A Dart **pub workspace** — four Dart packages and two Flutter desktop apps:
 
 | Package | Role |
 |---|---|
-| `oracle_core` | Pure-Dart base: `Database` (PostgreSQL pool), `SqlStatement`/`SqlVector` (pgvector), config, DI (`auto_injector`), value objects, the embeddings service (`local` / `gemini` / `openai` / `voyage`), `result_dart`. |
+| `oracle_core` | Pure-Dart base: `Database` (PostgreSQL pool), `SqlStatement`/`SqlVector` (pgvector), config, DI (`auto_injector`), value objects, the embeddings service (`local` / `gemini` / `openai` / `voyage`), secret protection (DPAPI), `result_dart`. |
 | `oracle_migration` | Versioned migration system (`v{semver}/{seq}_{name}/{seq}.sql`), SHA-256 checksums, advisory lock with stale-takeover, transactional, forward-fix. Runs on startup. |
-| `oracle_memory` | The domain — **9 DDD feature slices**, each `domain / infra / external` + a DI module. |
+| `oracle_memory` | The domain — **10 DDD feature slices**, each `domain / infra / external` + a DI module. |
 | `oracle_server` | Entrypoint + MCP server + hook receiver + recall service + maintenance scheduler + install generators. |
+| `apps/oracle_studio` | Flutter desktop control center — browse/curate everything, run the daemon in the tray, schedule backups, edit config. |
+| `apps/oracle_setup` | Flutter installer wizard, packaged into the single `OracleAI-Setup.exe`. |
 
-The nine slices in `oracle_memory`:
+The ten slices in `oracle_memory`:
 
 | Slice | What it owns |
 |---|---|
@@ -140,8 +145,9 @@ The nine slices in `oracle_memory`:
 | `memory` | Consolidated memory (tiers `episodic`/`semantic`/`procedural`, kinds, importance), hybrid search (RRF), supersession, forget, distance-gated recall. |
 | `capture` | Raw capture, hook-driven: `Project → Session` (the agent's own session id) `→ Request` (one per user prompt, embedded) `→ Messages` (the agent's work). Searchable request history. |
 | `handoff` | Continuity baton across sessions/agents (summary, open questions, next steps). |
-| `maintenance` | Deterministic sweep (decay + dedup), lint, no LLM. |
+| `maintenance` | Deterministic sweep (decay + dedup), lint, re-embed, no LLM. |
 | `metrics` | Measurement harness: per-session token & compaction metrics, A/B by label. |
+| `skill` | Central versioned skill library, shared across agents; materializes to `~/.claude/skills`. |
 
 Every slice follows the same shape: immutable **entity** + value objects → **repository** interface
 (`ResultDart`) → **usecases** → **datasource** interface → DB datasource (parameterized `SqlStatement`) +
@@ -150,7 +156,7 @@ mapper → **DI module**.
 ## Data model
 
 PostgreSQL + pgvector, embeddings as `vector(1024)`, HNSW indexes for vector recall, `tsvector`/GIN for
-full-text, hybrid search fused with **Reciprocal Rank Fusion (RRF, k=60)**. Eleven tables across four
+full-text, hybrid search fused with **Reciprocal Rank Fusion (RRF, k=60)**. Twelve tables across eight
 forward-only migrations:
 
 | Migration | Adds |
@@ -159,6 +165,10 @@ forward-only migrations:
 | `v1.1.0` mutation layer | `rules.priority`; `retired_at`/`retired_reason` on `rules`/`architectures`/`memories` (soft retire + audit). |
 | `v1.2.0` project resolve | unique index on `projects.repo_path` (race-safe cwd → project upsert). |
 | `v1.3.0` metrics | `session_metrics` (the measurement harness). |
+| `v1.4.0` request index | composite index on the hot capture path (`requests(session_id, created_at)`). |
+| `v1.5.0` search hygiene | `requests.embedding_model`; stored generated `fts` + GIN on `architectures`. |
+| `v1.6.0` memory key | `memories.key` — supersede a memory by stable key, like rules. |
+| `v1.7.0` skills | `skills` (central versioned skill library) + its indexes. |
 
 Lifecycle is **versioned, not destructive**: rules/architecture/memory are *superseded* (kept as history) or
 *retired* (soft, audited) — with an explicit *purge* for true deletion. Three orthogonal axes keep concerns
@@ -166,13 +176,14 @@ separate: **severity** (obligation), **priority** (ranking), **lifecycle** (acti
 
 ## MCP tool surface
 
-**32 tools**, each wired to a usecase via DI. Highlights:
+**39 tools**, each wired to a usecase via DI. Highlights:
 
-- **Scope** — `oracle_product_register/list`, `oracle_project_register/list/resolve`.
+- **Scope** — `oracle_product_register/list`, `oracle_project_register/list/resolve`, `oracle_session_brief`.
 - **Knowledge** — `oracle_architecture_save/get/search/retire`, `oracle_rule_save/rules_for_task/search/set_priority/retire`.
 - **Memory** — `oracle_memory_save/search/get/forget`.
+- **Skills** — `oracle_skill_save/search/get/list/retire` (central shared library).
 - **Continuity** — `oracle_handoff_begin/pending/accept`, `oracle_session_recent/history/requests`, `oracle_request_messages/search`.
-- **Maintenance** — `oracle_maintenance_run` (decay + dedup, with `dryRun`), `oracle_maintenance_lint`.
+- **Maintenance** — `oracle_maintenance_run` (decay + dedup, with `dryRun`), `oracle_maintenance_lint/reembed/backup`.
 - **Measurement** — `oracle_metrics_summary`, `oracle_metrics_session`.
 
 The server also advertises static **MCP `instructions`** (auto-injected once by the client) that tell the agent
@@ -280,9 +291,43 @@ on a claim that names a specific file, symbol, or value).
 | Pick up the previous session's handoff | `oracle_handoff_pending` / `oracle_handoff_accept` |
 | Forget wrong / obsolete memory | `oracle_memory_forget` |
 
+## Desktop app & installer
+
+For a zero-terminal setup on Windows, Oracle ships a **desktop experience** built with Flutter that reuses the
+exact same Dart engine (no HTTP layer, one source of truth for business logic).
+
+**Oracle Studio** — a control center for the memory bank:
+
+- Browse and curate everything: a per-project **dashboard**, memories, rules, skills, architectures, and the
+  capture browser (`Session → Request → Messages`). Agent-authored content is rendered as **markdown**.
+- Runs the **hooks daemon + maintenance/backup schedulers in the system tray** (closing the window hides to
+  tray, like Claude Desktop), so one background process owns capture, injection and upkeep.
+- Edit `.env` through a form, generate MCP/agent snippets, test the embedding key, schedule backups.
+- Single-instance (a second launch focuses the running window); opens maximized; pt/en UI.
+
+**`OracleAI-Setup.exe`** — one self-contained, **per-user** installer (no admin), produced with Inno Setup:
+
+- Installs the program to `%LOCALAPPDATA%\Programs\Oracle AI`, adds **Start Menu + Desktop shortcuts** and an
+  **Add/Remove Programs** entry with an uninstaller.
+- Can provision a **bundled portable PostgreSQL 17 + pgvector with no Docker and no configuration** (on a
+  non-standard loopback port so it never clashes with other local databases), or wire up an existing database
+  / one-click Docker.
+- Secrets at rest (database password, LLM API key) are **encrypted with Windows DPAPI** — tied to your user
+  account, decryptable by both the app and the CLI, never plaintext on disk.
+- Validates everything end-to-end (embedding key, restored backup, migrated schema) before finishing.
+
+Build the installer yourself:
+
+```powershell
+pwsh apps/oracle_setup/installer/build_installer.ps1   # → dist/OracleAI-Setup.exe
+```
+
+> The desktop layer is **Windows-first**; macOS/Linux adaptation (Keychain / Secret Service, native
+> shortcuts, packaging) is on the roadmap. The CLI/MCP server is cross-platform today.
+
 ## Quick start
 
-Requirements: **Docker** and (to build) **Dart SDK ≥ 3.11**.
+Prefer the terminal? Requirements: **Docker** and (to build) **Dart SDK ≥ 3.11**.
 
 ```bash
 # 1. Start PostgreSQL + pgvector (pick a free host port if 5432 is taken)
@@ -370,19 +415,24 @@ what compaction loses. The harness lets you verify it on your own workload.
 - **Dart** ≥ 3.11 (pub workspace, AOT binary)
 - **PostgreSQL 17 + pgvector** 0.8 (`vector`, HNSW, `tsvector`/GIN, hybrid RRF)
 - **MCP** via `mcp_dart` (stdio); **shelf** for the HTTP hook receiver
+- **Flutter** desktop (Oracle Studio + installer wizard); **Inno Setup** for the single-file installer;
+  **Windows DPAPI** (via `dart:ffi`) for secrets at rest; `gpt_markdown` for rendering
 - `auto_injector` (DI) · `result_dart` (typed results) · `crypto` / `path`
 - Clean Architecture + DDD
 
 ## Status & roadmap
 
-**Implemented & validated against real pgvector:** the full schema (migrations v1.0.0–v1.3.0), all 9 slices,
-32 MCP tools, embeddings (local + Gemini validated), the mutation layer (priority + retire/forget), the
-maintenance sweep (decay + dedup + lint + scheduler), multi-agent hardening (port tolerance, migration lock +
-stale-takeover, cwd→git-root resolve), the Claude Code integration (hook protocol, inject + capture, MCP
-instructions), the measurement harness, and a shared-daemon production topology.
+**Implemented & validated against real pgvector:** the full schema (migrations v1.0.0–v1.7.0), all 10 slices,
+39 MCP tools, embeddings (local + Gemini validated), the mutation layer (priority + retire/forget), the
+central skill library, the maintenance sweep (decay + dedup + lint + re-embed + scheduler), multi-agent
+hardening (port tolerance, migration lock + stale-takeover, cwd→git-root resolve), the Claude Code integration
+(hook protocol, inject + capture, MCP instructions), the measurement harness, and a shared-daemon production
+topology. **Desktop:** Oracle Studio (tray control center) and a single per-user `OracleAI-Setup.exe` with
+bundled portable PostgreSQL + pgvector (no Docker) and DPAPI-encrypted secrets.
 
 **Next:** run the measurement A/B (`oracle` vs `baseline`) on real workloads to turn the cost thesis into
-measured fact; deep-read of the agent transcript; richer per-tool capture; HTTP MCP transport.
+measured fact; deep-read of the agent transcript; richer per-tool capture; HTTP MCP transport; macOS/Linux
+desktop packaging.
 
 ## Documentation
 

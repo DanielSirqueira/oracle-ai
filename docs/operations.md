@@ -8,6 +8,11 @@
 - **Dart SDK ≥ 3.11** (to build; or use Docker only).
 - Optional: an embedding API key (Gemini / OpenAI / Voyage). Without one it runs the `local` offline embedder.
 
+> **Windows, zero terminal?** Run **`OracleAI-Setup.exe`** (see the README's *Desktop app & installer*): it
+> installs Oracle Studio + the CLI, can provision a **bundled portable PostgreSQL + pgvector with no Docker**,
+> writes the (DPAPI-encrypted) `.env`, migrates, and wires your agent — no steps below required. The sections
+> here are the manual / server / production path.
+
 ## 1. Start PostgreSQL + pgvector
 
 The `pgvector/pgvector:pg17` image is in `docker-compose.yml`. If port 5432 is taken, pick another via
@@ -60,7 +65,7 @@ Alternative without compiling: `dart run oracle_server:oracle_ai <args>` (slower
 ## 4. Initialize the database
 
 ```bash
-./build/oracle_ai migrate            # expect: migrations: applied=4 ... ok   (v1.0.0..v1.3.0)
+./build/oracle_ai migrate            # expect: migrations: applied=8 ... ok   (v1.0.0..v1.7.0)
 ```
 
 ## 5. Connect your agent

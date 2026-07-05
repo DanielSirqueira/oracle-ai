@@ -68,8 +68,13 @@ snapshot-consistent, restore-verified engine, plus tray "Backup now".
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | 0 ✅ | Skills backend (v1.7.0), research, this plan | verified on live DB |
-| 1 | Studio scaffold: workspace app, tray shell, DB connect, Dashboard + read-only browsers (memories/rules/skills/sessions) | browse real data |
-| 2 | Curation actions + global search + Skills editor with sync | edit round-trips verified |
-| 3 | Studio hosts hooks daemon + schedulers; Backup UI + scheduling; Settings/.env + MCP generator | console daemon retired |
-| 4 | Setup wizard incl. portable PG provisioning | clean-machine install works |
-| 5 | Packaging (Inno/MSIX), macOS/Linux adaptation, l10n en | signed installer |
+| 1 ✅ | Studio scaffold: workspace app, tray shell, DB connect, Dashboard + read-only browsers (memories/rules/skills/sessions) | browse real data |
+| 2 ✅ | Curation actions + global search + Skills editor with sync | edit round-trips verified |
+| 3 ✅ | Studio hosts hooks daemon + schedulers; Backup UI + scheduling; Settings/.env + MCP generator | console daemon retired |
+| 4 ✅ | Setup wizard incl. portable PG provisioning | clean-machine install works |
+| 5 ✅ | Packaging (Inno Setup → single `OracleAI-Setup.exe`), l10n en, DPAPI-encrypted secrets, Untitled-UI polish | installer builds & runs; macOS/Linux adaptation still open |
+
+> **Status:** phases 0–5 delivered — Studio is a full tray control center and the single-file
+> `OracleAI-Setup.exe` installs the whole stack (bundled PostgreSQL + pgvector, no Docker) per-user with
+> encrypted secrets. Remaining: macOS/Linux adaptation (Keychain / Secret Service, native shortcuts,
+> packaging) and MSIX for the Store path.

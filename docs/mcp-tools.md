@@ -1,6 +1,6 @@
 # MCP tools (reference)
 
-> The 32 tools exposed by the MCP server (stdio). Each is wired to a use case via DI; arguments map to the use
+> The 39 tools exposed by the MCP server (stdio). Each is wired to a use case via DI; arguments map to the use
 > case input, and the result is returned as JSON (errors carry `isError`).
 
 The server also advertises static MCP **`instructions`** that the client auto-injects once at connect time —
