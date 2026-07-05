@@ -418,39 +418,65 @@ class _ProjectSwitcher extends StatelessWidget {
               PopupMenuItem(enabled: false, child: Text(l10n.t('shell.noProjects'))),
           ],
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 340),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            constraints: const BoxConstraints(maxWidth: 400, minWidth: 240),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: OracleBrand.gray900,
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: OracleBrand.gray700),
+              // Elevated fill + a violet-tinted border so it clearly reads as
+              // the interactive project switcher, not just a label.
+              color: OracleBrand.gray800,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: OracleBrand.violet.withValues(alpha: 0.55), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: OracleBrand.violet.withValues(alpha: 0.18),
+                  blurRadius: 12,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.folder_outlined, size: 18, color: OracleBrand.violetSoft),
-              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  gradient: OracleBrand.gradient,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.folder_rounded, size: 17, color: Colors.white),
+              ),
+              const SizedBox(width: 11),
               Flexible(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
+                      l10n.t('shell.project').toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w700,
+                        color: OracleBrand.violetSoft,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
                       current?.name.value ?? l10n.t('shell.project'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600, color: OracleBrand.gray100),
+                          fontSize: 14, fontWeight: FontWeight.w600, color: OracleBrand.gray100),
                     ),
                     Text(
                       _pathOf(current),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: OracleBrand.gray500),
+                      style: const TextStyle(fontSize: 11, color: OracleBrand.gray400),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.unfold_more, size: 16, color: OracleBrand.gray500),
+              const SizedBox(width: 10),
+              const Icon(Icons.unfold_more, size: 18, color: OracleBrand.violetSoft),
             ]),
           ),
         );

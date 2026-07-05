@@ -278,8 +278,11 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      // Fixed height so cards in a row line up regardless of caption length
+      // (a 1- vs 2-line caption would otherwise make neighbours uneven).
       child: SizedBox(
         width: 200,
+        height: caption == null ? 108 : 134,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -309,10 +312,12 @@ class _MetricCard extends StatelessWidget {
                       ?.copyWith(fontWeight: FontWeight.w600)),
               if (caption != null) ...[
                 const SizedBox(height: 2),
-                Text(caption!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: OracleBrand.gray500)),
+                Expanded(
+                  child: Text(caption!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: OracleBrand.gray500)),
+                ),
               ],
             ],
           ),
