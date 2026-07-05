@@ -467,6 +467,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 stacked: true,
                 control: _snippet(hooksSnippet, () => _copy(hooksSnippet, '"hooks"')),
               ),
+              SettingRow(
+                label: l10n.t('set.promptTitle'),
+                description: l10n.t('set.promptDesc'),
+                stacked: true,
+                control: _snippet(
+                    server.agentProtocol().trim(),
+                    () => _copy(server.agentProtocol().trim(),
+                        l10n.t('set.promptTitle'))),
+              ),
             ],
           ),
         ],

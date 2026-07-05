@@ -213,6 +213,10 @@ const _pt = <String, String>{
   'set.agents': 'Integração de agentes',
   'set.mcpTitle': '.mcp.json (raiz do projeto do agente)',
   'set.hooksTitle': 'settings.json do Claude Code (bloco "hooks")',
+  'set.promptTitle': 'Prompt para o agente (CLAUDE.md / AGENTS.md)',
+  'set.promptDesc':
+      'Cole este protocolo no arquivo de instruções do seu agente para ensiná-lo a usar a Oracle: '
+          'recuperar antes de re-deduzir, registrar o que é durável e passar adiante o que ficou aberto.',
   'set.copied': 'copiado para a área de transferência.',
   'set.copy': 'Copiar',
   'set.envSave': 'Salvar .env',
@@ -457,6 +461,10 @@ const _en = <String, String>{
   'set.agents': 'Agent integration',
   'set.mcpTitle': '.mcp.json (agent project root)',
   'set.hooksTitle': 'Claude Code settings.json ("hooks" block)',
+  'set.promptTitle': 'Prompt for your agent (CLAUDE.md / AGENTS.md)',
+  'set.promptDesc':
+      "Paste this protocol into your agent's instruction file to teach it the Oracle workflow: "
+          'recall before re-deriving, record what is durable, and hand off what is open.',
   'set.copied': 'copied to clipboard.',
   'set.copy': 'Copy',
   'set.envSave': 'Save .env',

@@ -625,6 +625,9 @@ volumes:
   /// Agents point at the INSTALLED binary — the MCP lives with the program.
   String get mcpSnippet => mcpJson(command: installedCli);
 
+  /// Detailed instruction block to paste into the agent's CLAUDE.md/AGENTS.md.
+  String get agentPrompt => agentProtocol().trim();
+
   String get hooksSnippet =>
       hooksJson(host: '127.0.0.1', port: 49500, token: hookToken.isEmpty ? null : hookToken);
 }

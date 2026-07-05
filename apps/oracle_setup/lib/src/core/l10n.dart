@@ -75,6 +75,11 @@ const _pt = <String, String>{
   'agents.title': 'Conectar os agentes',
   'agents.mcp': '.mcp.json (na raiz de cada projeto do agente)',
   'agents.hooks': 'settings.json do Claude Code — bloco "hooks"',
+  'agents.promptIntro':
+      'Cole o protocolo abaixo no arquivo de instruções do agente (CLAUDE.md / AGENTS.md) para '
+          'ensiná-lo a usar a Oracle: recuperar antes de re-deduzir, registrar o que é durável, passar '
+          'adiante o que ficou aberto.',
+  'agents.promptTitle': 'Prompt para o agente (CLAUDE.md / AGENTS.md)',
   'agents.copy': 'Copiar',
   'agents.copied': 'Copiado.',
   'finish.title': 'Tudo pronto! 🎉',
@@ -219,6 +224,10 @@ const _en = <String, String>{
   'agents.title': 'Wire your agents',
   'agents.mcp': '.mcp.json (at each agent project root)',
   'agents.hooks': 'Claude Code settings.json — "hooks" block',
+  'agents.promptIntro':
+      "Paste the protocol below into your agent's instruction file (CLAUDE.md / AGENTS.md) to teach it "
+          'the Oracle workflow: recall before re-deriving, record what is durable, hand off what is open.',
+  'agents.promptTitle': 'Prompt for your agent (CLAUDE.md / AGENTS.md)',
   'agents.copy': 'Copy',
   'agents.copied': 'Copied.',
   'finish.title': 'All set! 🎉',

@@ -37,5 +37,8 @@ export 'src/domain/value_object/value_object.dart';
 export 'src/errors/database_failure.dart';
 export 'src/errors/system_failure.dart';
 
+// Runtime utilities
+export 'src/util/single_instance.dart';
+
 // Result pattern, re-exported for the domain/infra layers.
 export 'package:result_dart/result_dart.dart';

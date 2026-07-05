@@ -538,6 +538,11 @@ class _SetupWizardState extends State<SetupWizard> {
       _snippet(context, l10n.t('agents.mcp'), s.mcpSnippet),
       const SizedBox(height: 12),
       _snippet(context, l10n.t('agents.hooks'), s.hooksSnippet),
+      const SizedBox(height: 12),
+      Text(l10n.t('agents.promptIntro'),
+          style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
+      const SizedBox(height: 8),
+      _snippet(context, l10n.t('agents.promptTitle'), s.agentPrompt),
     ]);
   }
 
