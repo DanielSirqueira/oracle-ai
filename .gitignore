@@ -4,6 +4,9 @@
 build/
 pubspec_overrides.yaml
 
+# Packaged installer output (large, built artifact)
+dist/
+
 # Coverage
 coverage/
 
