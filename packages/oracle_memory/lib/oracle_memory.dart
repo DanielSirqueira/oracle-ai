@@ -142,6 +142,7 @@ export 'src/handoff/domain/repositories/handoff_repository.dart';
 export 'src/handoff/domain/usecases/accept_handoff_usecase.dart';
 export 'src/handoff/domain/usecases/begin_handoff_usecase.dart';
 export 'src/handoff/domain/usecases/pending_handoffs_usecase.dart';
+export 'src/handoff/domain/usecases/recent_handoffs_usecase.dart';
 export 'src/handoff/infra/datasources/handoff_datasource.dart';
 export 'src/handoff/infra/repositories/handoff_repository_impl.dart';
 export 'src/handoff/external/datasources/database/database_handoff_datasource.dart';

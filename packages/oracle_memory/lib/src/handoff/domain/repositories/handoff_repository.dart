@@ -11,6 +11,10 @@ abstract interface class HandoffRepository {
   /// SessionStart.
   AsyncResultDart<List<HandoffEntity>, HandoffFailure> pendingHandoffs(IdVO projectId);
 
+  /// Full handoff history for a project (all statuses), newest first — for the
+  /// Studio handoffs view.
+  AsyncResultDart<List<HandoffEntity>, HandoffFailure> recentHandoffs(IdVO projectId, {int limit});
+
   /// Marks a handoff accepted.
   AsyncResultDart<HandoffEntity, HandoffFailure> acceptHandoff(IdVO id);
 }

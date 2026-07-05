@@ -18,6 +18,14 @@ class DatabaseHandoffDatasource implements HandoffDatasource {
   @override
   Future<HandoffEntity> beginHandoff(HandoffEntity handoff) async {
     try {
+      // One open handoff per project: retire any still-open ones first so they
+      // don't accumulate as stale duplicates (the read side only shows the newest
+      // open, but the history/list would otherwise pile up unconsumed handoffs).
+      await _database.executeUpdate(SqlStatement(
+        "UPDATE handoffs SET status = 'expired' "
+        "WHERE project_id = :pid::uuid AND status = 'open'",
+        {'pid': handoff.projectId.value},
+      ));
       final result = await _database.executeUpdate(SqlStatement(
         'INSERT INTO handoffs (project_id, source_session_id, from_agent, to_agent, summary, '
         'open_questions, next_steps, files_touched, cwd) '
@@ -44,6 +52,20 @@ class DatabaseHandoffDatasource implements HandoffDatasource {
         "WHERE project_id = :pid::uuid AND status = 'open' "
         'ORDER BY created_at DESC LIMIT 1',
         {'pid': projectId.value},
+      ));
+      return result.rows.map(DatabaseHandoffMapper.fromRow).toList();
+    } on DatabaseFailure catch (error) {
+      throw DatasourceHandoffFailure(errorMessage: error.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  @override
+  Future<List<HandoffEntity>> recentHandoffs(IdVO projectId, {int limit = 50}) async {
+    try {
+      final result = await _database.select(SqlStatement(
+        'SELECT $_columns FROM handoffs WHERE project_id = :pid::uuid '
+        'ORDER BY created_at DESC LIMIT :lim',
+        {'pid': projectId.value, 'lim': limit},
       ));
       return result.rows.map(DatabaseHandoffMapper.fromRow).toList();
     } on DatabaseFailure catch (error) {

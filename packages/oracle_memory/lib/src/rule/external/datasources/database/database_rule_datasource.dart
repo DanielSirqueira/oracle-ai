@@ -167,7 +167,7 @@ class DatabaseRuleDatasource implements RuleDatasource {
           '$scopeFilter '
           'ORDER BY key, (project_id IS NOT NULL) DESC'
           ') t '
-          "ORDER BY (severity = 'required') DESC, priority DESC, title "
+          "ORDER BY (severity = 'required') DESC, priority ASC, title "
           'LIMIT :limit';
 
       final result = await _database.select(SqlStatement(sql, params));
@@ -246,7 +246,7 @@ class DatabaseRuleDatasource implements RuleDatasource {
       final sql = 'WITH ${ctes.join(', ')} '
           'SELECT $_columnsM, SUM(f.s) AS score '
           'FROM fused f JOIN rules m ON m.id = f.id '
-          'GROUP BY m.id ORDER BY score DESC, m.priority DESC LIMIT :limit';
+          'GROUP BY m.id ORDER BY score DESC, m.priority ASC LIMIT :limit';
 
       final result = await _database.select(SqlStatement(sql, params));
       return result.rows

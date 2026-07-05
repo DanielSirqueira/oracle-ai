@@ -18,7 +18,8 @@ class RuleEntity {
   final TextVO content;
   final RuleSeverity severity;
 
-  /// Ranking within the same [severity] (0..100, default 50). Higher wins in
+  /// Ranking within the same [severity] (0..100, default 50). LOWER wins —
+  /// priority 1 is the most relevant, 100 the least; delivered ascending in
   /// `rulesForTask`. Orthogonal to [severity]: severity is obligation
   /// (must vs should), priority is ordering/relevance.
   final int priority;

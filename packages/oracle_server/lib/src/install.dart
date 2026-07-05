@@ -121,7 +121,7 @@ acting on a claim that names a specific file, symbol, or value.
   - `title`: a short, searchable headline; `body`: the fact AND why it matters
   - `importance`: 0..1 (higher = more central)
 - Create or refine a rule with `oracle_rule_save` (`key`, `scope`, `title`, `content`,
-  `severity` = required|recommended, `priority` 0..100). Re-saving the same `key` REFINES it (versioned).
+  `severity` = required|recommended, `priority` 0..100 — LOWER = more relevant, 1 first). Re-saving the same `key` REFINES it (versioned).
 - Keep architecture current per area with `oracle_architecture_save`.
 
 ## What to save — and what not to

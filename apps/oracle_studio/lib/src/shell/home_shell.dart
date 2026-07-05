@@ -10,6 +10,8 @@ import '../core/l10n.dart';
 import '../core/oracle_connection.dart';
 import '../features/backup/backup_page.dart';
 import '../features/dashboard/dashboard_page.dart';
+import '../features/duplicates/duplicates_page.dart';
+import '../features/handoffs/handoffs_page.dart';
 import '../features/memories/memories_page.dart';
 import '../features/rules/rules_page.dart';
 import '../features/search/search_page.dart';
@@ -47,8 +49,10 @@ const _navGroups = <_NavGroup>[
   ]),
   _NavGroup('nav.groupActivity', [
     _Nav(Icons.forum_outlined, Icons.forum, 'nav.sessions', 'nav.sessionsHint'),
+    _Nav(Icons.swap_horiz_outlined, Icons.swap_horiz, 'nav.handoffs', 'nav.handoffsHint'),
   ]),
   _NavGroup('nav.groupSystem', [
+    _Nav(Icons.content_copy_outlined, Icons.content_copy, 'nav.duplicates', 'nav.duplicatesHint'),
     _Nav(Icons.save_outlined, Icons.save, 'nav.backup', 'nav.backupHint'),
     _Nav(Icons.settings_outlined, Icons.settings, 'nav.settings', 'nav.settingsHint'),
   ]),
@@ -157,6 +161,8 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
       RulesPage(project: _selected),
       SkillsPage(project: _selected),
       SessionsPage(project: _selected),
+      HandoffsPage(project: _selected),
+      DuplicatesPage(connection: widget.connection, project: _selected),
       BackupPage(connection: widget.connection, daemon: widget.daemon),
       SettingsPage(connection: widget.connection, daemon: widget.daemon),
     ];

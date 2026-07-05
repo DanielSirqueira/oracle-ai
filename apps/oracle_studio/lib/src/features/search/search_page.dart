@@ -10,12 +10,20 @@ class _GlobalResults {
   final List<MemorySearchResult> memories;
   final List<RuleSearchResult> rules;
   final List<SkillSearchResult> skills;
-  const _GlobalResults({required this.memories, required this.rules, required this.skills});
-  bool get isEmpty => memories.isEmpty && rules.isEmpty && skills.isEmpty;
+  final List<ArchitectureSearchResult> sections;
+  const _GlobalResults({
+    required this.memories,
+    required this.rules,
+    required this.skills,
+    required this.sections,
+  });
+  bool get isEmpty =>
+      memories.isEmpty && rules.isEmpty && skills.isEmpty && sections.isEmpty;
 }
 
-/// One query across the whole memory bank: memories, rules and skills searched
-/// in parallel with the same hybrid engines the agents use.
+/// One query across the whole memory bank: memories, rules, skills and
+/// architecture sections searched in parallel with the same hybrid (vector +
+/// full-text) engines the agents use.
 class SearchPage extends StatefulWidget {
   final ValueNotifier<ProjectEntity?> project;
   const SearchPage({super.key, required this.project});
@@ -51,11 +59,16 @@ class _SearchPageState extends State<SearchPage> {
           injector
               .get<SearchSkillsUsecase>()(SkillSearchFilter(query: q, projectId: pid, limit: 10))
               .then((r) => r.getOrDefault(const [])),
+          injector
+              .get<SearchArchitectureUsecase>()(
+                  ArchitectureSearchFilter(query: q, projectId: pid, limit: 10))
+              .then((r) => r.getOrDefault(const [])),
         ]);
         return _GlobalResults(
           memories: results[0] as List<MemorySearchResult>,
           rules: results[1] as List<RuleSearchResult>,
           skills: results[2] as List<SkillSearchResult>,
+          sections: results[3] as List<ArchitectureSearchResult>,
         );
       }();
     });
@@ -145,6 +158,19 @@ class _SearchPageState extends State<SearchPage> {
                                       '${h.skill.key} · score ${h.score.toStringAsFixed(3)}',
                                   onTap: () => _showContent(context, h.skill.name.value,
                                       '${h.skill.description.value}\n\n${h.skill.content.value}'),
+                                ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (data.sections.isNotEmpty) ...[
+                              _SectionHeader(l10n.t('search.sections'),
+                                  Icons.account_tree_outlined, data.sections.length),
+                              for (final h in data.sections)
+                                _HitTile(
+                                  icon: Icons.account_tree_outlined,
+                                  title: h.architecture.area,
+                                  subtitle: 'score ${h.score.toStringAsFixed(3)}',
+                                  onTap: () => _showContent(context, h.architecture.area,
+                                      h.architecture.content.value),
                                 ),
                             ],
                           ],

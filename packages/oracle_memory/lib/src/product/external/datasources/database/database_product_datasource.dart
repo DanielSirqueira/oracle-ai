@@ -15,10 +15,23 @@ class DatabaseProductDatasource implements ProductDatasource {
   @override
   Future<ProductEntity> registerProduct(ProductEntity product) async {
     try {
+      final params = DatabaseProductMapper.toInsertParams(product);
+      // Resolve-or-create: products have no natural key, so a second
+      // oracle_product_register with the same name would fork the ecosystem into
+      // two owners and split all downstream scoping. Reuse the existing product
+      // with the same (case-insensitive) name instead of inserting a duplicate.
+      final existing = await _database.select(SqlStatement(
+        'SELECT $_columns FROM products WHERE lower(name) = lower(:name) '
+        'ORDER BY created_at LIMIT 1',
+        {'name': params['name']},
+      ));
+      if (existing.rows.isNotEmpty) {
+        return DatabaseProductMapper.fromRow(existing.rows.first);
+      }
       final result = await _database.executeUpdate(SqlStatement(
         'INSERT INTO products (name, description) VALUES (:name, :description) '
         'RETURNING id, created_at, updated_at',
-        DatabaseProductMapper.toInsertParams(product),
+        params,
       ));
       final row = result.rows.first;
       return product.copyWith(

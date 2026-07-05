@@ -20,6 +20,12 @@ class SaveMemoryUsecaseImpl implements SaveMemoryUsecase {
   final Embedder _embedder;
   const SaveMemoryUsecaseImpl(this._repository, this._embedder);
 
+  /// Keyless near-duplicate guard: a save without a `key` that lands within this
+  /// cosine distance of an existing same-owner/same-kind memory supersedes it in
+  /// place instead of appending a duplicate. Deliberately tight (only genuine
+  /// near-identical text), matching the maintenance dedup sweep threshold.
+  static const _keylessDedupDistance = 0.05;
+
   @override
   AsyncResultDart<MemoryEntity, MemoryFailure> call(MemoryEntity memory) async {
     final fields = <FieldSystemFailure>[];
@@ -63,6 +69,29 @@ class SaveMemoryUsecaseImpl implements SaveMemoryUsecase {
         final vector = await _embedder.embed('${memory.title.value}\n${memory.body.value}');
         memory = memory.copyWith(embedding: vector, embeddingModel: _embedder.model);
       } catch (_) {/* save without embedding */}
+    }
+
+    // Keyless near-duplicate guard. Without a `key`, a memory would append a new
+    // row on every save; when the incoming memory is near-identical to an
+    // existing one in the same owner AND kind, supersede that one in place so the
+    // agent stops piling up duplicates. Keyed saves already supersede by key; an
+    // explicit `supersedes` is respected as-is. Best-effort — never blocks a save.
+    if ((key == null || key.isEmpty) &&
+        memory.supersedes == null &&
+        memory.embedding != null &&
+        memory.embeddingModel != null) {
+      try {
+        final near = await _repository.nearestByEmbedding(
+          productId: memory.productId,
+          projectId: memory.projectId,
+          embedding: memory.embedding!,
+          embeddingModel: memory.embeddingModel!,
+          maxDistance: _keylessDedupDistance,
+          limit: 5,
+        );
+        final twin = near.firstWhereOrNull((n) => n.memory.kind == memory.kind);
+        if (twin != null) memory = memory.copyWith(supersedes: twin.memory.id);
+      } catch (_) {/* fall back to a plain insert */}
     }
 
     return _repository.saveMemory(memory);

@@ -28,6 +28,16 @@ class HandoffRepositoryImpl implements HandoffRepository {
   }
 
   @override
+  AsyncResultDart<List<HandoffEntity>, HandoffFailure> recentHandoffs(IdVO projectId,
+      {int limit = 50}) async {
+    try {
+      return Success(await _datasource.recentHandoffs(projectId, limit: limit));
+    } on HandoffFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
   AsyncResultDart<HandoffEntity, HandoffFailure> acceptHandoff(IdVO id) async {
     try {
       return Success(await _datasource.acceptHandoff(id));

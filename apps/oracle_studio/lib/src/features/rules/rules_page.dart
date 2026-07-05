@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 
+import '../../core/brand.dart';
 import '../../core/fmt.dart';
 import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
@@ -280,6 +281,8 @@ class _RuleDetail extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        Text(l10n.t('rule.priorityHint'),
+            style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
         Row(children: [
           Text(l10n.t('rule.priority')),
           Expanded(
@@ -301,18 +304,24 @@ class _RuleDetail extends StatelessWidget {
                 builder: (context) => StatefulBuilder(
                   builder: (context, setState) => AlertDialog(
                     title: Text(l10n.t('rule.rerank')),
-                    content: Row(mainAxisSize: MainAxisSize.min, children: [
-                      SizedBox(
-                        width: 320,
-                        child: Slider(
-                          value: p.toDouble(),
-                          max: 100,
-                          divisions: 20,
-                          label: '$p',
-                          onChanged: (v) => setState(() => p = v.round()),
+                    content: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Text(l10n.t('rule.priorityHint'),
+                          style: const TextStyle(
+                              fontSize: 12, color: OracleBrand.gray400)),
+                      const SizedBox(height: 8),
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        SizedBox(
+                          width: 320,
+                          child: Slider(
+                            value: p.toDouble(),
+                            max: 100,
+                            divisions: 20,
+                            label: '$p',
+                            onChanged: (v) => setState(() => p = v.round()),
+                          ),
                         ),
-                      ),
-                      Text('$p'),
+                        Text('$p'),
+                      ]),
                     ]),
                     actions: [
                       TextButton(

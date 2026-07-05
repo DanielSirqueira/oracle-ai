@@ -326,7 +326,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           'severity': {'type': 'string', 'description': 'required | recommended (obligation)'},
           'priority': {
             'type': 'integer',
-            'description': 'Ranking within a severity, 0..100 (default 50). Higher wins in rules_for_task.'
+            'description': 'Ranking within a severity, 0..100 (default 50). LOWER wins — 1 is most relevant, delivered first in rules_for_task.'
           },
           'tags': {
             'type': 'array',
@@ -356,12 +356,12 @@ Capture is automatic — hooks record the session, each user request, and your w
 
     server.tool(
       'oracle_rule_set_priority',
-      description: 'Re-rank an existing rule in place (no new version). Raise/lower how '
-          'strongly a still-valid rule weighs in rules_for_task.',
+      description: 'Re-rank an existing rule in place (no new version). Set how strongly a '
+          'still-valid rule weighs in rules_for_task — LOWER is stronger (1 = most relevant).',
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'id': {'type': 'string'},
-          'priority': {'type': 'integer', 'description': '0..100'},
+          'priority': {'type': 'integer', 'description': '0..100 — lower = more relevant (1 first)'},
         },
         required: ['id', 'priority'],
       ),
