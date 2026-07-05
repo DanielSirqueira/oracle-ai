@@ -143,6 +143,7 @@ const _pt = <String, String>{
   'inst.backupOk': 'Backup válido ✓',
   'inst.backupBad': 'Arquivo inválido — não parece um backup do Oracle',
   'inst.installNow': 'Instalar agora',
+  'log.stoppedRunning': 'Instância anterior em execução encerrada',
   'log.copying': 'Copiando programas para',
   'log.copied': 'Programas copiados',
   'log.noAppPayload':
@@ -157,6 +158,7 @@ const _pt = <String, String>{
   'log.vNoStudio': 'Studio não copiado (payload ausente)',
   // finish
   'finish.open': 'Abrir o Oracle Studio',
+  'finish.openHint': 'Clique em "Concluir" para abrir o Oracle AI e fechar o instalador.',
   // credentials / self-heal
   'log.credsReused': 'Reusando credenciais salvas do banco embutido.',
   'log.credsSaved': 'Credenciais do banco embutido salvas.',
@@ -287,6 +289,7 @@ const _en = <String, String>{
   'inst.backupOk': 'Backup valid ✓',
   'inst.backupBad': 'Invalid file — does not look like an Oracle backup',
   'inst.installNow': 'Install now',
+  'log.stoppedRunning': 'Stopped a previously-running instance',
   'log.copying': 'Copying programs to',
   'log.copied': 'Programs copied',
   'log.noAppPayload': 'App payload missing (development run) — skipping binary copy.',
@@ -299,6 +302,7 @@ const _en = <String, String>{
   'log.vNoCli': 'oracle_ai.exe not copied (payload missing)',
   'log.vNoStudio': 'Studio not copied (payload missing)',
   'finish.open': 'Open Oracle Studio',
+  'finish.openHint': 'Click "Finish" to open Oracle AI and close the installer.',
   'log.credsReused': 'Reusing saved credentials of the bundled database.',
   'log.credsSaved': 'Bundled database credentials saved.',
   'log.selfHeal':

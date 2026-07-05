@@ -516,7 +516,8 @@ volumes:
     return b.toString();
   }
 
-  /// Copies a directory tree (the Studio payload) into the install root.
+  /// Copies a directory tree (the Studio payload) into the install root,
+  /// overwriting any previous install.
   Future<int> _copyTree(Directory from, Directory to) async {
     var copied = 0;
     await to.create(recursive: true);
@@ -526,11 +527,49 @@ volumes:
       if (entity is Directory) {
         await Directory(target).create(recursive: true);
       } else if (entity is File) {
-        await entity.copy(target);
+        await _copyOver(entity, target);
         copied++;
       }
     }
     return copied;
+  }
+
+  /// Copies [src] to [target], replacing an existing file. `File.copy` on
+  /// Windows fails with ERROR_ALREADY_EXISTS (183) when the target is present,
+  /// so remove it first. As a last resort (a stubborn lock), the old file is
+  /// renamed aside — a running image can be renamed even when it can't be
+  /// deleted — so the fresh copy still lands.
+  Future<void> _copyOver(File src, String target) async {
+    final dst = File(target);
+    await dst.parent.create(recursive: true);
+    if (dst.existsSync()) {
+      try {
+        await dst.delete();
+      } catch (_) {
+        try {
+          await dst.rename('$target.old-${DateTime.now().millisecondsSinceEpoch}');
+        } catch (_) {/* fall through — the copy will surface a clear error */}
+      }
+    }
+    await src.copy(target);
+  }
+
+  /// Best-effort termination of a previously-installed Studio/CLI that may be
+  /// running (tray, agent-spawned MCP) and locking the files we overwrite.
+  Future<void> _stopRunningInstances() async {
+    if (!Platform.isWindows) return;
+    var stopped = false;
+    for (final image in const ['oracle_studio.exe', 'oracle_ai.exe']) {
+      try {
+        final r = await Process.run('taskkill', ['/F', '/IM', image, '/T']);
+        if (r.exitCode == 0) stopped = true;
+      } catch (_) {/* taskkill missing or nothing to kill */}
+    }
+    if (stopped) {
+      _log(l10n.t('log.stoppedRunning'));
+      // Let Windows release the file handles before we overwrite.
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+    }
   }
 
   /// The real installation: program files copied to the OS-recommended
@@ -547,12 +586,16 @@ volumes:
       await Directory(installRoot).create(recursive: true);
 
       // 1) Program payload → %LOCALAPPDATA%\Programs\Oracle AI.
+      // A previous install may still be running (Studio in the tray, MCP
+      // spawned by an agent) and would lock the .exe/.dll we're about to
+      // overwrite — stop it first so this is a clean reinstall.
+      await _stopRunningInstances();
       final exeDir = File(Platform.resolvedExecutable).parent.path;
       final appPayload = Directory('$exeDir${sep}app');
       if (appPayload.existsSync()) {
         _log('${l10n.t('log.copying')} $installRoot');
         final cli = File('${appPayload.path}${sep}oracle_ai.exe');
-        if (cli.existsSync()) await cli.copy(installedCli);
+        if (cli.existsSync()) await _copyOver(cli, installedCli);
         final studioSrc = Directory('${appPayload.path}${sep}studio');
         if (studioSrc.existsSync()) {
           final n = await _copyTree(studioSrc, Directory('$installRoot${sep}studio'));

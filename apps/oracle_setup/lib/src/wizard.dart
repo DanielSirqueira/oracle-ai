@@ -577,12 +577,14 @@ class _SetupWizardState extends State<SetupWizard> {
             ),
           ]),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
+        // No "open" button here — "Concluir" (nav bar) launches the system and
+        // closes the installer, so a separate open action would be redundant.
         Center(
-          child: FilledButton.icon(
-            onPressed: _state.launchInstalled,
-            icon: const Icon(Icons.rocket_launch),
-            label: Text(l10n.t('finish.open')),
+          child: Text(
+            l10n.t('finish.openHint'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: OracleBrand.gray400),
           ),
         ),
       ]);
