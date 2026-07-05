@@ -5,6 +5,7 @@ import 'package:oracle_memory/oracle_memory.dart';
 import '../../core/fmt.dart';
 import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
+import '../../widgets/markdown_view.dart';
 
 /// Capture browser: sessions → user demands (requests) → agent work (messages).
 class SessionsPage extends StatefulWidget {
@@ -160,7 +161,7 @@ class _SessionsPageState extends State<SessionsPage> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              SelectableText(
+                              MarkdownView(
                                 m.content.value,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),

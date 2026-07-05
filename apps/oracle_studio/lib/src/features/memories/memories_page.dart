@@ -6,6 +6,7 @@ import '../../core/fmt.dart';
 import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
+import '../../widgets/markdown_view.dart';
 
 /// Browse and curate the consolidated memories of the selected project: hybrid
 /// search, create, edit (a new version superseding the old — history is kept)
@@ -315,7 +316,7 @@ class _MemoryDetail extends StatelessWidget {
           ],
         ),
         const Divider(height: 32),
-        SelectableText(memory.body.value, style: Theme.of(context).textTheme.bodyMedium),
+        MarkdownView(memory.body.value),
       ],
     );
   }

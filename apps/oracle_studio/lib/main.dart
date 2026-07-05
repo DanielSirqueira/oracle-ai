@@ -34,6 +34,9 @@ Future<void> main() async {
     titleBarStyle: TitleBarStyle.normal,
   );
   await windowManager.waitUntilReadyToShow(options, () async {
+    // Open maximized — a control center wants the whole screen; the restored
+    // size above is what the user gets when they un-maximize.
+    await windowManager.maximize();
     await windowManager.show();
     await windowManager.focus();
   });

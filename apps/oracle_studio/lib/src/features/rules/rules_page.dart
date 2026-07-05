@@ -6,6 +6,7 @@ import '../../core/fmt.dart';
 import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
+import '../../widgets/markdown_view.dart';
 
 /// Browse and curate the rules that apply to the selected project. Editing
 /// re-saves the same key (supersession, history kept); priority is an in-place
@@ -327,7 +328,7 @@ class _RuleDetail extends StatelessWidget {
           ),
         ]),
         const Divider(height: 32),
-        SelectableText(rule.content.value, style: Theme.of(context).textTheme.bodyMedium),
+        MarkdownView(rule.content.value),
       ],
     );
   }

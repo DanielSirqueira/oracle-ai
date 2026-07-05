@@ -23,6 +23,8 @@ dependencies:
   tray_manager: ^0.3.2
   launch_at_startup: ^0.5.1
   file_selector: ^1.1.0
+  # Renders the markdown that agents write into rules/memories/skills/messages.
+  gpt_markdown: ^1.0.0
 
 dev_dependencies:
   flutter_test:

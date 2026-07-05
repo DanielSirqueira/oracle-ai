@@ -7,6 +7,7 @@ import '../../core/fmt.dart';
 import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
+import '../../widgets/markdown_view.dart';
 
 /// The central skill library: browse, create, edit (same key = supersede),
 /// retire, and materialize to disk (sync) for native agent discovery.
@@ -279,13 +280,7 @@ class _SkillDetail extends StatelessWidget {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: SelectableText(
-              skill.content.value,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(fontFamily: 'monospace', height: 1.5),
-            ),
+            child: MarkdownView(skill.content.value),
           ),
         ),
       ],

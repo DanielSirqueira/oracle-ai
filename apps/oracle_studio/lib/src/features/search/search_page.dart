@@ -4,6 +4,7 @@ import 'package:oracle_memory/oracle_memory.dart';
 
 import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
+import '../../widgets/markdown_view.dart';
 
 class _GlobalResults {
   final List<MemorySearchResult> memories;
@@ -67,7 +68,7 @@ class _SearchPageState extends State<SearchPage> {
         title: Text(title),
         content: SizedBox(
           width: 640,
-          child: SingleChildScrollView(child: SelectableText(body)),
+          child: SingleChildScrollView(child: MarkdownView(body)),
         ),
         actions: [
           TextButton(
