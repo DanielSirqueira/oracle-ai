@@ -12,13 +12,13 @@ abstract interface class RuleDatasource {
 
   /// The current (is_latest) rule with [key] in the given owner, or null.
   /// Lets a save skip re-embedding + re-inserting when nothing changed.
-  Future<RuleEntity?> currentByKey({IdVO? productId, IdVO? projectId, required String key});
+  Future<RuleEntity?> currentByKey({IdVO? organizationId, IdVO? projectId, required String key});
 
   /// Latest rules in the same owner within [maxDistance] cosine distance of
   /// [embedding] (same model only), excluding [excludeId]. Backs the save-time
   /// near-duplicate signal. Empty when nothing is close enough.
   Future<List<RuleNeighbor>> nearestByEmbedding({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required List<double> embedding,
     required String embeddingModel,

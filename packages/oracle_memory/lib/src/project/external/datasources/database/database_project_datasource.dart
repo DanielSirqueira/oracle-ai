@@ -16,8 +16,8 @@ class DatabaseProjectDatasource implements ProjectDatasource {
   Future<ProjectEntity> registerProject(ProjectEntity project) async {
     try {
       final result = await _database.executeUpdate(SqlStatement(
-        'INSERT INTO projects (product_id, name, description, repo_path) '
-        'VALUES (:product_id::uuid, :name, :description, :repo_path) '
+        'INSERT INTO projects (organization_id, name, description, repo_path) '
+        'VALUES (:organization_id::uuid, :name, :description, :repo_path) '
         'RETURNING id, created_at, updated_at',
         DatabaseProjectMapper.toInsertParams(project),
       ));
@@ -41,10 +41,10 @@ class DatabaseProjectDatasource implements ProjectDatasource {
       // Race-safe get-or-create keyed on repo_path. DO UPDATE (not DO NOTHING)
       // so RETURNING always yields the row — existing or freshly inserted.
       final result = await _database.executeUpdate(SqlStatement(
-        'INSERT INTO projects (product_id, name, description, repo_path) '
-        'VALUES (:product_id::uuid, :name, :description, :repo_path) '
+        'INSERT INTO projects (organization_id, name, description, repo_path) '
+        'VALUES (:organization_id::uuid, :name, :description, :repo_path) '
         'ON CONFLICT (repo_path) DO UPDATE SET updated_at = now() '
-        'RETURNING id, product_id, name, description, repo_path, created_at, updated_at',
+        'RETURNING id, organization_id, name, description, repo_path, created_at, updated_at',
         DatabaseProjectMapper.toInsertParams(project),
       ));
       return DatabaseProjectMapper.fromRow(result.rows.first);
@@ -60,7 +60,7 @@ class DatabaseProjectDatasource implements ProjectDatasource {
   Future<ProjectEntity> getProjectById(IdVO id) async {
     try {
       final result = await _database.select(SqlStatement(
-        'SELECT id, product_id, name, description, repo_path, created_at, updated_at '
+        'SELECT id, organization_id, name, description, repo_path, created_at, updated_at '
         'FROM projects WHERE id = :id::uuid',
         {'id': id.value},
       ));
@@ -85,13 +85,13 @@ class DatabaseProjectDatasource implements ProjectDatasource {
         where.add('name ILIKE :like');
         params['like'] = '%${filter.search.trim()}%';
       }
-      if (filter.productId != null) {
-        where.add('product_id = :product_id::uuid');
-        params['product_id'] = filter.productId!.value;
+      if (filter.organizationId != null) {
+        where.add('organization_id = :organization_id::uuid');
+        params['organization_id'] = filter.organizationId!.value;
       }
       final whereClause = where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}';
       final result = await _database.select(SqlStatement(
-        'SELECT id, product_id, name, description, repo_path, created_at, updated_at '
+        'SELECT id, organization_id, name, description, repo_path, created_at, updated_at '
         'FROM projects $whereClause ORDER BY name LIMIT :limit OFFSET :offset',
         params,
       ));

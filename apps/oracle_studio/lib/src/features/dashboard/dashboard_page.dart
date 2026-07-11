@@ -55,7 +55,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<_DashboardData> _load() async {
     final db = widget.connection.database!;
     const tables = [
-      'products', 'projects', 'memories', 'rules', 'skills',
+      'organizations', 'projects', 'memories', 'rules', 'skills',
       'architectures', 'sessions', 'requests', 'messages', 'handoffs',
     ];
     final selects = tables.map((t) => '(SELECT count(*) FROM $t) AS $t').join(', ');
@@ -138,7 +138,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _SectionLabel(l10n.t('dash.global'), l10n.t('dash.globalSub')),
           const SizedBox(height: 12),
           Wrap(spacing: 12, runSpacing: 12, children: [
-            _MetricCard(l10n.t('dash.products'), data.global['products']!,
+            _MetricCard(l10n.t('dash.organizations'), data.global['organizations']!,
                 Icons.inventory_2_outlined, null),
             _MetricCard(l10n.t('dash.projects'), data.global['projects']!,
                 Icons.folder_outlined, null),

@@ -9,14 +9,14 @@ import '../errors/skill_failure.dart';
 /// Business contract for the shared skill library.
 abstract interface class SkillRepository {
   /// Saves a skill, superseding any current version with the same key in the
-  /// same owner (project, product, or global).
+  /// same owner (project, organization, or global).
   AsyncResultDart<SkillEntity, SkillFailure> saveSkill(SkillEntity skill);
 
   /// Latest skills near [embedding] (same owner + model), excluding [excludeId]
   /// — the save-time near-duplicate signal. A failed lookup degrades to an empty
   /// list, so it is a plain optional, not a Result.
   Future<List<SkillNeighbor>> nearestByEmbedding({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required List<double> embedding,
     required String embeddingModel,
@@ -29,7 +29,7 @@ abstract interface class SkillRepository {
   /// none exists. Used to short-circuit an unchanged re-save before embedding.
   /// A failed lookup degrades to null (the caller just performs a normal save).
   Future<SkillEntity?> currentByKey({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required String key,
   });
@@ -37,21 +37,21 @@ abstract interface class SkillRepository {
   AsyncResultDart<SkillEntity, SkillFailure> getSkillById(IdVO id);
 
   /// Resolves [key] with override semantics: the project's version wins over
-  /// the product's, which wins over the global one.
+  /// the organization's, which wins over the global one.
   AsyncResultDart<SkillEntity, SkillFailure> getSkillByKey(
     String key, {
     IdVO? projectId,
-    IdVO? productId,
+    IdVO? organizationId,
   });
 
   /// Hybrid search over the library (vector + full-text, RRF). Always includes
-  /// global skills; project/product narrow the additional scope.
+  /// global skills; project/organization narrow the additional scope.
   AsyncResultDart<List<SkillSearchResult>, SkillFailure> searchSkills(SkillSearchFilter filter);
 
   /// Current (latest, non-retired) skills visible to the given scope.
   AsyncResultDart<List<SkillEntity>, SkillFailure> listSkills({
     IdVO? projectId,
-    IdVO? productId,
+    IdVO? organizationId,
     int limit,
   });
 

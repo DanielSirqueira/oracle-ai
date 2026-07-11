@@ -24,10 +24,10 @@ class SkillSyncService {
     return '$home/.claude/skills';
   }
 
-  Future<SkillSyncReport> sync({String? dir, IdVO? projectId, IdVO? productId}) async {
+  Future<SkillSyncReport> sync({String? dir, IdVO? projectId, IdVO? organizationId}) async {
     final target = dir ?? defaultDir();
     final result = await injector.get<ListSkillsUsecase>()(
-        projectId: projectId, productId: productId, limit: 500);
+        projectId: projectId, organizationId: organizationId, limit: 500);
     if (result.isError()) {
       throw result.exceptionOrNull()!;
     }

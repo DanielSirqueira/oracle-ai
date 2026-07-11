@@ -5,12 +5,12 @@ import '../enums/rule_severity.dart';
 
 const _listEquality = ListEquality<Object?>();
 
-/// A development rule. Belongs to a [productId] (inherited by all its projects)
+/// A development rule. Belongs to a [organizationId] (inherited by all its projects)
 /// OR a [projectId] (project-specific override). [key] is a stable slug used for
 /// supersession; [scope] narrows it to a module/folder/area (e.g. `controllers`).
 class RuleEntity {
   final IdVO id;
-  final IdVO? productId;
+  final IdVO? organizationId;
   final IdVO? projectId;
   final String key;
   final String scope;
@@ -33,7 +33,7 @@ class RuleEntity {
 
   const RuleEntity({
     required this.id,
-    this.productId,
+    this.organizationId,
     this.projectId,
     required this.key,
     required this.scope,
@@ -60,7 +60,7 @@ class RuleEntity {
 
   RuleEntity copyWith({
     IdVO? id,
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     String? key,
     String? scope,
@@ -78,7 +78,7 @@ class RuleEntity {
   }) {
     return RuleEntity(
       id: id ?? this.id,
-      productId: productId ?? this.productId,
+      organizationId: organizationId ?? this.organizationId,
       projectId: projectId ?? this.projectId,
       key: key ?? this.key,
       scope: scope ?? this.scope,
@@ -101,7 +101,7 @@ class RuleEntity {
     if (identical(this, other)) return true;
     return other is RuleEntity &&
         other.id == id &&
-        other.productId == productId &&
+        other.organizationId == organizationId &&
         other.projectId == projectId &&
         other.key == key &&
         other.scope == scope &&
@@ -118,7 +118,7 @@ class RuleEntity {
   @override
   int get hashCode => Object.hash(
         id,
-        productId,
+        organizationId,
         projectId,
         key,
         scope,

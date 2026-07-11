@@ -11,7 +11,7 @@ abstract interface class ResolveProjectUsecase {
   AsyncResultDart<ProjectEntity, ProjectFailure> call(
     String repoPath, {
     String? name,
-    IdVO? productId,
+    IdVO? organizationId,
   });
 }
 
@@ -23,7 +23,7 @@ class ResolveProjectUsecaseImpl implements ResolveProjectUsecase {
   AsyncResultDart<ProjectEntity, ProjectFailure> call(
     String repoPath, {
     String? name,
-    IdVO? productId,
+    IdVO? organizationId,
   }) async {
     final normalized = _normalize(repoPath);
     if (normalized.isEmpty) {
@@ -37,7 +37,7 @@ class ResolveProjectUsecaseImpl implements ResolveProjectUsecase {
         (name != null && name.trim().isNotEmpty) ? name.trim() : _basename(normalized);
     return _repository.resolveProject(ProjectEntity(
       id: const IdVO.empty(),
-      productId: productId,
+      organizationId: organizationId,
       name: TextVO(projectName),
       repoPath: normalized,
     ));

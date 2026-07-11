@@ -37,7 +37,7 @@ re-derive, record durable learnings as you go.
 - SKILLS: a centralized, shared skill library (procedural how-to guides) lives here — one copy for every
   agent, no per-agent folders. Before starting a non-trivial kind of task, `oracle_skill_search` with the
   task context; load the winner with `oracle_skill_get` (searches return name+description only — cheap).
-  Save reusable know-how with `oracle_skill_save` (stable kebab-case key; omit project/product for a
+  Save reusable know-how with `oracle_skill_save` (stable kebab-case key; omit project/organization for a
   global skill; re-saving the same key updates it).
 - At the end of a task / before context compaction, write a handoff with `oracle_handoff_begin`.
 - Keep memory healthy: retire/forget what is wrong or obsolete. Bad memory is worse than none.
@@ -121,7 +121,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         properties: {
           'repoPath': {'type': 'string', 'description': 'Absolute repository path (the agent cwd)'},
           'name': {'type': 'string', 'description': 'Optional; defaults to the directory name'},
-          'productId': {'type': 'string', 'description': 'Optional ecosystem/product this repo belongs to'},
+          'organizationId': {'type': 'string', 'description': 'Optional ecosystem/organization this repo belongs to'},
         },
         required: ['repoPath'],
       ),
@@ -134,7 +134,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<ResolveProjectUsecase>()(
           repoPath.trim().isEmpty ? repoPath : repoRootOf(repoPath),
           name: a['name']?.toString(),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
         );
         return result.fold((p) => _ok(_projectJson(p)), _err);
       },
@@ -175,11 +175,11 @@ Capture is automatic — hooks record the session, each user request, and your w
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'projectId': {'type': 'string'},
-          'productId': {'type': 'string'},
+          'organizationId': {'type': 'string'},
           'key': {
             'type': 'string',
             'description': 'Optional stable slug (kebab-case). Re-saving the same key in the same '
-                'project/product supersedes the previous version — use it to update one memory '
+                'project/organization supersedes the previous version — use it to update one memory '
                 'instead of creating duplicates.'
           },
           'supersedes': {
@@ -209,7 +209,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<SaveMemoryUsecase>()(MemoryEntity(
           id: const IdVO.empty(),
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
           key: (key == null || key.isEmpty) ? null : key,
           supersedes: (supersedes == null || supersedes.isEmpty) ? null : IdVO(supersedes),
           tier: MemoryTier.parse('${a['tier'] ?? 'semantic'}'),
@@ -233,7 +233,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         properties: {
           'query': {'type': 'string'},
           'projectId': {'type': 'string'},
-          'productId': {'type': 'string'},
+          'organizationId': {'type': 'string'},
           'tiers': {
             'type': 'array',
             'items': {'type': 'string'}
@@ -257,7 +257,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<SearchMemoriesUsecase>()(MemorySearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
           tiers: _stringList(a['tiers']).map(MemoryTier.parse).toList(),
           kinds: _stringList(a['kinds']).map(MemoryKind.parse).toList(),
           limit: _clampLimit(a['limit'], fallback: 10),
@@ -318,7 +318,7 @@ Capture is automatic — hooks record the session, each user request, and your w
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'projectId': {'type': 'string'},
-          'productId': {'type': 'string'},
+          'organizationId': {'type': 'string'},
           'key': {'type': 'string', 'description': 'Stable slug (e.g. controllers-pattern)'},
           'scope': {'type': 'string', 'description': 'module / folder / area'},
           'title': {'type': 'string'},
@@ -340,7 +340,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<SaveRuleUsecase>()(RuleEntity(
           id: const IdVO.empty(),
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
           key: '${a['key'] ?? ''}',
           scope: '${a['scope'] ?? ''}',
           title: TextVO('${a['title'] ?? ''}'),
@@ -400,7 +400,7 @@ Capture is automatic — hooks record the session, each user request, and your w
 
     server.tool(
       'oracle_rules_for_task',
-      description: 'Applicable rules for a task in a project (product→project inheritance '
+      description: 'Applicable rules for a task in a project (organization→project inheritance '
           'and override). Consult before generating code.',
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
@@ -428,7 +428,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         properties: {
           'query': {'type': 'string'},
           'projectId': {'type': 'string'},
-          'productId': {'type': 'string'},
+          'organizationId': {'type': 'string'},
           'scope': {'type': 'string'},
           'severities': {
             'type': 'array',
@@ -448,7 +448,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<SearchRulesUsecase>()(RuleSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
           scope: a['scope']?.toString(),
           severities: _stringList(a['severities']).map(RuleSeverity.parse).toList(),
           limit: _clampLimit(a['limit'], fallback: 10),
@@ -460,10 +460,10 @@ Capture is automatic — hooks record the session, each user request, and your w
       },
     );
 
-    // --- product ---
+    // --- organization ---
     server.tool(
-      'oracle_product_register',
-      description: 'Register a product (the ecosystem scope above projects).',
+      'oracle_organization_register',
+      description: 'Register a organization (the ecosystem scope above projects).',
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'name': {'type': 'string'},
@@ -473,29 +473,29 @@ Capture is automatic — hooks record the session, each user request, and your w
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
-        final result = await injector.get<RegisterProductUsecase>()(ProductEntity(
+        final result = await injector.get<RegisterOrganizationUsecase>()(OrganizationEntity(
           id: const IdVO.empty(),
           name: TextVO('${a['name'] ?? ''}'),
           description: a['description'] == null ? null : TextVO('${a['description']}'),
         ));
-        return result.fold((p) => _ok(_productJson(p)), _err);
+        return result.fold((p) => _ok(_organizationJson(p)), _err);
       },
     );
 
     server.tool(
-      'oracle_product_list',
-      description: 'List products.',
+      'oracle_organization_list',
+      description: 'List organizations.',
       toolInputSchema: const mcp.ToolInputSchema(properties: {
         'search': {'type': 'string'},
         'limit': {'type': 'integer'},
       }),
       callback: ({args, extra}) async {
         final a = args ?? const {};
-        final result = await injector.get<ListProductsUsecase>()(ProductFilter(
+        final result = await injector.get<ListOrganizationsUsecase>()(OrganizationFilter(
           search: '${a['search'] ?? ''}',
           limit: _clampLimit(a['limit'], fallback: 50, max: 200),
         ));
-        return result.fold((list) => _ok(list.map(_productJson).toList()), _err);
+        return result.fold((list) => _ok(list.map(_organizationJson).toList()), _err);
       },
     );
 
@@ -505,7 +505,7 @@ Capture is automatic — hooks record the session, each user request, and your w
       description: 'Save a reusable skill (SKILL.md-style how-to) into the CENTRAL shared '
           'library — one copy for every agent, no per-agent folders. Use a stable kebab-case '
           '`key`; re-saving the same key in the same scope supersedes it. Omit projectId AND '
-          'productId for a GLOBAL skill (visible everywhere). `description` is the recall '
+          'organizationId for a GLOBAL skill (visible everywhere). `description` is the recall '
           'trigger — write it as "what it does + when to use it". Re-saving unchanged content '
           'is a free no-op.',
       toolInputSchema: const mcp.ToolInputSchema(
@@ -518,7 +518,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           },
           'content': {'type': 'string', 'description': 'The skill body (markdown, SKILL.md style)'},
           'projectId': {'type': 'string', 'description': 'Scope to one project (omit for wider scope)'},
-          'productId': {'type': 'string', 'description': 'Scope to a product (omit for global)'},
+          'organizationId': {'type': 'string', 'description': 'Scope to a organization (omit for global)'},
           'tags': {
             'type': 'array',
             'items': {'type': 'string'}
@@ -531,7 +531,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<SaveSkillUsecase>()(SkillEntity(
           id: const IdVO.empty(),
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
           key: '${a['key'] ?? ''}'.trim(),
           name: TextVO('${a['name'] ?? ''}'),
           description: TextVO('${a['description'] ?? ''}'),
@@ -548,12 +548,12 @@ Capture is automatic — hooks record the session, each user request, and your w
       description: 'Find skills in the shared library by task context (hybrid search: vector + '
           'full-text). Returns name+description+key per hit (cheap, progressive disclosure) — '
           'load the winner with oracle_skill_get. Global skills are always included; projectId/'
-          'productId add their scoped skills.',
+          'organizationId add their scoped skills.',
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'query': {'type': 'string', 'description': 'The task context (what you are about to do)'},
           'projectId': {'type': 'string'},
-          'productId': {'type': 'string'},
+          'organizationId': {'type': 'string'},
           'limit': {'type': 'integer', 'description': 'Default 10, max 50'},
         },
         required: ['query'],
@@ -563,7 +563,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<SearchSkillsUsecase>()(SkillSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
           limit: _clampLimit(a['limit'], fallback: 10),
         ));
         return result.fold(
@@ -575,7 +575,7 @@ Capture is automatic — hooks record the session, each user request, and your w
                     'description': e.skill.description.value,
                     'scope': e.skill.projectId != null
                         ? 'project'
-                        : (e.skill.productId != null ? 'product' : 'global'),
+                        : (e.skill.organizationId != null ? 'organization' : 'global'),
                     'score': e.score,
                   })
               .toList()),
@@ -587,13 +587,13 @@ Capture is automatic — hooks record the session, each user request, and your w
     server.tool(
       'oracle_skill_get',
       description: 'Load one skill\'s full content (the "use the skill" step after '
-          'oracle_skill_search). Pass an id, or a key — a key resolves project → product → '
+          'oracle_skill_search). Pass an id, or a key — a key resolves project → organization → '
           'global, so a project-specific version overrides the shared one.',
       toolInputSchema: const mcp.ToolInputSchema(properties: {
         'id': {'type': 'string'},
         'key': {'type': 'string'},
         'projectId': {'type': 'string', 'description': 'Used for key resolution'},
-        'productId': {'type': 'string', 'description': 'Used for key resolution'},
+        'organizationId': {'type': 'string', 'description': 'Used for key resolution'},
       }),
       callback: ({args, extra}) async {
         final a = args ?? const {};
@@ -601,7 +601,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           id: a['id'] == null ? null : IdVO('${a['id']}'),
           key: a['key']?.toString(),
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
         );
         return result.fold((s) => _ok(_skillJson(s)), _err);
       },
@@ -609,18 +609,18 @@ Capture is automatic — hooks record the session, each user request, and your w
 
     server.tool(
       'oracle_skill_list',
-      description: 'Inventory of the current skills visible to a scope (global + product + '
+      description: 'Inventory of the current skills visible to a scope (global + organization + '
           'project). Name+description+key only.',
       toolInputSchema: const mcp.ToolInputSchema(properties: {
         'projectId': {'type': 'string'},
-        'productId': {'type': 'string'},
+        'organizationId': {'type': 'string'},
         'limit': {'type': 'integer', 'description': 'Default 200'},
       }),
       callback: ({args, extra}) async {
         final a = args ?? const {};
         final result = await injector.get<ListSkillsUsecase>()(
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
-          productId: a['productId'] == null ? null : IdVO('${a['productId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
           limit: _clampLimit(a['limit'], fallback: 200, max: 500),
         );
         return result.fold(
@@ -632,7 +632,7 @@ Capture is automatic — hooks record the session, each user request, and your w
                     'description': s.description.value,
                     'scope': s.projectId != null
                         ? 'project'
-                        : (s.productId != null ? 'product' : 'global'),
+                        : (s.organizationId != null ? 'organization' : 'global'),
                   })
               .toList()),
           _err,
@@ -1153,7 +1153,7 @@ Capture is automatic — hooks record the session, each user request, and your w
 
   static Map<String, dynamic> _projectJson(ProjectEntity p) => {
         'id': p.id.value,
-        'productId': p.productId?.value,
+        'organizationId': p.organizationId?.value,
         'name': p.name.value,
         'description': p.description?.value,
         'repoPath': p.repoPath,
@@ -1163,7 +1163,7 @@ Capture is automatic — hooks record the session, each user request, and your w
 
   static Map<String, dynamic> _memoryJson(MemoryEntity m) => {
         'id': m.id.value,
-        'productId': m.productId?.value,
+        'organizationId': m.organizationId?.value,
         'projectId': m.projectId?.value,
         'key': m.key,
         'tier': m.tier.code,
@@ -1179,7 +1179,7 @@ Capture is automatic — hooks record the session, each user request, and your w
 
   static Map<String, dynamic> _ruleJson(RuleEntity r) => {
         'id': r.id.value,
-        'productId': r.productId?.value,
+        'organizationId': r.organizationId?.value,
         'projectId': r.projectId?.value,
         'key': r.key,
         'scope': r.scope,
@@ -1194,14 +1194,14 @@ Capture is automatic — hooks record the session, each user request, and your w
 
   static Map<String, dynamic> _skillJson(SkillEntity s) => {
         'id': s.id.value,
-        'productId': s.productId?.value,
+        'organizationId': s.organizationId?.value,
         'projectId': s.projectId?.value,
         'key': s.key,
         'name': s.name.value,
         'description': s.description.value,
         'content': s.content.value,
         'tags': s.tags,
-        'scope': s.projectId != null ? 'project' : (s.productId != null ? 'product' : 'global'),
+        'scope': s.projectId != null ? 'project' : (s.organizationId != null ? 'organization' : 'global'),
         'isLatest': s.isLatest,
         'createdAt': s.createdAt?.toIso8601String(),
       };
@@ -1214,7 +1214,7 @@ Capture is automatic — hooks record the session, each user request, and your w
     final json = _memoryJson(m);
     if (m.embedding == null || m.embeddingModel == null) return json;
     final near = await injector.get<MemoryRepository>().nearestByEmbedding(
-          productId: m.productId,
+          organizationId: m.organizationId,
           projectId: m.projectId,
           embedding: m.embedding!,
           embeddingModel: m.embeddingModel!,
@@ -1242,7 +1242,7 @@ Capture is automatic — hooks record the session, each user request, and your w
     final json = _ruleJson(r);
     if (r.embedding == null || r.embeddingModel == null) return json;
     final near = await injector.get<RuleRepository>().nearestByEmbedding(
-          productId: r.productId,
+          organizationId: r.organizationId,
           projectId: r.projectId,
           embedding: r.embedding!,
           embeddingModel: r.embeddingModel!,
@@ -1269,7 +1269,7 @@ Capture is automatic — hooks record the session, each user request, and your w
     final json = _skillJson(s);
     if (s.embedding == null || s.embeddingModel == null) return json;
     final near = await injector.get<SkillRepository>().nearestByEmbedding(
-          productId: s.productId,
+          organizationId: s.organizationId,
           projectId: s.projectId,
           embedding: s.embedding!,
           embeddingModel: s.embeddingModel!,
@@ -1290,7 +1290,7 @@ Capture is automatic — hooks record the session, each user request, and your w
     return json;
   }
 
-  static Map<String, dynamic> _productJson(ProductEntity p) => {
+  static Map<String, dynamic> _organizationJson(OrganizationEntity p) => {
         'id': p.id.value,
         'name': p.name.value,
         'description': p.description?.value,

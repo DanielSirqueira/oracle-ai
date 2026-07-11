@@ -9,7 +9,7 @@ const _listEquality = ListEquality<String>();
 
 /// Saves a skill after validation.
 ///
-/// A skill may be GLOBAL (no product/project) — the shared-library common case
+/// A skill may be GLOBAL (no organization/project) — the shared-library common case
 /// — so scope is not required, unlike rules/memories.
 abstract interface class SaveSkillUsecase {
   AsyncResultDart<SkillEntity, SkillFailure> call(SkillEntity skill);
@@ -48,7 +48,7 @@ class SaveSkillUsecaseImpl implements SaveSkillUsecase {
     // no pointless new version on a repeated save.
     if (skill.embedding == null) {
       final existing = await _repository.currentByKey(
-        productId: skill.productId,
+        organizationId: skill.organizationId,
         projectId: skill.projectId,
         key: skill.key.trim(),
       );

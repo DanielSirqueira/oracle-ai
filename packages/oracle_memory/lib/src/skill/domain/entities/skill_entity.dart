@@ -8,11 +8,11 @@ const _listEquality = ListEquality<Object?>();
 /// folder. [key] is the stable slug used for supersession (and the folder name
 /// when materialized); [description] is the recall trigger ("when to use").
 ///
-/// Scope: belongs to a [projectId], OR a [productId], OR is GLOBAL (both null)
+/// Scope: belongs to a [projectId], OR a [organizationId], OR is GLOBAL (both null)
 /// — ecosystem-wide skills are the common case.
 class SkillEntity {
   final IdVO id;
-  final IdVO? productId;
+  final IdVO? organizationId;
   final IdVO? projectId;
   final String key;
   final TextVO name;
@@ -31,7 +31,7 @@ class SkillEntity {
 
   const SkillEntity({
     required this.id,
-    this.productId,
+    this.organizationId,
     this.projectId,
     required this.key,
     required this.name,
@@ -56,7 +56,7 @@ class SkillEntity {
 
   SkillEntity copyWith({
     IdVO? id,
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     String? key,
     TextVO? name,
@@ -72,7 +72,7 @@ class SkillEntity {
   }) {
     return SkillEntity(
       id: id ?? this.id,
-      productId: productId ?? this.productId,
+      organizationId: organizationId ?? this.organizationId,
       projectId: projectId ?? this.projectId,
       key: key ?? this.key,
       name: name ?? this.name,
@@ -93,7 +93,7 @@ class SkillEntity {
     if (identical(this, other)) return true;
     return other is SkillEntity &&
         other.id == id &&
-        other.productId == productId &&
+        other.organizationId == organizationId &&
         other.projectId == projectId &&
         other.key == key &&
         other.name == name &&
@@ -108,7 +108,7 @@ class SkillEntity {
   @override
   int get hashCode => Object.hash(
         id,
-        productId,
+        organizationId,
         projectId,
         key,
         name,

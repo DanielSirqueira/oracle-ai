@@ -32,8 +32,8 @@ class SaveRuleUsecaseImpl implements SaveRuleUsecase {
     if (rule.content.isBlank) {
       fields.add(const FieldSystemFailure(field: 'content', message: 'Required'));
     }
-    if (rule.productId == null && rule.projectId == null) {
-      fields.add(const FieldSystemFailure(field: 'scope', message: 'Product or project required'));
+    if (rule.organizationId == null && rule.projectId == null) {
+      fields.add(const FieldSystemFailure(field: 'scope', message: 'Organization or project required'));
     }
     if (fields.isNotEmpty) {
       return Failure(ValidatedFieldRuleFailure(
@@ -48,7 +48,7 @@ class SaveRuleUsecaseImpl implements SaveRuleUsecase {
     // tokens and no pointless new version on a repeated save.
     if (rule.embedding == null) {
       final existing = await _repository.currentByKey(
-        productId: rule.productId,
+        organizationId: rule.organizationId,
         projectId: rule.projectId,
         key: rule.key.trim(),
       );

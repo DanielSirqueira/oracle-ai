@@ -134,7 +134,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
         final result = await injector.get<SaveMemoryUsecase>()(MemoryEntity(
           id: const IdVO.empty(),
           projectId: original?.projectId ?? project.id,
-          productId: original?.productId,
+          organizationId: original?.organizationId,
           key: k.isEmpty ? null : k,
           // Editing = a NEW version that supersedes the old row (audit trail
           // preserved), exactly like an agent updating a memory.

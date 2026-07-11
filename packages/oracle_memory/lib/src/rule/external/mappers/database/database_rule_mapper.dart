@@ -8,7 +8,7 @@ class DatabaseRuleMapper {
   const DatabaseRuleMapper._();
 
   static Map<String, Object?> toInsertParams(RuleEntity r) => {
-        'product_id': r.productId?.value,
+        'organization_id': r.organizationId?.value,
         'project_id': r.projectId?.value,
         'key': r.key,
         'scope': r.scope,
@@ -23,12 +23,12 @@ class DatabaseRuleMapper {
       };
 
   static RuleEntity fromRow(Map<String, DataRowType> row) {
-    final productId = row['product_id']?.toText();
+    final organizationId = row['organization_id']?.toText();
     final projectId = row['project_id']?.toText();
     final supersedes = row['supersedes']?.toText();
     return RuleEntity(
       id: IdVO(row['id']!.toText()!),
-      productId: productId == null ? null : IdVO(productId),
+      organizationId: organizationId == null ? null : IdVO(organizationId),
       projectId: projectId == null ? null : IdVO(projectId),
       key: row['key']!.toText() ?? '',
       scope: row['scope']!.toText() ?? '',

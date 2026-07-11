@@ -155,7 +155,7 @@ class Bootstrap {
     injector.addInstance<Embedder>(embedder);
     // Register feature modules (Datasource → Repository → UseCases), then commit.
     registerModules([
-      ProductModule(),
+      OrganizationModule(),
       ProjectModule(),
       ArchitectureModule(),
       RuleModule(),

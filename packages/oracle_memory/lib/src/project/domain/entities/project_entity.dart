@@ -1,10 +1,10 @@
 import 'package:oracle_core/oracle_core.dart';
 
-/// A project — the central scope unit. Belongs to a [productId] (optional, for
+/// A project — the central scope unit. Belongs to a [organizationId] (optional, for
 /// the ecosystem hierarchy) and owns architecture, rules, sessions and memory.
 class ProjectEntity {
   final IdVO id;
-  final IdVO? productId;
+  final IdVO? organizationId;
   final TextVO name;
   final TextVO? description;
   final String? repoPath;
@@ -13,7 +13,7 @@ class ProjectEntity {
 
   const ProjectEntity({
     required this.id,
-    this.productId,
+    this.organizationId,
     required this.name,
     this.description,
     this.repoPath,
@@ -26,7 +26,7 @@ class ProjectEntity {
 
   ProjectEntity copyWith({
     IdVO? id,
-    IdVO? productId,
+    IdVO? organizationId,
     TextVO? name,
     TextVO? description,
     String? repoPath,
@@ -35,7 +35,7 @@ class ProjectEntity {
   }) {
     return ProjectEntity(
       id: id ?? this.id,
-      productId: productId ?? this.productId,
+      organizationId: organizationId ?? this.organizationId,
       name: name ?? this.name,
       description: description ?? this.description,
       repoPath: repoPath ?? this.repoPath,
@@ -49,7 +49,7 @@ class ProjectEntity {
     if (identical(this, other)) return true;
     return other is ProjectEntity &&
         other.id == id &&
-        other.productId == productId &&
+        other.organizationId == organizationId &&
         other.name == name &&
         other.description == description &&
         other.repoPath == repoPath &&
@@ -59,5 +59,5 @@ class ProjectEntity {
 
   @override
   int get hashCode =>
-      Object.hash(id, productId, name, description, repoPath, createdAt, updatedAt);
+      Object.hash(id, organizationId, name, description, repoPath, createdAt, updatedAt);
 }

@@ -91,7 +91,7 @@ class _SkillsPageState extends State<SkillsPage> {
           id: const IdVO.empty(),
           projectId:
               original != null ? original.projectId : (scopeToProject ? project?.id : null),
-          productId: original?.productId,
+          organizationId: original?.organizationId,
           key: key.text.trim(),
           name: TextVO(name.text),
           description: TextVO(description.text),
@@ -197,13 +197,13 @@ class _SkillsPageState extends State<SkillsPage> {
                         final s = skills[i];
                         final scope = s.projectId != null
                             ? l10n.t('skill.project')
-                            : (s.productId != null
-                                ? l10n.t('skill.product')
+                            : (s.organizationId != null
+                                ? l10n.t('skill.organization')
                                 : l10n.t('skill.global'));
                         return ListTile(
                           selected: _selectedSkill?.id.value == s.id.value,
                           leading: Icon(
-                            s.projectId == null && s.productId == null
+                            s.projectId == null && s.organizationId == null
                                 ? Icons.public
                                 : Icons.folder_outlined,
                             size: 20,
@@ -238,10 +238,10 @@ class _SkillDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isGlobal = skill.projectId == null && skill.productId == null;
+    final isGlobal = skill.projectId == null && skill.organizationId == null;
     final scope = skill.projectId != null
         ? l10n.t('skill.project')
-        : (skill.productId != null ? l10n.t('skill.product') : l10n.t('skill.global'));
+        : (skill.organizationId != null ? l10n.t('skill.organization') : l10n.t('skill.global'));
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [

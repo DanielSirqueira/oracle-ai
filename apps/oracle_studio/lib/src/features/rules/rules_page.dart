@@ -110,10 +110,10 @@ class _RulesPageState extends State<RulesPage> {
       onSave: () async {
         final result = await injector.get<SaveRuleUsecase>()(RuleEntity(
           id: const IdVO.empty(),
-          // Keep the original owner on edit (a product rule stays a product
+          // Keep the original owner on edit (a organization rule stays a organization
           // rule); new rules created here are project-scoped.
           projectId: original == null ? project.id : original.projectId,
-          productId: original?.productId,
+          organizationId: original?.organizationId,
           key: key.text.trim(),
           scope: scope.text.trim(),
           title: TextVO(title.text),
@@ -274,7 +274,7 @@ class _RuleDetail extends StatelessWidget {
             MetaChip(
                 rule.projectId != null
                     ? l10n.t('rule.fromProject')
-                    : l10n.t('rule.fromProduct'),
+                    : l10n.t('rule.fromOrganization'),
                 icon: Icons.account_tree_outlined),
             MetaChip(fmtDateTime(rule.createdAt), icon: Icons.schedule),
             for (final t in rule.tags) MetaChip('#$t'),

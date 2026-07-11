@@ -16,7 +16,7 @@ abstract interface class MemoryRepository {
   /// A failed lookup degrades to null (the caller just performs a normal save),
   /// so it stays a plain optional rather than a Result.
   Future<MemoryEntity?> currentByKey({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required String key,
   });
@@ -25,7 +25,7 @@ abstract interface class MemoryRepository {
   /// [excludeId] — the save-time near-duplicate signal. Non-critical: a failed
   /// lookup degrades to an empty list, so it is a plain optional, not a Result.
   Future<List<MemoryNeighbor>> nearestByEmbedding({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required List<double> embedding,
     required String embeddingModel,

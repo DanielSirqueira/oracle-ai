@@ -7,12 +7,12 @@ import '../enums/memory_tier.dart';
 const _listEquality = ListEquality<Object?>();
 
 /// A consolidated memory — a durable, citable fact/decision/gotcha/rule written
-/// by the agent (`oracle_memory_save`). Scoped to a product OR a project.
+/// by the agent (`oracle_memory_save`). Scoped to a organization OR a project.
 ///
 /// [embedding] is the vector representation used for semantic recall (pgvector).
 class MemoryEntity {
   final IdVO id;
-  final IdVO? productId;
+  final IdVO? organizationId;
   final IdVO? projectId;
 
   /// Optional stable identity. When set, re-saving a memory with the same
@@ -35,7 +35,7 @@ class MemoryEntity {
 
   const MemoryEntity({
     required this.id,
-    this.productId,
+    this.organizationId,
     this.projectId,
     this.key,
     required this.tier,
@@ -62,7 +62,7 @@ class MemoryEntity {
 
   MemoryEntity copyWith({
     IdVO? id,
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     String? key,
     MemoryTier? tier,
@@ -80,7 +80,7 @@ class MemoryEntity {
   }) {
     return MemoryEntity(
       id: id ?? this.id,
-      productId: productId ?? this.productId,
+      organizationId: organizationId ?? this.organizationId,
       projectId: projectId ?? this.projectId,
       key: key ?? this.key,
       tier: tier ?? this.tier,
@@ -103,7 +103,7 @@ class MemoryEntity {
     if (identical(this, other)) return true;
     return other is MemoryEntity &&
         other.id == id &&
-        other.productId == productId &&
+        other.organizationId == organizationId &&
         other.projectId == projectId &&
         other.key == key &&
         other.tier == tier &&
@@ -121,7 +121,7 @@ class MemoryEntity {
   @override
   int get hashCode => Object.hash(
         id,
-        productId,
+        organizationId,
         projectId,
         key,
         tier,

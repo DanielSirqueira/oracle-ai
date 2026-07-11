@@ -6,7 +6,7 @@ enum SkillSearchMode { keyword, semantic, hybrid }
 /// Filter for hybrid skill search.
 ///
 /// Scope semantics: results include GLOBAL skills (no owner) plus, when given,
-/// the project's and/or product's skills — an agent should always see the
+/// the project's and/or organization's skills — an agent should always see the
 /// shared library, narrowed by its context.
 class SkillSearchFilter {
   final String query;
@@ -17,7 +17,7 @@ class SkillSearchFilter {
   final String? queryModel;
 
   final IdVO? projectId;
-  final IdVO? productId;
+  final IdVO? organizationId;
   final SkillSearchMode mode;
   final int limit;
 
@@ -26,7 +26,7 @@ class SkillSearchFilter {
     this.queryEmbedding,
     this.queryModel,
     this.projectId,
-    this.productId,
+    this.organizationId,
     this.mode = SkillSearchMode.hybrid,
     this.limit = 10,
   });
@@ -37,7 +37,7 @@ class SkillSearchFilter {
       queryEmbedding: queryEmbedding ?? this.queryEmbedding,
       queryModel: queryModel ?? this.queryModel,
       projectId: projectId,
-      productId: productId,
+      organizationId: organizationId,
       mode: mode,
       limit: limit,
     );

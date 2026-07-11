@@ -2,7 +2,7 @@
 ///
 /// Implementations: [LocalEmbedder] (offline, deterministic bag-of-words) and
 /// [HttpEmbedder] (OpenAI-compatible / Voyage). All vectors are L2-normalized,
-/// so cosine distance (`<=>`) and inner product rank identically.
+/// so cosine distance (`<=>`) and inner organization rank identically.
 abstract interface class Embedder {
   /// Model identifier stored alongside each vector (invariant: one model per
   /// index — see `embedding_model` columns).

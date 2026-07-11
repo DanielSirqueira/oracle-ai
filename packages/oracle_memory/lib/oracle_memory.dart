@@ -75,19 +75,19 @@ export 'src/skill/external/datasources/database/database_skill_datasource.dart';
 export 'src/skill/external/mappers/database/database_skill_mapper.dart';
 export 'src/skill/skill_module.dart';
 
-// --- product ---
-export 'src/product/domain/dtos/filters/product_filter.dart';
-export 'src/product/domain/entities/product_entity.dart';
-export 'src/product/domain/errors/product_failure.dart';
-export 'src/product/domain/repositories/product_repository.dart';
-export 'src/product/domain/usecases/get_product_by_id_usecase.dart';
-export 'src/product/domain/usecases/list_products_usecase.dart';
-export 'src/product/domain/usecases/register_product_usecase.dart';
-export 'src/product/infra/datasources/product_datasource.dart';
-export 'src/product/infra/repositories/product_repository_impl.dart';
-export 'src/product/external/datasources/database/database_product_datasource.dart';
-export 'src/product/external/mappers/database/database_product_mapper.dart';
-export 'src/product/product_module.dart';
+// --- organization ---
+export 'src/organization/domain/dtos/filters/organization_filter.dart';
+export 'src/organization/domain/entities/organization_entity.dart';
+export 'src/organization/domain/errors/organization_failure.dart';
+export 'src/organization/domain/repositories/organization_repository.dart';
+export 'src/organization/domain/usecases/get_organization_by_id_usecase.dart';
+export 'src/organization/domain/usecases/list_organizations_usecase.dart';
+export 'src/organization/domain/usecases/register_organization_usecase.dart';
+export 'src/organization/infra/datasources/organization_datasource.dart';
+export 'src/organization/infra/repositories/organization_repository_impl.dart';
+export 'src/organization/external/datasources/database/database_organization_datasource.dart';
+export 'src/organization/external/mappers/database/database_organization_mapper.dart';
+export 'src/organization/organization_module.dart';
 
 // --- architecture ---
 export 'src/architecture/domain/dtos/filters/architecture_search_filter.dart';

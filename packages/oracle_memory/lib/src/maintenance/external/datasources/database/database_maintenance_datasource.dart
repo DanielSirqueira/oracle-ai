@@ -69,7 +69,7 @@ class DatabaseMaintenanceDatasource implements MaintenanceDatasource {
           'AND EXISTS (SELECT 1 FROM memories o '
           'WHERE o.is_latest AND o.retired_at IS NULL AND o.embedding IS NOT NULL '
           'AND o.id <> m.id AND o.kind = m.kind '
-          'AND o.product_id IS NOT DISTINCT FROM m.product_id '
+          'AND o.organization_id IS NOT DISTINCT FROM m.organization_id '
           'AND o.project_id IS NOT DISTINCT FROM m.project_id '
           'AND (o.embedding <=> m.embedding) < :dist '
           'AND (o.importance, o.created_at, o.id) > (m.importance, m.created_at, m.id)) '

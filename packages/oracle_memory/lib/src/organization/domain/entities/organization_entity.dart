@@ -1,15 +1,15 @@
 import 'package:oracle_core/oracle_core.dart';
 
-/// A product — the ecosystem scope above projects. Its rules and memories are
+/// A organization — the ecosystem scope above projects. Its rules and memories are
 /// inherited by every [ProjectEntity] that belongs to it.
-class ProductEntity {
+class OrganizationEntity {
   final IdVO id;
   final TextVO name;
   final TextVO? description;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  const ProductEntity({
+  const OrganizationEntity({
     required this.id,
     required this.name,
     this.description,
@@ -17,16 +17,16 @@ class ProductEntity {
     this.updatedAt,
   });
 
-  factory ProductEntity.empty() => const ProductEntity(id: IdVO.empty(), name: TextVO.empty());
+  factory OrganizationEntity.empty() => const OrganizationEntity(id: IdVO.empty(), name: TextVO.empty());
 
-  ProductEntity copyWith({
+  OrganizationEntity copyWith({
     IdVO? id,
     TextVO? name,
     TextVO? description,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
-    return ProductEntity(
+    return OrganizationEntity(
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
@@ -38,7 +38,7 @@ class ProductEntity {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is ProductEntity &&
+    return other is OrganizationEntity &&
         other.id == id &&
         other.name == name &&
         other.description == description &&

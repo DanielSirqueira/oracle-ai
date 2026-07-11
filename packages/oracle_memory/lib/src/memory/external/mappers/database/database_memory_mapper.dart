@@ -11,7 +11,7 @@ class DatabaseMemoryMapper {
   /// Params for INSERT. uuids are cast in SQL (`:x::uuid`); the embedding is
   /// sent via [SqlVector] and cast (`:embedding::vector(1024)`).
   static Map<String, Object?> toInsertParams(MemoryEntity m) => {
-        'product_id': m.productId?.value,
+        'organization_id': m.organizationId?.value,
         'project_id': m.projectId?.value,
         'key': m.key,
         'tier': m.tier.code,
@@ -26,12 +26,12 @@ class DatabaseMemoryMapper {
       };
 
   static MemoryEntity fromRow(Map<String, DataRowType> row) {
-    final productId = row['product_id']?.toText();
+    final organizationId = row['organization_id']?.toText();
     final projectId = row['project_id']?.toText();
     final supersedes = row['supersedes']?.toText();
     return MemoryEntity(
       id: IdVO(row['id']!.toText()!),
-      productId: productId == null ? null : IdVO(productId),
+      organizationId: organizationId == null ? null : IdVO(organizationId),
       projectId: projectId == null ? null : IdVO(projectId),
       key: row['key']?.toText(),
       tier: MemoryTier.parse(row['tier']!.toText() ?? 'semantic'),

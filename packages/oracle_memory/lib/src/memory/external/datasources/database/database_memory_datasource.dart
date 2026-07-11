@@ -21,11 +21,11 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
   // The pgvector `vector` type is returned by the driver as binary; cast it to
   // text (`[1,0,...]`) so DataRowType.toVector() can parse it on read.
   static const _columns =
-      'id, product_id, project_id, key, tier, kind, title, body, tags, importance, '
+      'id, organization_id, project_id, key, tier, kind, title, body, tags, importance, '
       'embedding::text AS embedding, embedding_model, is_latest, supersedes, created_at, updated_at';
 
   static const _columnsM =
-      'm.id, m.product_id, m.project_id, m.key, m.tier, m.kind, m.title, m.body, m.tags, '
+      'm.id, m.organization_id, m.project_id, m.key, m.tier, m.kind, m.title, m.body, m.tags, '
       'm.importance, m.embedding::text AS embedding, m.embedding_model, m.is_latest, '
       'm.supersedes, m.created_at, m.updated_at';
 
@@ -61,8 +61,8 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
           params = {'key': key, 'pid': memory.projectId!.value};
         } else {
           sql = 'UPDATE memories SET is_latest = false, superseded_at = now() '
-              'WHERE is_latest AND key = :key AND project_id IS NULL AND product_id = :prodid::uuid';
-          params = {'key': key, 'prodid': memory.productId!.value};
+              'WHERE is_latest AND key = :key AND project_id IS NULL AND organization_id = :prodid::uuid';
+          params = {'key': key, 'prodid': memory.organizationId!.value};
         }
         queries.add(SavePointQuery(statement: SqlStatement(sql, params)));
       }
@@ -70,9 +70,9 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
       queries.add(SavePointQuery(
         statement: SqlStatement(
           'INSERT INTO memories '
-          '(product_id, project_id, key, tier, kind, title, body, tags, importance, '
+          '(organization_id, project_id, key, tier, kind, title, body, tags, importance, '
           'embedding, embedding_model, supersedes) '
-          'VALUES (:product_id::uuid, :project_id::uuid, :key, :tier, :kind, :title, :body, '
+          'VALUES (:organization_id::uuid, :project_id::uuid, :key, :tier, :kind, :title, :body, '
           ':tags, :importance, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
           'RETURNING id, created_at, updated_at',
           DatabaseMemoryMapper.toInsertParams(memory),
@@ -92,7 +92,7 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
   }
 
   @override
-  Future<MemoryEntity?> currentByKey({IdVO? productId, IdVO? projectId, required String key}) async {
+  Future<MemoryEntity?> currentByKey({IdVO? organizationId, IdVO? projectId, required String key}) async {
     try {
       final String sql;
       final Map<String, Object?> params;
@@ -100,10 +100,10 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
         sql = 'SELECT $_columns FROM memories '
             'WHERE is_latest AND key = :key AND project_id = :pid::uuid LIMIT 1';
         params = {'key': key, 'pid': projectId.value};
-      } else if (productId != null) {
+      } else if (organizationId != null) {
         sql = 'SELECT $_columns FROM memories '
-            'WHERE is_latest AND key = :key AND project_id IS NULL AND product_id = :prodid::uuid LIMIT 1';
-        params = {'key': key, 'prodid': productId.value};
+            'WHERE is_latest AND key = :key AND project_id IS NULL AND organization_id = :prodid::uuid LIMIT 1';
+        params = {'key': key, 'prodid': organizationId.value};
       } else {
         return null;
       }
@@ -117,7 +117,7 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
 
   @override
   Future<List<MemoryNeighbor>> nearestByEmbedding({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required List<double> embedding,
     required String embeddingModel,
@@ -140,9 +140,9 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
       if (projectId != null) {
         owner = 'project_id = :pid::uuid';
         params['pid'] = projectId.value;
-      } else if (productId != null) {
-        owner = 'project_id IS NULL AND product_id = :prodid::uuid';
-        params['prodid'] = productId.value;
+      } else if (organizationId != null) {
+        owner = 'project_id IS NULL AND organization_id = :prodid::uuid';
+        params['prodid'] = organizationId.value;
       } else {
         return const [];
       }
@@ -307,16 +307,16 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
 
       // Scope predicate (alias `m` inside the `scoped` CTE).
       final scope = <String>['m.is_latest'];
-      if (filter.projectId != null && filter.productId != null) {
-        scope.add('(m.project_id = :pid::uuid OR m.product_id = :prodid::uuid)');
+      if (filter.projectId != null && filter.organizationId != null) {
+        scope.add('(m.project_id = :pid::uuid OR m.organization_id = :prodid::uuid)');
         params['pid'] = filter.projectId!.value;
-        params['prodid'] = filter.productId!.value;
+        params['prodid'] = filter.organizationId!.value;
       } else if (filter.projectId != null) {
         scope.add('m.project_id = :pid::uuid');
         params['pid'] = filter.projectId!.value;
-      } else if (filter.productId != null) {
-        scope.add('m.product_id = :prodid::uuid');
-        params['prodid'] = filter.productId!.value;
+      } else if (filter.organizationId != null) {
+        scope.add('m.organization_id = :prodid::uuid');
+        params['prodid'] = filter.organizationId!.value;
       }
       if (filter.tiers.isNotEmpty) {
         scope.add('m.tier = ANY(:tiers)');

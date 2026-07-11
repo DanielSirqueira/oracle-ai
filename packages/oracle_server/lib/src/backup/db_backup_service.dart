@@ -27,7 +27,7 @@ class DbBackupService {
   /// The migration ledger (`_migrations`, `_migrations_lock`) is intentionally
   /// excluded — the schema/ledger is rebuilt by running migrations on restore.
   static const List<String> tables = [
-    'products',
+    'organizations',
     'projects',
     'sessions',
     'requests',

@@ -9,7 +9,7 @@ const _listEquality = ListEquality<String>();
 
 /// Persists a consolidated memory after validation.
 ///
-/// Guardrails (anti-junk): non-blank title/body and a scope (product or project)
+/// Guardrails (anti-junk): non-blank title/body and a scope (organization or project)
 /// are required — refusing to write trivial/unscoped memory.
 abstract interface class SaveMemoryUsecase {
   AsyncResultDart<MemoryEntity, MemoryFailure> call(MemoryEntity memory);
@@ -35,8 +35,8 @@ class SaveMemoryUsecaseImpl implements SaveMemoryUsecase {
     if (memory.body.isBlank) {
       fields.add(const FieldSystemFailure(field: 'body', message: 'Required'));
     }
-    if (memory.productId == null && memory.projectId == null) {
-      fields.add(const FieldSystemFailure(field: 'scope', message: 'Product or project required'));
+    if (memory.organizationId == null && memory.projectId == null) {
+      fields.add(const FieldSystemFailure(field: 'scope', message: 'Organization or project required'));
     }
     if (fields.isNotEmpty) {
       return Failure(ValidatedFieldMemoryFailure(
@@ -53,7 +53,7 @@ class SaveMemoryUsecaseImpl implements SaveMemoryUsecase {
     final key = memory.key?.trim();
     if (key != null && key.isNotEmpty && memory.embedding == null) {
       final existing = await _repository.currentByKey(
-        productId: memory.productId,
+        organizationId: memory.organizationId,
         projectId: memory.projectId,
         key: key,
       );
@@ -82,7 +82,7 @@ class SaveMemoryUsecaseImpl implements SaveMemoryUsecase {
         memory.embeddingModel != null) {
       try {
         final near = await _repository.nearestByEmbedding(
-          productId: memory.productId,
+          organizationId: memory.organizationId,
           projectId: memory.projectId,
           embedding: memory.embedding!,
           embeddingModel: memory.embeddingModel!,

@@ -1,18 +1,18 @@
 import 'package:oracle_core/oracle_core.dart';
 
-import '../../../domain/entities/product_entity.dart';
+import '../../../domain/entities/organization_entity.dart';
 
-class DatabaseProductMapper {
-  const DatabaseProductMapper._();
+class DatabaseOrganizationMapper {
+  const DatabaseOrganizationMapper._();
 
-  static Map<String, Object?> toInsertParams(ProductEntity p) => {
+  static Map<String, Object?> toInsertParams(OrganizationEntity p) => {
         'name': p.name.value,
         'description': p.description?.value,
       };
 
-  static ProductEntity fromRow(Map<String, DataRowType> row) {
+  static OrganizationEntity fromRow(Map<String, DataRowType> row) {
     final description = row['description']?.toText();
-    return ProductEntity(
+    return OrganizationEntity(
       id: IdVO(row['id']!.toText()!),
       name: TextVO(row['name']!.toText() ?? ''),
       description: description == null ? null : TextVO(description),

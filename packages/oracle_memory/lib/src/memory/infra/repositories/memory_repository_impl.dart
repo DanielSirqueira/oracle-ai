@@ -23,13 +23,13 @@ class MemoryRepositoryImpl implements MemoryRepository {
 
   @override
   Future<MemoryEntity?> currentByKey({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required String key,
   }) async {
     try {
       return await _datasource.currentByKey(
-          productId: productId, projectId: projectId, key: key);
+          organizationId: organizationId, projectId: projectId, key: key);
     } on MemoryFailure {
       return null; // optimization read only — degrade to a normal save
     }
@@ -37,7 +37,7 @@ class MemoryRepositoryImpl implements MemoryRepository {
 
   @override
   Future<List<MemoryNeighbor>> nearestByEmbedding({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required List<double> embedding,
     required String embeddingModel,
@@ -47,7 +47,7 @@ class MemoryRepositoryImpl implements MemoryRepository {
   }) async {
     try {
       return await _datasource.nearestByEmbedding(
-        productId: productId,
+        organizationId: organizationId,
         projectId: projectId,
         embedding: embedding,
         embeddingModel: embeddingModel,

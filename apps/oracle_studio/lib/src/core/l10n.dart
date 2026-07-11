@@ -110,9 +110,9 @@ const _pt = <String, String>{
   'dash.thisProject': 'Este projeto',
   'dash.thisProjectSub': 'Identidade e números do projeto selecionado no topo.',
   'dash.global': 'Todo o acervo',
-  'dash.globalSub': 'Totais somando todos os projetos e produtos.',
+  'dash.globalSub': 'Totais somando todos os projetos e organizações.',
   'dash.created': 'criado em',
-  'dash.products': 'Produtos',
+  'dash.organizations': 'Produtos',
   'dash.projects': 'Projetos',
   'dash.memories': 'Memórias',
   'dash.rules': 'Regras',
@@ -172,7 +172,7 @@ const _pt = <String, String>{
   'mem.deleted': 'Memória apagada.',
   'mem.forgetSoft': 'Esquecer (mantém auditoria)',
   // rules
-  'rule.header': 'Regras do projeto (com herança do produto)',
+  'rule.header': 'Regras do projeto (com herança da organização)',
   'rule.new': 'Nova regra',
   'rule.newTitle': 'Nova regra (do projeto)',
   'rule.editTitle': 'Refinar regra (nova versão)',
@@ -201,7 +201,7 @@ const _pt = <String, String>{
   'rule.retired': 'Regra aposentada.',
   'rule.deleted': 'Regra apagada.',
   'rule.fromProject': 'do projeto',
-  'rule.fromProduct': 'do produto (herdada)',
+  'rule.fromOrganization': 'da organização (herdada)',
   'rule.refine': 'Refinar (nova versão)',
   'rule.scopeChip': 'escopo',
   // skills
@@ -223,7 +223,7 @@ const _pt = <String, String>{
   'skill.scopeSelectProject': 'Deste projeto (selecione um projeto)',
   'skill.global': 'global',
   'skill.project': 'projeto',
-  'skill.product': 'produto',
+  'skill.organization': 'organização',
   'skill.empty': 'Nenhuma skill ainda — crie aqui ou deixe os agentes salvarem com oracle_skill_save.',
   'skill.selectOne': 'Selecione uma skill.',
   'skill.created': 'Skill criada.',
@@ -347,7 +347,7 @@ const _pt = <String, String>{
       'Um backup é um arquivo .sql portátil com TODA a memória (embeddings inclusos). Guarde, versione ou leve para outra máquina.',
   'bk.what': 'O que o backup contém?',
   'bk.whatDesc':
-      'Todos os produtos, projetos, memórias, regras, skills, sessões e métricas — com snapshot consistente mesmo com agentes trabalhando. A restauração só acontece em banco vazio (nunca sobrescreve).',
+      'Todas as organizações, projetos, memórias, regras, skills, sessões e métricas — com snapshot consistente mesmo com agentes trabalhando. A restauração só acontece em banco vazio (nunca sobrescreve).',
 };
 
 const _en = <String, String>{
@@ -440,9 +440,9 @@ const _en = <String, String>{
   'dash.thisProject': 'This project',
   'dash.thisProjectSub': 'Identity and numbers for the project selected at the top.',
   'dash.global': 'Whole memory bank',
-  'dash.globalSub': 'Totals across every project and product.',
+  'dash.globalSub': 'Totals across every project and organization.',
   'dash.created': 'created',
-  'dash.products': 'Products',
+  'dash.organizations': 'Organizations',
   'dash.projects': 'Projects',
   'dash.memories': 'Memories',
   'dash.rules': 'Rules',
@@ -500,7 +500,7 @@ const _en = <String, String>{
   'mem.forgotten': 'Memory forgotten.',
   'mem.deleted': 'Memory deleted.',
   'mem.forgetSoft': 'Forget (keeps audit trail)',
-  'rule.header': 'Project rules (with product inheritance)',
+  'rule.header': 'Project rules (with organization inheritance)',
   'rule.new': 'New rule',
   'rule.newTitle': 'New rule (project-scoped)',
   'rule.editTitle': 'Refine rule (new version)',
@@ -529,7 +529,7 @@ const _en = <String, String>{
   'rule.retired': 'Rule retired.',
   'rule.deleted': 'Rule deleted.',
   'rule.fromProject': 'project-scoped',
-  'rule.fromProduct': 'product (inherited)',
+  'rule.fromOrganization': 'organization (inherited)',
   'rule.refine': 'Refine (new version)',
   'rule.scopeChip': 'scope',
   'skill.header': 'Central skill library',
@@ -550,7 +550,7 @@ const _en = <String, String>{
   'skill.scopeSelectProject': 'This project (select a project)',
   'skill.global': 'global',
   'skill.project': 'project',
-  'skill.product': 'product',
+  'skill.organization': 'organization',
   'skill.empty': 'No skills yet — create one here or let agents save with oracle_skill_save.',
   'skill.selectOne': 'Select a skill.',
   'skill.created': 'Skill created.',
@@ -668,5 +668,5 @@ const _en = <String, String>{
       'A backup is a portable .sql file with ALL the memory (embeddings included). Keep it, version it, or take it to another machine.',
   'bk.what': 'What does a backup contain?',
   'bk.whatDesc':
-      'Every product, project, memory, rule, skill, session and metric — with a consistent snapshot even while agents keep working. Restore only happens into an empty database (never overwrites).',
+      'Every organization, project, memory, rule, skill, session and metric — with a consistent snapshot even while agents keep working. Restore only happens into an empty database (never overwrites).',
 };

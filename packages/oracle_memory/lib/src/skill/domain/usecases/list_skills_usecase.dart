@@ -5,11 +5,11 @@ import '../errors/skill_failure.dart';
 import '../repositories/skill_repository.dart';
 
 /// Inventory of the current (latest, non-retired) skills visible to a scope:
-/// global + the product's + the project's. Used by listings and by sync-skills.
+/// global + the organization's + the project's. Used by listings and by sync-skills.
 abstract interface class ListSkillsUsecase {
   AsyncResultDart<List<SkillEntity>, SkillFailure> call({
     IdVO? projectId,
-    IdVO? productId,
+    IdVO? organizationId,
     int limit,
   });
 }
@@ -21,9 +21,9 @@ class ListSkillsUsecaseImpl implements ListSkillsUsecase {
   @override
   AsyncResultDart<List<SkillEntity>, SkillFailure> call({
     IdVO? projectId,
-    IdVO? productId,
+    IdVO? organizationId,
     int limit = 200,
   }) {
-    return _repository.listSkills(projectId: projectId, productId: productId, limit: limit);
+    return _repository.listSkills(projectId: projectId, organizationId: organizationId, limit: limit);
   }
 }

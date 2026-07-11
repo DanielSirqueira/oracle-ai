@@ -6,13 +6,13 @@ import '../repositories/skill_repository.dart';
 
 /// Loads one skill's full content (progressive disclosure: searches return
 /// name+description; this is the "load the skill" step). Accepts an [id] or a
-/// [key] — a key resolves project → product → global (override semantics).
+/// [key] — a key resolves project → organization → global (override semantics).
 abstract interface class GetSkillUsecase {
   AsyncResultDart<SkillEntity, SkillFailure> call({
     IdVO? id,
     String? key,
     IdVO? projectId,
-    IdVO? productId,
+    IdVO? organizationId,
   });
 }
 
@@ -25,13 +25,13 @@ class GetSkillUsecaseImpl implements GetSkillUsecase {
     IdVO? id,
     String? key,
     IdVO? projectId,
-    IdVO? productId,
+    IdVO? organizationId,
   }) async {
     if (id != null && id.value.trim().isNotEmpty) {
       return _repository.getSkillById(id);
     }
     if (key != null && key.trim().isNotEmpty) {
-      return _repository.getSkillByKey(key.trim(), projectId: projectId, productId: productId);
+      return _repository.getSkillByKey(key.trim(), projectId: projectId, organizationId: organizationId);
     }
     return Failure(ValidatedFieldSkillFailure(
       errorMessage: 'Invalid lookup',

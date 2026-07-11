@@ -13,8 +13,8 @@ import '../../mappers/database/database_rule_mapper.dart';
 ///
 /// - [saveRule]: supersedes the current latest rule with the same key in the
 ///   same owner (one transaction), then inserts the new version.
-/// - [rulesForTask]: resolves product→project inheritance and override
-///   (project rules win over product rules with the same key).
+/// - [rulesForTask]: resolves organization→project inheritance and override
+///   (project rules win over organization rules with the same key).
 /// - [searchRules]: hybrid search (vector + full-text, RRF), like memory.
 class DatabaseRuleDatasource implements RuleDatasource {
   final Database _database;
@@ -23,11 +23,11 @@ class DatabaseRuleDatasource implements RuleDatasource {
   // `embedding::text` so DataRowType.toVector() can parse it (driver returns
   // the vector type as binary).
   static const _columns =
-      'id, product_id, project_id, key, scope, title, content, severity, priority, tags, '
+      'id, organization_id, project_id, key, scope, title, content, severity, priority, tags, '
       'embedding::text AS embedding, embedding_model, is_latest, supersedes, created_at, updated_at';
 
   static const _columnsM =
-      'm.id, m.product_id, m.project_id, m.key, m.scope, m.title, m.content, m.severity, '
+      'm.id, m.organization_id, m.project_id, m.key, m.scope, m.title, m.content, m.severity, '
       'm.priority, m.tags, m.embedding::text AS embedding, m.embedding_model, m.is_latest, '
       'm.supersedes, m.created_at, m.updated_at';
 
@@ -46,15 +46,15 @@ class DatabaseRuleDatasource implements RuleDatasource {
         supersedeParams = {'key': rule.key, 'pid': rule.projectId!.value};
       } else {
         supersedeSql = 'UPDATE rules SET is_latest = false '
-            'WHERE is_latest AND key = :key AND project_id IS NULL AND product_id = :prodid::uuid';
-        supersedeParams = {'key': rule.key, 'prodid': rule.productId!.value};
+            'WHERE is_latest AND key = :key AND project_id IS NULL AND organization_id = :prodid::uuid';
+        supersedeParams = {'key': rule.key, 'prodid': rule.organizationId!.value};
       }
 
       // 2) Insert the new version.
       const insertSql =
-          'INSERT INTO rules (product_id, project_id, key, scope, title, content, '
+          'INSERT INTO rules (organization_id, project_id, key, scope, title, content, '
           'severity, priority, tags, embedding, embedding_model, supersedes) '
-          'VALUES (:product_id::uuid, :project_id::uuid, :key, :scope, :title, :content, '
+          'VALUES (:organization_id::uuid, :project_id::uuid, :key, :scope, :title, :content, '
           ':severity, :priority, :tags, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
           'RETURNING id, created_at, updated_at';
 
@@ -74,7 +74,7 @@ class DatabaseRuleDatasource implements RuleDatasource {
   }
 
   @override
-  Future<RuleEntity?> currentByKey({IdVO? productId, IdVO? projectId, required String key}) async {
+  Future<RuleEntity?> currentByKey({IdVO? organizationId, IdVO? projectId, required String key}) async {
     try {
       final String sql;
       final Map<String, Object?> params;
@@ -82,10 +82,10 @@ class DatabaseRuleDatasource implements RuleDatasource {
         sql = 'SELECT $_columns FROM rules '
             'WHERE is_latest AND key = :key AND project_id = :pid::uuid LIMIT 1';
         params = {'key': key, 'pid': projectId.value};
-      } else if (productId != null) {
+      } else if (organizationId != null) {
         sql = 'SELECT $_columns FROM rules '
-            'WHERE is_latest AND key = :key AND project_id IS NULL AND product_id = :prodid::uuid LIMIT 1';
-        params = {'key': key, 'prodid': productId.value};
+            'WHERE is_latest AND key = :key AND project_id IS NULL AND organization_id = :prodid::uuid LIMIT 1';
+        params = {'key': key, 'prodid': organizationId.value};
       } else {
         return null;
       }
@@ -99,7 +99,7 @@ class DatabaseRuleDatasource implements RuleDatasource {
 
   @override
   Future<List<RuleNeighbor>> nearestByEmbedding({
-    IdVO? productId,
+    IdVO? organizationId,
     IdVO? projectId,
     required List<double> embedding,
     required String embeddingModel,
@@ -121,9 +121,9 @@ class DatabaseRuleDatasource implements RuleDatasource {
       if (projectId != null) {
         owner = 'project_id = :pid::uuid';
         params['pid'] = projectId.value;
-      } else if (productId != null) {
-        owner = 'project_id IS NULL AND product_id = :prodid::uuid';
-        params['prodid'] = productId.value;
+      } else if (organizationId != null) {
+        owner = 'project_id IS NULL AND organization_id = :prodid::uuid';
+        params['prodid'] = organizationId.value;
       } else {
         return const [];
       }
@@ -157,13 +157,13 @@ class DatabaseRuleDatasource implements RuleDatasource {
         params['scope'] = query.scope!.trim();
       }
 
-      // Inheritance: project rules + product rules of the project's product.
+      // Inheritance: project rules + organization rules of the project's organization.
       // Override: DISTINCT ON (key) keeps the project-scoped rule per key.
       final sql = 'SELECT * FROM ('
           'SELECT DISTINCT ON (key) $_columns FROM rules '
           'WHERE is_latest '
           'AND (project_id = :pid::uuid '
-          'OR (project_id IS NULL AND product_id = (SELECT product_id FROM projects WHERE id = :pid::uuid))) '
+          'OR (project_id IS NULL AND organization_id = (SELECT organization_id FROM projects WHERE id = :pid::uuid))) '
           '$scopeFilter '
           'ORDER BY key, (project_id IS NOT NULL) DESC'
           ') t '
@@ -194,16 +194,16 @@ class DatabaseRuleDatasource implements RuleDatasource {
 
       final params = <String, Object?>{'limit': filter.limit};
       final scope = <String>['m.is_latest'];
-      if (filter.projectId != null && filter.productId != null) {
-        scope.add('(m.project_id = :pid::uuid OR m.product_id = :prodid::uuid)');
+      if (filter.projectId != null && filter.organizationId != null) {
+        scope.add('(m.project_id = :pid::uuid OR m.organization_id = :prodid::uuid)');
         params['pid'] = filter.projectId!.value;
-        params['prodid'] = filter.productId!.value;
+        params['prodid'] = filter.organizationId!.value;
       } else if (filter.projectId != null) {
         scope.add('m.project_id = :pid::uuid');
         params['pid'] = filter.projectId!.value;
-      } else if (filter.productId != null) {
-        scope.add('m.product_id = :prodid::uuid');
-        params['prodid'] = filter.productId!.value;
+      } else if (filter.organizationId != null) {
+        scope.add('m.organization_id = :prodid::uuid');
+        params['prodid'] = filter.organizationId!.value;
       }
       if (filter.scope != null && filter.scope!.trim().isNotEmpty) {
         scope.add('m.scope = :rscope');
