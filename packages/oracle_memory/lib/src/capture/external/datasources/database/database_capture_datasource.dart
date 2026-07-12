@@ -89,6 +89,20 @@ class DatabaseCaptureDatasource implements CaptureDatasource {
   }
 
   @override
+  Future<void> addSessionTokens(IdVO sessionId, {int input = 0, int output = 0}) async {
+    try {
+      await _database.executeUpdate(SqlStatement(
+        'UPDATE sessions SET input_tokens = input_tokens + :in, '
+        'output_tokens = output_tokens + :out, total_tokens = total_tokens + :tot '
+        'WHERE id = :sid::uuid',
+        {'in': input, 'out': output, 'tot': input + output, 'sid': sessionId.value},
+      ));
+    } on DatabaseFailure catch (e) {
+      throw DatasourceCaptureFailure(errorMessage: e.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  @override
   Future<AgentEventEntity> logEvent(AgentEventEntity event) async {
     try {
       final result = await _database.executeUpdate(SqlStatement(

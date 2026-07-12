@@ -22,6 +22,17 @@ class CaptureRepositoryImpl implements CaptureRepository {
   }
 
   @override
+  AsyncResultDart<IdVO, CaptureFailure> addSessionTokens(IdVO sessionId,
+      {int input = 0, int output = 0}) async {
+    try {
+      await _datasource.addSessionTokens(sessionId, input: input, output: output);
+      return Success(sessionId);
+    } on CaptureFailure catch (f) {
+      return Failure(f);
+    }
+  }
+
+  @override
   AsyncResultDart<RequestEntity, CaptureFailure> openRequest(RequestEntity request) async {
     try {
       return Success(await _datasource.openRequest(request));

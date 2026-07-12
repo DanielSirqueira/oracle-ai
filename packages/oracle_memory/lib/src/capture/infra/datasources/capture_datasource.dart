@@ -16,6 +16,9 @@ abstract interface class CaptureDatasource {
 
   Future<MessageEntity> appendMessage(MessageEntity message);
 
+  /// Adds token usage of a completed turn to the session's rolling aggregate.
+  Future<void> addSessionTokens(IdVO sessionId, {int input, int output});
+
   Future<AgentEventEntity> logEvent(AgentEventEntity event);
 
   /// Messages of a whole session (joined through its requests), oldest first.

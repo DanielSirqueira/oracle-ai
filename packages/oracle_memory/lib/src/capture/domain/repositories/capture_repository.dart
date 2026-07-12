@@ -27,6 +27,10 @@ abstract interface class CaptureRepository {
 
   AsyncResultDart<MessageEntity, CaptureFailure> appendMessage(MessageEntity message);
 
+  /// Adds token usage of a completed turn to the session's rolling aggregate.
+  /// Returns the session id on success.
+  AsyncResultDart<IdVO, CaptureFailure> addSessionTokens(IdVO sessionId, {int input, int output});
+
   AsyncResultDart<AgentEventEntity, CaptureFailure> logEvent(AgentEventEntity event);
 
   /// Messages of a whole session (joined through its requests), oldest first.

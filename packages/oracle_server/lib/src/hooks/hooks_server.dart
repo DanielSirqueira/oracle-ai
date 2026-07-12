@@ -208,8 +208,18 @@ class HooksServer {
         await _captureMessage(
             projectId, p, cwd, MessageRole.assistant, '${p['last_assistant_message'] ?? ''}');
         // One Stop = one completed turn; record its token usage from the transcript.
-        await _recordMetric(projectId, p,
-            usage: lastTurnUsage('${p['transcript_path'] ?? ''}'), turns: 1);
+        final usage = lastTurnUsage('${p['transcript_path'] ?? ''}');
+        await _recordMetric(projectId, p, usage: usage, turns: 1);
+        // Roll the turn's tokens into the session's aggregate so the dashboard can
+        // show tokens per session and roll them up to module/project/organization.
+        if (usage.input + usage.output > 0) {
+          final session = await _ensureSession(projectId, p, cwd);
+          if (session != null) {
+            await injector
+                .get<CaptureRepository>()
+                .addSessionTokens(session.id, input: usage.input, output: usage.output);
+          }
+        }
       case 'PostToolUse':
         final name = '${p['tool_name'] ?? 'tool'}';
         final resp = _truncate('${p['tool_response'] ?? ''}', 2000);
