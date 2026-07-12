@@ -55,8 +55,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<_DashboardData> _load() async {
     final db = widget.connection.database!;
     const tables = [
-      'organizations', 'projects', 'memories', 'rules', 'skills',
-      'architectures', 'sessions', 'requests', 'messages', 'handoffs',
+      'organizations', 'projects', 'modules', 'memories', 'rules', 'skills',
+      'architectures', 'sessions', 'requests', 'messages', 'handoffs', 'agent_searches',
     ];
     final selects = tables.map((t) => '(SELECT count(*) FROM $t) AS $t').join(', ');
     final row = (await db.select(SqlStatement('SELECT $selects', const {}))).rows.first;
@@ -65,19 +65,29 @@ class _DashboardPageState extends State<DashboardPage> {
     final project = widget.project.value;
     Map<String, int>? projectCounts;
     if (project != null) {
+      // Rollup for the project: its own rows PLUS its modules' rows (module
+      // knowledge belongs to the project), so the totals reflect the whole
+      // project instead of being split across fake sub-projects.
       const q = '''
         SELECT
-          (SELECT count(*) FROM memories WHERE project_id = :pid::uuid AND is_latest) AS memories,
-          (SELECT count(*) FROM rules WHERE project_id = :pid::uuid AND is_latest) AS rules,
-          (SELECT count(*) FROM architectures WHERE project_id = :pid::uuid AND is_latest) AS architectures,
+          (SELECT count(*) FROM modules WHERE project_id = :pid::uuid) AS modules,
+          (SELECT count(*) FROM memories m WHERE m.is_latest AND (m.project_id = :pid::uuid
+             OR m.module_id IN (SELECT id FROM modules WHERE project_id = :pid::uuid))) AS memories,
+          (SELECT count(*) FROM rules m WHERE m.is_latest AND (m.project_id = :pid::uuid
+             OR m.module_id IN (SELECT id FROM modules WHERE project_id = :pid::uuid))) AS rules,
+          (SELECT count(*) FROM architectures m WHERE m.is_latest AND (m.project_id = :pid::uuid
+             OR m.module_id IN (SELECT id FROM modules WHERE project_id = :pid::uuid))) AS architectures,
           (SELECT count(*) FROM sessions WHERE project_id = :pid::uuid) AS sessions,
           (SELECT count(*) FROM requests r JOIN sessions s ON s.id = r.session_id
              WHERE s.project_id = :pid::uuid) AS requests,
-          (SELECT count(*) FROM handoffs WHERE project_id = :pid::uuid) AS handoffs
+          (SELECT count(*) FROM handoffs WHERE project_id = :pid::uuid) AS handoffs,
+          (SELECT coalesce(sum(total_tokens),0) FROM sessions WHERE project_id = :pid::uuid) AS tokens
       ''';
       final pr = (await db.select(SqlStatement(q, {'pid': project.id.value}))).rows.first;
       projectCounts = {
-        for (final k in ['memories', 'rules', 'architectures', 'sessions', 'requests', 'handoffs'])
+        for (final k in [
+          'modules', 'memories', 'rules', 'architectures', 'sessions', 'requests', 'handoffs', 'tokens'
+        ])
           k: pr[k]?.toInt() ?? 0,
       };
     }
@@ -118,6 +128,8 @@ class _DashboardPageState extends State<DashboardPage> {
             _ProjectCard(data.projectEntity!, data.project!),
             const SizedBox(height: 12),
             Wrap(spacing: 12, runSpacing: 12, children: [
+              _MetricCard(l10n.t('dash.modules'), data.project!['modules']!,
+                  Icons.widgets_outlined, l10n.t('dash.capModules')),
               _MetricCard(l10n.t('dash.memories'), data.project!['memories']!,
                   Icons.psychology_outlined, l10n.t('dash.capMemories')),
               _MetricCard(l10n.t('dash.rules'), data.project!['rules']!,
@@ -130,6 +142,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   Icons.question_answer_outlined, l10n.t('dash.capRequests')),
               _MetricCard(l10n.t('dash.handoffs'), data.project!['handoffs']!,
                   Icons.swap_horiz_outlined, l10n.t('dash.capHandoffs')),
+              _MetricCard(l10n.t('dash.tokens'), data.project!['tokens']!,
+                  Icons.toll_outlined, l10n.t('dash.capTokens')),
             ]),
             const SizedBox(height: 28),
           ],
@@ -142,6 +156,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 Icons.inventory_2_outlined, null),
             _MetricCard(l10n.t('dash.projects'), data.global['projects']!,
                 Icons.folder_outlined, null),
+            _MetricCard(l10n.t('dash.modules'), data.global['modules']!,
+                Icons.widgets_outlined, null),
             _MetricCard(l10n.t('dash.memories'), data.global['memories']!,
                 Icons.psychology_outlined, null),
             _MetricCard(l10n.t('dash.rules'), data.global['rules']!, Icons.rule_outlined, null),
@@ -156,6 +172,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 Icons.chat_outlined, null),
             _MetricCard(l10n.t('dash.handoffs'), data.global['handoffs']!,
                 Icons.swap_horiz_outlined, null),
+            _MetricCard(l10n.t('dash.searches'), data.global['agent_searches']!,
+                Icons.manage_search_outlined, null),
           ]),
           const SizedBox(height: 28),
 
