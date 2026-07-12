@@ -18,6 +18,7 @@ class SkillSearchFilter {
 
   final IdVO? projectId;
   final IdVO? organizationId;
+  final IdVO? moduleId;
   final SkillSearchMode mode;
   final int limit;
 
@@ -27,6 +28,7 @@ class SkillSearchFilter {
     this.queryModel,
     this.projectId,
     this.organizationId,
+    this.moduleId,
     this.mode = SkillSearchMode.hybrid,
     this.limit = 10,
   });
@@ -38,6 +40,7 @@ class SkillSearchFilter {
       queryModel: queryModel ?? this.queryModel,
       projectId: projectId,
       organizationId: organizationId,
+      moduleId: moduleId,
       mode: mode,
       limit: limit,
     );

@@ -23,42 +23,50 @@ class DatabaseSkillDatasource implements SkillDatasource {
   // `embedding::text` so DataRowType.toVector() can parse it (driver returns
   // the vector type as binary).
   static const _columns =
-      'id, organization_id, project_id, key, name, description, content, tags, '
+      'id, organization_id, project_id, module_id, key, name, description, content, tags, '
       'embedding::text AS embedding, embedding_model, is_latest, supersedes, created_at, updated_at';
 
   static const _columnsM =
-      'm.id, m.organization_id, m.project_id, m.key, m.name, m.description, m.content, m.tags, '
-      'm.embedding::text AS embedding, m.embedding_model, m.is_latest, m.supersedes, '
+      'm.id, m.organization_id, m.project_id, m.module_id, m.key, m.name, m.description, m.content, '
+      'm.tags, m.embedding::text AS embedding, m.embedding_model, m.is_latest, m.supersedes, '
       'm.created_at, m.updated_at';
 
   static const _rrfK = 60;
   static const _candidatePool = 50;
 
-  /// Owner predicate + params for a (project | organization | global) scope.
-  static (String, Map<String, Object?>) _owner(IdVO? projectId, IdVO? organizationId) {
+  /// Owner predicate + params for a (module | project | organization | global)
+  /// scope — most specific wins.
+  static (String, Map<String, Object?>) _owner(
+      IdVO? moduleId, IdVO? projectId, IdVO? organizationId) {
+    if (moduleId != null) {
+      return ('module_id = :mid::uuid', {'mid': moduleId.value});
+    }
     if (projectId != null) {
-      return ('project_id = :pid::uuid', {'pid': projectId.value});
+      return ('module_id IS NULL AND project_id = :pid::uuid', {'pid': projectId.value});
     }
     if (organizationId != null) {
-      return ('project_id IS NULL AND organization_id = :prodid::uuid', {'prodid': organizationId.value});
+      return (
+        'module_id IS NULL AND project_id IS NULL AND organization_id = :prodid::uuid',
+        {'prodid': organizationId.value}
+      );
     }
-    return ('project_id IS NULL AND organization_id IS NULL', const {});
+    return ('module_id IS NULL AND project_id IS NULL AND organization_id IS NULL', const {});
   }
 
   @override
   Future<SkillEntity> saveSkill(SkillEntity skill) async {
     try {
       // 1) Supersede the current latest version of this key in the same owner.
-      final (owner, ownerParams) = _owner(skill.projectId, skill.organizationId);
+      final (owner, ownerParams) = _owner(skill.moduleId, skill.projectId, skill.organizationId);
       final supersedeSql = 'UPDATE skills SET is_latest = false, updated_at = now() '
           'WHERE is_latest AND key = :key AND $owner';
 
       // 2) Insert the new version.
       const insertSql = 'INSERT INTO skills '
-          '(organization_id, project_id, key, name, description, content, tags, '
+          '(organization_id, project_id, module_id, key, name, description, content, tags, '
           'embedding, embedding_model, supersedes) '
-          'VALUES (:organization_id::uuid, :project_id::uuid, :key, :name, :description, :content, '
-          ':tags, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
+          'VALUES (:organization_id::uuid, :project_id::uuid, :module_id::uuid, :key, :name, '
+          ':description, :content, :tags, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
           'RETURNING id, created_at, updated_at';
 
       final results = await _database.executeSavePoint([
@@ -82,6 +90,7 @@ class DatabaseSkillDatasource implements SkillDatasource {
   Future<List<SkillNeighbor>> nearestByEmbedding({
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     required List<double> embedding,
     required String embeddingModel,
     IdVO? excludeId,
@@ -89,7 +98,7 @@ class DatabaseSkillDatasource implements SkillDatasource {
     int? limit,
   }) async {
     try {
-      final (owner, ownerParams) = _owner(projectId, organizationId);
+      final (owner, ownerParams) = _owner(moduleId, projectId, organizationId);
       final params = <String, Object?>{
         'vec': SqlVector(embedding),
         'model': embeddingModel,
@@ -121,9 +130,10 @@ class DatabaseSkillDatasource implements SkillDatasource {
   }
 
   @override
-  Future<SkillEntity?> currentByKey({IdVO? organizationId, IdVO? projectId, required String key}) async {
+  Future<SkillEntity?> currentByKey(
+      {IdVO? organizationId, IdVO? projectId, IdVO? moduleId, required String key}) async {
     try {
-      final (owner, ownerParams) = _owner(projectId, organizationId);
+      final (owner, ownerParams) = _owner(moduleId, projectId, organizationId);
       final result = await _database.select(SqlStatement(
         'SELECT $_columns FROM skills WHERE is_latest AND retired_at IS NULL '
         'AND key = :key AND $owner LIMIT 1',
@@ -154,23 +164,27 @@ class DatabaseSkillDatasource implements SkillDatasource {
   }
 
   @override
-  Future<SkillEntity> getSkillByKey(String key, {IdVO? projectId, IdVO? organizationId}) async {
+  Future<SkillEntity> getSkillByKey(String key,
+      {IdVO? projectId, IdVO? organizationId, IdVO? moduleId}) async {
     try {
       // Override resolution in one query: candidate rows from any visible scope,
-      // most specific first (project > organization > global).
+      // most specific first (module > project > organization > global).
       final params = <String, Object?>{
         'key': key,
         'pid': projectId?.value,
         'prodid': organizationId?.value,
+        'mid': moduleId?.value,
       };
       final result = await _database.executeUpdate(SqlStatement(
         'UPDATE skills SET access_count = access_count + 1, last_accessed_at = now() '
         'WHERE id = ('
         '  SELECT id FROM skills WHERE is_latest AND retired_at IS NULL AND key = :key '
-        '  AND (project_id = :pid::uuid '
-        '       OR (project_id IS NULL AND organization_id = :prodid::uuid) '
-        '       OR (project_id IS NULL AND organization_id IS NULL)) '
-        '  ORDER BY (project_id IS NOT NULL) DESC, (organization_id IS NOT NULL) DESC '
+        '  AND ((:mid::uuid IS NOT NULL AND module_id = :mid::uuid) '
+        '       OR (module_id IS NULL AND project_id = :pid::uuid) '
+        '       OR (module_id IS NULL AND project_id IS NULL AND organization_id = :prodid::uuid) '
+        '       OR (module_id IS NULL AND project_id IS NULL AND organization_id IS NULL)) '
+        '  ORDER BY (module_id IS NOT NULL) DESC, (project_id IS NOT NULL) DESC, '
+        '           (organization_id IS NOT NULL) DESC '
         '  LIMIT 1'
         ') RETURNING $_columns',
         params,
@@ -200,13 +214,19 @@ class DatabaseSkillDatasource implements SkillDatasource {
       final params = <String, Object?>{'limit': filter.limit};
       // Global skills are always visible; project/organization ADD to the scope
       // (unlike rules, where scope narrows) — the library is shared by design.
-      final visible = <String>['(m.project_id IS NULL AND m.organization_id IS NULL)'];
+      final visible = <String>[
+        '(m.module_id IS NULL AND m.project_id IS NULL AND m.organization_id IS NULL)'
+      ];
+      if (filter.moduleId != null) {
+        visible.add('m.module_id = :mid::uuid');
+        params['mid'] = filter.moduleId!.value;
+      }
       if (filter.projectId != null) {
-        visible.add('m.project_id = :pid::uuid');
+        visible.add('(m.module_id IS NULL AND m.project_id = :pid::uuid)');
         params['pid'] = filter.projectId!.value;
       }
       if (filter.organizationId != null) {
-        visible.add('(m.project_id IS NULL AND m.organization_id = :prodid::uuid)');
+        visible.add('(m.module_id IS NULL AND m.project_id IS NULL AND m.organization_id = :prodid::uuid)');
         params['prodid'] = filter.organizationId!.value;
       }
       final scope = 'm.is_latest AND m.retired_at IS NULL AND (${visible.join(' OR ')})';
@@ -260,13 +280,13 @@ class DatabaseSkillDatasource implements SkillDatasource {
   Future<List<SkillEntity>> listSkills({IdVO? projectId, IdVO? organizationId, int limit = 200}) async {
     try {
       final params = <String, Object?>{'limit': limit};
-      final visible = <String>['(project_id IS NULL AND organization_id IS NULL)'];
+      final visible = <String>['(module_id IS NULL AND project_id IS NULL AND organization_id IS NULL)'];
       if (projectId != null) {
-        visible.add('project_id = :pid::uuid');
+        visible.add('(module_id IS NULL AND project_id = :pid::uuid)');
         params['pid'] = projectId.value;
       }
       if (organizationId != null) {
-        visible.add('(project_id IS NULL AND organization_id = :prodid::uuid)');
+        visible.add('(module_id IS NULL AND project_id IS NULL AND organization_id = :prodid::uuid)');
         params['prodid'] = organizationId.value;
       }
       final result = await _database.select(SqlStatement(

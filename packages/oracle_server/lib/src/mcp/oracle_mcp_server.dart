@@ -597,6 +597,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           id: const IdVO.empty(),
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           key: '${a['key'] ?? ''}'.trim(),
           name: TextVO('${a['name'] ?? ''}'),
           description: TextVO('${a['description'] ?? ''}'),
@@ -629,6 +630,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           limit: _clampLimit(a['limit'], fallback: 10),
         ));
         return result.fold(

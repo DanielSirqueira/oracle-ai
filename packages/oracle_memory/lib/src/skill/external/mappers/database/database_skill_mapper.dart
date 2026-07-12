@@ -9,6 +9,7 @@ class DatabaseSkillMapper {
   static Map<String, Object?> toInsertParams(SkillEntity s) => {
         'organization_id': s.organizationId?.value,
         'project_id': s.projectId?.value,
+        'module_id': s.moduleId?.value,
         'key': s.key,
         'name': s.name.value,
         'description': s.description.value,
@@ -22,11 +23,13 @@ class DatabaseSkillMapper {
   static SkillEntity fromRow(Map<String, DataRowType> row) {
     final organizationId = row['organization_id']?.toText();
     final projectId = row['project_id']?.toText();
+    final moduleId = row['module_id']?.toText();
     final supersedes = row['supersedes']?.toText();
     return SkillEntity(
       id: IdVO(row['id']!.toText()!),
       organizationId: organizationId == null ? null : IdVO(organizationId),
       projectId: projectId == null ? null : IdVO(projectId),
+      moduleId: moduleId == null ? null : IdVO(moduleId),
       key: row['key']!.toText() ?? '',
       name: TextVO(row['name']!.toText() ?? ''),
       description: TextVO(row['description']!.toText() ?? ''),

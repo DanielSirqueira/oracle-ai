@@ -14,6 +14,7 @@ class SkillEntity {
   final IdVO id;
   final IdVO? organizationId;
   final IdVO? projectId;
+  final IdVO? moduleId;
   final String key;
   final TextVO name;
   final TextVO description;
@@ -33,6 +34,7 @@ class SkillEntity {
     required this.id,
     this.organizationId,
     this.projectId,
+    this.moduleId,
     required this.key,
     required this.name,
     required this.description,
@@ -58,6 +60,7 @@ class SkillEntity {
     IdVO? id,
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     String? key,
     TextVO? name,
     TextVO? description,
@@ -74,6 +77,7 @@ class SkillEntity {
       id: id ?? this.id,
       organizationId: organizationId ?? this.organizationId,
       projectId: projectId ?? this.projectId,
+      moduleId: moduleId ?? this.moduleId,
       key: key ?? this.key,
       name: name ?? this.name,
       description: description ?? this.description,
@@ -95,6 +99,7 @@ class SkillEntity {
         other.id == id &&
         other.organizationId == organizationId &&
         other.projectId == projectId &&
+        other.moduleId == moduleId &&
         other.key == key &&
         other.name == name &&
         other.description == description &&
@@ -110,6 +115,7 @@ class SkillEntity {
         id,
         organizationId,
         projectId,
+        moduleId,
         key,
         name,
         description,

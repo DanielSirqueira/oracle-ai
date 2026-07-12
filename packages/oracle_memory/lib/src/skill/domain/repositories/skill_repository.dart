@@ -18,6 +18,7 @@ abstract interface class SkillRepository {
   Future<List<SkillNeighbor>> nearestByEmbedding({
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     required List<double> embedding,
     required String embeddingModel,
     IdVO? excludeId,
@@ -31,6 +32,7 @@ abstract interface class SkillRepository {
   Future<SkillEntity?> currentByKey({
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     required String key,
   });
 
@@ -42,6 +44,7 @@ abstract interface class SkillRepository {
     String key, {
     IdVO? projectId,
     IdVO? organizationId,
+    IdVO? moduleId,
   });
 
   /// Hybrid search over the library (vector + full-text, RRF). Always includes

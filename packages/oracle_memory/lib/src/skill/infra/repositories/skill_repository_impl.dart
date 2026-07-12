@@ -25,6 +25,7 @@ class SkillRepositoryImpl implements SkillRepository {
   Future<List<SkillNeighbor>> nearestByEmbedding({
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     required List<double> embedding,
     required String embeddingModel,
     IdVO? excludeId,
@@ -35,6 +36,7 @@ class SkillRepositoryImpl implements SkillRepository {
       return await _datasource.nearestByEmbedding(
         organizationId: organizationId,
         projectId: projectId,
+        moduleId: moduleId,
         embedding: embedding,
         embeddingModel: embeddingModel,
         excludeId: excludeId,
@@ -50,11 +52,12 @@ class SkillRepositoryImpl implements SkillRepository {
   Future<SkillEntity?> currentByKey({
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     required String key,
   }) async {
     try {
       return await _datasource.currentByKey(
-          organizationId: organizationId, projectId: projectId, key: key);
+          organizationId: organizationId, projectId: projectId, moduleId: moduleId, key: key);
     } on SkillFailure {
       return null; // optimization read only — degrade to a normal save
     }
@@ -74,10 +77,11 @@ class SkillRepositoryImpl implements SkillRepository {
     String key, {
     IdVO? projectId,
     IdVO? organizationId,
+    IdVO? moduleId,
   }) async {
     try {
-      return Success(
-          await _datasource.getSkillByKey(key, projectId: projectId, organizationId: organizationId));
+      return Success(await _datasource.getSkillByKey(key,
+          projectId: projectId, organizationId: organizationId, moduleId: moduleId));
     } on SkillFailure catch (failure) {
       return Failure(failure);
     }
