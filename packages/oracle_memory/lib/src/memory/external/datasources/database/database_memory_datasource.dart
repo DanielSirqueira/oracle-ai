@@ -21,12 +21,12 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
   // The pgvector `vector` type is returned by the driver as binary; cast it to
   // text (`[1,0,...]`) so DataRowType.toVector() can parse it on read.
   static const _columns =
-      'id, organization_id, project_id, key, tier, kind, title, body, tags, importance, '
+      'id, organization_id, project_id, module_id, key, tier, kind, title, body, tags, importance, '
       'embedding::text AS embedding, embedding_model, is_latest, supersedes, created_at, updated_at';
 
   static const _columnsM =
-      'm.id, m.organization_id, m.project_id, m.key, m.tier, m.kind, m.title, m.body, m.tags, '
-      'm.importance, m.embedding::text AS embedding, m.embedding_model, m.is_latest, '
+      'm.id, m.organization_id, m.project_id, m.module_id, m.key, m.tier, m.kind, m.title, m.body, '
+      'm.tags, m.importance, m.embedding::text AS embedding, m.embedding_model, m.is_latest, '
       'm.supersedes, m.created_at, m.updated_at';
 
   static const _rrfK = 60;
@@ -55,13 +55,19 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
       if (key != null && key.isNotEmpty) {
         final String sql;
         final Map<String, Object?> params;
-        if (memory.projectId != null) {
+        // Supersede within the SAME owner level (module > project > organization).
+        if (memory.moduleId != null) {
           sql = 'UPDATE memories SET is_latest = false, superseded_at = now() '
-              'WHERE is_latest AND key = :key AND project_id = :pid::uuid';
+              'WHERE is_latest AND key = :key AND module_id = :mid::uuid';
+          params = {'key': key, 'mid': memory.moduleId!.value};
+        } else if (memory.projectId != null) {
+          sql = 'UPDATE memories SET is_latest = false, superseded_at = now() '
+              'WHERE is_latest AND key = :key AND module_id IS NULL AND project_id = :pid::uuid';
           params = {'key': key, 'pid': memory.projectId!.value};
         } else {
           sql = 'UPDATE memories SET is_latest = false, superseded_at = now() '
-              'WHERE is_latest AND key = :key AND project_id IS NULL AND organization_id = :prodid::uuid';
+              'WHERE is_latest AND key = :key AND module_id IS NULL AND project_id IS NULL '
+              'AND organization_id = :prodid::uuid';
           params = {'key': key, 'prodid': memory.organizationId!.value};
         }
         queries.add(SavePointQuery(statement: SqlStatement(sql, params)));
@@ -70,10 +76,10 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
       queries.add(SavePointQuery(
         statement: SqlStatement(
           'INSERT INTO memories '
-          '(organization_id, project_id, key, tier, kind, title, body, tags, importance, '
+          '(organization_id, project_id, module_id, key, tier, kind, title, body, tags, importance, '
           'embedding, embedding_model, supersedes) '
-          'VALUES (:organization_id::uuid, :project_id::uuid, :key, :tier, :kind, :title, :body, '
-          ':tags, :importance, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
+          'VALUES (:organization_id::uuid, :project_id::uuid, :module_id::uuid, :key, :tier, :kind, '
+          ':title, :body, :tags, :importance, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
           'RETURNING id, created_at, updated_at',
           DatabaseMemoryMapper.toInsertParams(memory),
         ),
@@ -305,19 +311,24 @@ class DatabaseMemoryDatasource implements MemoryDatasource {
 
       final params = <String, Object?>{'limit': filter.limit};
 
-      // Scope predicate (alias `m` inside the `scoped` CTE).
+      // Scope predicate (alias `m` inside the `scoped` CTE). Recall unions the
+      // three levels the caller passes — module, project, organization — so a
+      // module search also surfaces its project's and organization's knowledge.
       final scope = <String>['m.is_latest'];
-      if (filter.projectId != null && filter.organizationId != null) {
-        scope.add('(m.project_id = :pid::uuid OR m.organization_id = :prodid::uuid)');
+      final owners = <String>[];
+      if (filter.moduleId != null) {
+        owners.add('m.module_id = :mid::uuid');
+        params['mid'] = filter.moduleId!.value;
+      }
+      if (filter.projectId != null) {
+        owners.add('m.project_id = :pid::uuid');
         params['pid'] = filter.projectId!.value;
-        params['prodid'] = filter.organizationId!.value;
-      } else if (filter.projectId != null) {
-        scope.add('m.project_id = :pid::uuid');
-        params['pid'] = filter.projectId!.value;
-      } else if (filter.organizationId != null) {
-        scope.add('m.organization_id = :prodid::uuid');
+      }
+      if (filter.organizationId != null) {
+        owners.add('m.organization_id = :prodid::uuid');
         params['prodid'] = filter.organizationId!.value;
       }
+      if (owners.isNotEmpty) scope.add('(${owners.join(' OR ')})');
       if (filter.tiers.isNotEmpty) {
         scope.add('m.tier = ANY(:tiers)');
         params['tiers'] = filter.tiers.map((t) => t.code).toList();

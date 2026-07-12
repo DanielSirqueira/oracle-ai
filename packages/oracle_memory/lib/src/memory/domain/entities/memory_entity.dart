@@ -14,6 +14,7 @@ class MemoryEntity {
   final IdVO id;
   final IdVO? organizationId;
   final IdVO? projectId;
+  final IdVO? moduleId;
 
   /// Optional stable identity. When set, re-saving a memory with the same
   /// [key] in the same owner supersedes the previous version (like rules),
@@ -37,6 +38,7 @@ class MemoryEntity {
     required this.id,
     this.organizationId,
     this.projectId,
+    this.moduleId,
     this.key,
     required this.tier,
     required this.kind,
@@ -64,6 +66,7 @@ class MemoryEntity {
     IdVO? id,
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     String? key,
     MemoryTier? tier,
     MemoryKind? kind,
@@ -82,6 +85,7 @@ class MemoryEntity {
       id: id ?? this.id,
       organizationId: organizationId ?? this.organizationId,
       projectId: projectId ?? this.projectId,
+      moduleId: moduleId ?? this.moduleId,
       key: key ?? this.key,
       tier: tier ?? this.tier,
       kind: kind ?? this.kind,
@@ -105,6 +109,7 @@ class MemoryEntity {
         other.id == id &&
         other.organizationId == organizationId &&
         other.projectId == projectId &&
+        other.moduleId == moduleId &&
         other.key == key &&
         other.tier == tier &&
         other.kind == kind &&
@@ -123,6 +128,7 @@ class MemoryEntity {
         id,
         organizationId,
         projectId,
+        moduleId,
         key,
         tier,
         kind,

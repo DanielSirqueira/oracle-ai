@@ -34,6 +34,7 @@ class MemorySearchFilter {
 
   final IdVO? projectId;
   final IdVO? organizationId;
+  final IdVO? moduleId;
   final List<MemoryTier> tiers;
   final List<MemoryKind> kinds;
   final SearchMode mode;
@@ -45,6 +46,7 @@ class MemorySearchFilter {
     this.queryModel,
     this.projectId,
     this.organizationId,
+    this.moduleId,
     this.tiers = const [],
     this.kinds = const [],
     this.mode = SearchMode.hybrid,
@@ -58,6 +60,7 @@ class MemorySearchFilter {
       queryModel: queryModel ?? this.queryModel,
       projectId: projectId,
       organizationId: organizationId,
+      moduleId: moduleId,
       tiers: tiers,
       kinds: kinds,
       mode: mode,

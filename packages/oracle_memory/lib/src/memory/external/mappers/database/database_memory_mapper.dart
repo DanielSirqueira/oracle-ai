@@ -13,6 +13,7 @@ class DatabaseMemoryMapper {
   static Map<String, Object?> toInsertParams(MemoryEntity m) => {
         'organization_id': m.organizationId?.value,
         'project_id': m.projectId?.value,
+        'module_id': m.moduleId?.value,
         'key': m.key,
         'tier': m.tier.code,
         'kind': m.kind.code,
@@ -28,11 +29,13 @@ class DatabaseMemoryMapper {
   static MemoryEntity fromRow(Map<String, DataRowType> row) {
     final organizationId = row['organization_id']?.toText();
     final projectId = row['project_id']?.toText();
+    final moduleId = row['module_id']?.toText();
     final supersedes = row['supersedes']?.toText();
     return MemoryEntity(
       id: IdVO(row['id']!.toText()!),
       organizationId: organizationId == null ? null : IdVO(organizationId),
       projectId: projectId == null ? null : IdVO(projectId),
+      moduleId: moduleId == null ? null : IdVO(moduleId),
       key: row['key']?.toText(),
       tier: MemoryTier.parse(row['tier']!.toText() ?? 'semantic'),
       kind: MemoryKind.parse(row['kind']!.toText() ?? 'fact'),

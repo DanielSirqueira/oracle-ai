@@ -35,8 +35,9 @@ class SaveMemoryUsecaseImpl implements SaveMemoryUsecase {
     if (memory.body.isBlank) {
       fields.add(const FieldSystemFailure(field: 'body', message: 'Required'));
     }
-    if (memory.organizationId == null && memory.projectId == null) {
-      fields.add(const FieldSystemFailure(field: 'scope', message: 'Organization or project required'));
+    if (memory.organizationId == null && memory.projectId == null && memory.moduleId == null) {
+      fields.add(const FieldSystemFailure(
+          field: 'scope', message: 'Organization, project or module required'));
     }
     if (fields.isNotEmpty) {
       return Failure(ValidatedFieldMemoryFailure(
