@@ -16,6 +16,20 @@ export 'src/project/external/datasources/database/database_project_datasource.da
 export 'src/project/external/mappers/database/database_project_mapper.dart';
 export 'src/project/project_module.dart';
 
+// --- module ---
+export 'src/module/domain/dtos/filters/module_filter.dart';
+export 'src/module/domain/entities/module_entity.dart';
+export 'src/module/domain/errors/module_failure.dart';
+export 'src/module/domain/repositories/module_repository.dart';
+export 'src/module/domain/usecases/get_module_by_id_usecase.dart';
+export 'src/module/domain/usecases/list_modules_usecase.dart';
+export 'src/module/domain/usecases/resolve_module_usecase.dart';
+export 'src/module/infra/datasources/module_datasource.dart';
+export 'src/module/infra/repositories/module_repository_impl.dart';
+export 'src/module/external/datasources/database/database_module_datasource.dart';
+export 'src/module/external/mappers/database/database_module_mapper.dart';
+export 'src/module/module_module.dart';
+
 // --- memory ---
 export 'src/memory/domain/dtos/filters/memory_search_filter.dart';
 export 'src/memory/domain/dtos/memory_neighbor.dart';

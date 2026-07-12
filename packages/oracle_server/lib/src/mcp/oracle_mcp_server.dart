@@ -141,6 +141,66 @@ Capture is automatic — hooks record the session, each user request, and your w
     );
 
     server.tool(
+      'oracle_module_resolve',
+      description: 'Map a working SUBPATH (under the project repo root) to a stable moduleId, '
+          'creating the module on first sight. Use this instead of registering a submodule as a '
+          'separate project — a project has many modules (a service, layer, package). Pass the '
+          'module subpath (e.g. "services/auth"), or a `cwd` to derive it. An empty/root path '
+          'means the work is project-level (no module).',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'projectId': {'type': 'string', 'description': 'The project this module belongs to'},
+          'path': {'type': 'string', 'description': 'Module subpath under the repo root, e.g. services/auth'},
+          'cwd': {'type': 'string', 'description': 'Optional; a cwd to derive the subpath from (relative to the git root)'},
+          'name': {'type': 'string', 'description': 'Optional; defaults to the last path segment'},
+          'description': {'type': 'string', 'description': 'Optional module description'},
+        },
+        required: ['projectId'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final projectId = '${a['projectId'] ?? ''}'.trim();
+        var path = '${a['path'] ?? ''}'.trim();
+        if (path.isEmpty && '${a['cwd'] ?? ''}'.trim().isNotEmpty) {
+          path = _relativeSubpath('${a['cwd']}');
+        }
+        if (path.isEmpty) {
+          return _ok(<String, dynamic>{
+            'module': null,
+            'note': 'Path is the repo root — this work is project-level; no module was created.',
+          });
+        }
+        final result = await injector.get<ResolveModuleUsecase>()(
+          IdVO(projectId),
+          path,
+          name: a['name']?.toString(),
+          description: a['description']?.toString(),
+        );
+        return result.fold((m) => _ok(_moduleJson(m)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_module_list',
+      description: "List a project's modules (id, key, name, path).",
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'projectId': {'type': 'string'},
+          'limit': {'type': 'integer', 'description': 'Default 100'},
+        },
+        required: ['projectId'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<ListModulesUsecase>()(ModuleFilter(
+          projectId: IdVO('${a['projectId'] ?? ''}'),
+          limit: (a['limit'] as num?)?.toInt() ?? 100,
+        ));
+        return result.fold((list) => _ok(list.map(_moduleJson).toList()), _err);
+      },
+    );
+
+    server.tool(
       'oracle_session_brief',
       description: 'Get oriented at the start of work: pass your repo path (cwd) and receive the projectId '
           'plus a brief — pending handoff + required rules + key memories. Call this first.',
@@ -1160,6 +1220,27 @@ Capture is automatic — hooks record the session, each user request, and your w
         'createdAt': p.createdAt?.toIso8601String(),
         'updatedAt': p.updatedAt?.toIso8601String(),
       };
+
+  static Map<String, dynamic> _moduleJson(ModuleEntity m) => {
+        'id': m.id.value,
+        'projectId': m.projectId.value,
+        'key': m.key,
+        'name': m.name.value,
+        'path': m.path,
+        'description': m.description?.value,
+        'createdAt': m.createdAt?.toIso8601String(),
+        'updatedAt': m.updatedAt?.toIso8601String(),
+      };
+
+  /// A cwd relative to its git root — the module subpath (empty at the root).
+  static String _relativeSubpath(String cwd) {
+    final root = repoRootOf(cwd).replaceAll(r'\', '/');
+    final c = cwd.trim().replaceAll(r'\', '/');
+    if (c.length > root.length && c.startsWith(root)) {
+      return c.substring(root.length).replaceAll(RegExp(r'^/+|/+$'), '');
+    }
+    return '';
+  }
 
   static Map<String, dynamic> _memoryJson(MemoryEntity m) => {
         'id': m.id.value,

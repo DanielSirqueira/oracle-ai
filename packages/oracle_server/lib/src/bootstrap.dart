@@ -157,6 +157,7 @@ class Bootstrap {
     registerModules([
       OrganizationModule(),
       ProjectModule(),
+      ModuleModule(),
       ArchitectureModule(),
       RuleModule(),
       SkillModule(),
