@@ -16,8 +16,11 @@ class SaveArchitectureUsecaseImpl implements SaveArchitectureUsecase {
   @override
   AsyncResultDart<ArchitectureEntity, ArchitectureFailure> call(ArchitectureEntity architecture) async {
     final fields = <FieldSystemFailure>[];
-    if (architecture.projectId.isEmpty) {
-      fields.add(const FieldSystemFailure(field: 'projectId', message: 'Required'));
+    if (architecture.organizationId == null &&
+        architecture.projectId == null &&
+        architecture.moduleId == null) {
+      fields.add(const FieldSystemFailure(
+          field: 'scope', message: 'Organization, project or module required'));
     }
     if (architecture.area.trim().isEmpty) {
       fields.add(const FieldSystemFailure(field: 'area', message: 'Required'));
@@ -37,8 +40,12 @@ class SaveArchitectureUsecaseImpl implements SaveArchitectureUsecase {
     // the current page for this area has identical content, return it without
     // embedding or writing — no wasted embedding tokens, no pointless version.
     if (architecture.embedding == null) {
-      final existing =
-          (await _repository.getByArea(architecture.projectId, architecture.area.trim())).getOrNull();
+      final existing = (await _repository.getByArea(
+        organizationId: architecture.organizationId,
+        projectId: architecture.projectId,
+        moduleId: architecture.moduleId,
+        area: architecture.area.trim(),
+      )).getOrNull();
       if (existing != null && existing.content.value == architecture.content.value) {
         return Success(existing);
       }

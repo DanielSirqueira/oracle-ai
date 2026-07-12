@@ -7,7 +7,12 @@ import '../../domain/entities/architecture_entity.dart';
 abstract interface class ArchitectureDatasource {
   Future<ArchitectureEntity> saveArchitecture(ArchitectureEntity architecture);
 
-  Future<ArchitectureEntity> getByArea(IdVO projectId, String area);
+  Future<ArchitectureEntity> getByArea({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    required String area,
+  });
 
   Future<List<ArchitectureSearchResult>> searchArchitecture(ArchitectureSearchFilter filter);
 

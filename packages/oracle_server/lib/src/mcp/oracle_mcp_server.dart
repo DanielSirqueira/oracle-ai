@@ -746,7 +746,9 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<SaveArchitectureUsecase>()(ArchitectureEntity(
           id: const IdVO.empty(),
-          projectId: IdVO('${a['projectId'] ?? ''}'),
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           area: '${a['area'] ?? ''}',
           content: TextVO('${a['content'] ?? ''}'),
         ));
@@ -760,15 +762,19 @@ Capture is automatic — hooks record the session, each user request, and your w
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'projectId': {'type': 'string'},
+          'organizationId': {'type': 'string'},
+          'moduleId': {'type': 'string'},
           'area': {'type': 'string'},
         },
-        required: ['projectId', 'area'],
+        required: ['area'],
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
         final result = await injector.get<GetArchitectureByAreaUsecase>()(
-          IdVO('${a['projectId'] ?? ''}'),
-          '${a['area'] ?? ''}',
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
+          area: '${a['area'] ?? ''}',
         );
         return result.fold((x) => _ok(_architectureJson(x)), _err);
       },
@@ -797,6 +803,8 @@ Capture is automatic — hooks record the session, each user request, and your w
         final result = await injector.get<SearchArchitectureUsecase>()(ArchitectureSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           area: a['area']?.toString(),
           limit: _clampLimit(a['limit'], fallback: 10),
         ));
@@ -1385,7 +1393,9 @@ Capture is automatic — hooks record the session, each user request, and your w
 
   static Map<String, dynamic> _architectureJson(ArchitectureEntity a) => {
         'id': a.id.value,
-        'projectId': a.projectId.value,
+        'organizationId': a.organizationId?.value,
+        'projectId': a.projectId?.value,
+        'moduleId': a.moduleId?.value,
         'area': a.area,
         'content': a.content.value,
         'isLatest': a.isLatest,

@@ -12,12 +12,13 @@ class DatabaseArchitectureDatasource implements ArchitectureDatasource {
   const DatabaseArchitectureDatasource({required Database database}) : _database = database;
 
   static const _columns =
-      'id, project_id, area, content, embedding::text AS embedding, embedding_model, '
-      'is_latest, supersedes, created_at, updated_at';
+      'id, organization_id, project_id, module_id, area, content, embedding::text AS embedding, '
+      'embedding_model, is_latest, supersedes, created_at, updated_at';
 
   static const _columnsM =
-      'm.id, m.project_id, m.area, m.content, m.embedding::text AS embedding, m.embedding_model, '
-      'm.is_latest, m.supersedes, m.created_at, m.updated_at';
+      'm.id, m.organization_id, m.project_id, m.module_id, m.area, m.content, '
+      'm.embedding::text AS embedding, m.embedding_model, m.is_latest, m.supersedes, '
+      'm.created_at, m.updated_at';
 
   static const _rrfK = 60;
   static const _candidatePool = 50;
@@ -25,18 +26,32 @@ class DatabaseArchitectureDatasource implements ArchitectureDatasource {
   @override
   Future<ArchitectureEntity> saveArchitecture(ArchitectureEntity architecture) async {
     try {
+      // Supersede the current page for this area within the SAME owner level
+      // (module > project > organization).
+      final String supSql;
+      final Map<String, Object?> supParams;
+      if (architecture.moduleId != null) {
+        supSql = 'UPDATE architectures SET is_latest = false '
+            'WHERE is_latest AND module_id = :mid::uuid AND area = :area';
+        supParams = {'mid': architecture.moduleId!.value, 'area': architecture.area};
+      } else if (architecture.projectId != null) {
+        supSql = 'UPDATE architectures SET is_latest = false '
+            'WHERE is_latest AND module_id IS NULL AND project_id = :pid::uuid AND area = :area';
+        supParams = {'pid': architecture.projectId!.value, 'area': architecture.area};
+      } else {
+        supSql = 'UPDATE architectures SET is_latest = false '
+            'WHERE is_latest AND module_id IS NULL AND project_id IS NULL '
+            'AND organization_id = :oid::uuid AND area = :area';
+        supParams = {'oid': architecture.organizationId!.value, 'area': architecture.area};
+      }
       final results = await _database.executeSavePoint([
+        SavePointQuery(statement: SqlStatement(supSql, supParams)),
         SavePointQuery(
           statement: SqlStatement(
-            'UPDATE architectures SET is_latest = false '
-            'WHERE is_latest AND project_id = :pid::uuid AND area = :area',
-            {'pid': architecture.projectId.value, 'area': architecture.area},
-          ),
-        ),
-        SavePointQuery(
-          statement: SqlStatement(
-            'INSERT INTO architectures (project_id, area, content, embedding, embedding_model, supersedes) '
-            'VALUES (:project_id::uuid, :area, :content, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
+            'INSERT INTO architectures '
+            '(organization_id, project_id, module_id, area, content, embedding, embedding_model, supersedes) '
+            'VALUES (:organization_id::uuid, :project_id::uuid, :module_id::uuid, :area, :content, '
+            ':embedding::vector(1024), :embedding_model, :supersedes::uuid) '
             'RETURNING id, created_at, updated_at',
             DatabaseArchitectureMapper.toInsertParams(architecture),
           ),
@@ -54,12 +69,30 @@ class DatabaseArchitectureDatasource implements ArchitectureDatasource {
   }
 
   @override
-  Future<ArchitectureEntity> getByArea(IdVO projectId, String area) async {
+  Future<ArchitectureEntity> getByArea({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    required String area,
+  }) async {
     try {
+      final String owner;
+      final params = <String, Object?>{'area': area};
+      if (moduleId != null) {
+        owner = 'module_id = :mid::uuid';
+        params['mid'] = moduleId.value;
+      } else if (projectId != null) {
+        owner = 'module_id IS NULL AND project_id = :pid::uuid';
+        params['pid'] = projectId.value;
+      } else if (organizationId != null) {
+        owner = 'module_id IS NULL AND project_id IS NULL AND organization_id = :oid::uuid';
+        params['oid'] = organizationId.value;
+      } else {
+        throw ArchitectureNotFoundFailure(stackTrace: StackTrace.current);
+      }
       final result = await _database.select(SqlStatement(
-        'SELECT $_columns FROM architectures '
-        'WHERE is_latest AND project_id = :pid::uuid AND area = :area',
-        {'pid': projectId.value, 'area': area},
+        'SELECT $_columns FROM architectures WHERE is_latest AND $owner AND area = :area',
+        params,
       ));
       if (result.rows.isEmpty) {
         throw ArchitectureNotFoundFailure(stackTrace: StackTrace.current);
@@ -87,10 +120,20 @@ class DatabaseArchitectureDatasource implements ArchitectureDatasource {
 
       final params = <String, Object?>{'limit': filter.limit};
       final scope = <String>['m.is_latest'];
+      final owners = <String>[];
+      if (filter.moduleId != null) {
+        owners.add('m.module_id = :mid::uuid');
+        params['mid'] = filter.moduleId!.value;
+      }
       if (filter.projectId != null) {
-        scope.add('m.project_id = :pid::uuid');
+        owners.add('m.project_id = :pid::uuid');
         params['pid'] = filter.projectId!.value;
       }
+      if (filter.organizationId != null) {
+        owners.add('m.organization_id = :oid::uuid');
+        params['oid'] = filter.organizationId!.value;
+      }
+      if (owners.isNotEmpty) scope.add('(${owners.join(' OR ')})');
       if (filter.area != null && filter.area!.trim().isNotEmpty) {
         scope.add('m.area = :area');
         params['area'] = filter.area!.trim();

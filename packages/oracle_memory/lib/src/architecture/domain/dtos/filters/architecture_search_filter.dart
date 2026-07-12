@@ -12,6 +12,8 @@ class ArchitectureSearchFilter {
   final String? queryModel;
 
   final IdVO? projectId;
+  final IdVO? organizationId;
+  final IdVO? moduleId;
   final String? area;
   final ArchitectureSearchMode mode;
   final int limit;
@@ -21,6 +23,8 @@ class ArchitectureSearchFilter {
     this.queryEmbedding,
     this.queryModel,
     this.projectId,
+    this.organizationId,
+    this.moduleId,
     this.area,
     this.mode = ArchitectureSearchMode.hybrid,
     this.limit = 10,
@@ -32,6 +36,8 @@ class ArchitectureSearchFilter {
       queryEmbedding: queryEmbedding ?? this.queryEmbedding,
       queryModel: queryModel ?? this.queryModel,
       projectId: projectId,
+      organizationId: organizationId,
+      moduleId: moduleId,
       area: area,
       mode: mode,
       limit: limit,

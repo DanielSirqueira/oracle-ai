@@ -6,7 +6,9 @@ class DatabaseArchitectureMapper {
   const DatabaseArchitectureMapper._();
 
   static Map<String, Object?> toInsertParams(ArchitectureEntity a) => {
-        'project_id': a.projectId.value,
+        'organization_id': a.organizationId?.value,
+        'project_id': a.projectId?.value,
+        'module_id': a.moduleId?.value,
         'area': a.area,
         'content': a.content.value,
         'embedding': a.embedding == null ? null : SqlVector(a.embedding!),
@@ -15,10 +17,15 @@ class DatabaseArchitectureMapper {
       };
 
   static ArchitectureEntity fromRow(Map<String, DataRowType> row) {
+    final organizationId = row['organization_id']?.toText();
+    final projectId = row['project_id']?.toText();
+    final moduleId = row['module_id']?.toText();
     final supersedes = row['supersedes']?.toText();
     return ArchitectureEntity(
       id: IdVO(row['id']!.toText()!),
-      projectId: IdVO(row['project_id']!.toText()!),
+      organizationId: organizationId == null ? null : IdVO(organizationId),
+      projectId: projectId == null ? null : IdVO(projectId),
+      moduleId: moduleId == null ? null : IdVO(moduleId),
       area: row['area']!.toText() ?? '',
       content: TextVO(row['content']!.toText() ?? ''),
       embedding: row['embedding']?.toVector(),

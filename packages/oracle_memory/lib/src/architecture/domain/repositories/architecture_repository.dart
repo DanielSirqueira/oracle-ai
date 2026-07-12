@@ -13,7 +13,12 @@ abstract interface class ArchitectureRepository {
   );
 
   /// Current architecture page for a project area.
-  AsyncResultDart<ArchitectureEntity, ArchitectureFailure> getByArea(IdVO projectId, String area);
+  AsyncResultDart<ArchitectureEntity, ArchitectureFailure> getByArea({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    required String area,
+  });
 
   AsyncResultDart<List<ArchitectureSearchResult>, ArchitectureFailure> searchArchitecture(
     ArchitectureSearchFilter filter,

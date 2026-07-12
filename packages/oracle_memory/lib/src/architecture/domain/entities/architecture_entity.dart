@@ -1,10 +1,13 @@
 import 'package:oracle_core/oracle_core.dart';
 
-/// A project architecture page for an [area] (module/layer). Versioned: saving
-/// the same area supersedes the previous version.
+/// An architecture page for an [area] (module/layer). Versioned: saving the same
+/// area in the same owner supersedes the previous version. Scoped to an
+/// organization OR a project OR a module (most specific wins on recall).
 class ArchitectureEntity {
   final IdVO id;
-  final IdVO projectId;
+  final IdVO? organizationId;
+  final IdVO? projectId;
+  final IdVO? moduleId;
   final String area;
   final TextVO content;
   final List<double>? embedding;
@@ -16,7 +19,9 @@ class ArchitectureEntity {
 
   const ArchitectureEntity({
     required this.id,
-    required this.projectId,
+    this.organizationId,
+    this.projectId,
+    this.moduleId,
     required this.area,
     required this.content,
     this.embedding,
@@ -29,14 +34,15 @@ class ArchitectureEntity {
 
   factory ArchitectureEntity.empty() => const ArchitectureEntity(
         id: IdVO.empty(),
-        projectId: IdVO.empty(),
         area: '',
         content: TextVO.empty(),
       );
 
   ArchitectureEntity copyWith({
     IdVO? id,
+    IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     String? area,
     TextVO? content,
     List<double>? embedding,
@@ -48,7 +54,9 @@ class ArchitectureEntity {
   }) {
     return ArchitectureEntity(
       id: id ?? this.id,
+      organizationId: organizationId ?? this.organizationId,
       projectId: projectId ?? this.projectId,
+      moduleId: moduleId ?? this.moduleId,
       area: area ?? this.area,
       content: content ?? this.content,
       embedding: embedding ?? this.embedding,
@@ -65,7 +73,9 @@ class ArchitectureEntity {
     if (identical(this, other)) return true;
     return other is ArchitectureEntity &&
         other.id == id &&
+        other.organizationId == organizationId &&
         other.projectId == projectId &&
+        other.moduleId == moduleId &&
         other.area == area &&
         other.content == content &&
         other.embeddingModel == embeddingModel &&
@@ -74,6 +84,6 @@ class ArchitectureEntity {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, projectId, area, content, embeddingModel, isLatest, supersedes);
+  int get hashCode => Object.hash(
+      id, organizationId, projectId, moduleId, area, content, embeddingModel, isLatest, supersedes);
 }

@@ -24,12 +24,15 @@ class ArchitectureRepositoryImpl implements ArchitectureRepository {
   }
 
   @override
-  AsyncResultDart<ArchitectureEntity, ArchitectureFailure> getByArea(
-    IdVO projectId,
-    String area,
-  ) async {
+  AsyncResultDart<ArchitectureEntity, ArchitectureFailure> getByArea({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    required String area,
+  }) async {
     try {
-      return Success(await _datasource.getByArea(projectId, area));
+      return Success(await _datasource.getByArea(
+          organizationId: organizationId, projectId: projectId, moduleId: moduleId, area: area));
     } on ArchitectureFailure catch (failure) {
       return Failure(failure);
     }
