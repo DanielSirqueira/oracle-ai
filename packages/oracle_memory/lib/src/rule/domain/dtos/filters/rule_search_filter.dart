@@ -16,6 +16,7 @@ class RuleSearchFilter {
 
   final IdVO? projectId;
   final IdVO? organizationId;
+  final IdVO? moduleId;
 
   /// Optional scope filter.
   final String? scope;
@@ -29,6 +30,7 @@ class RuleSearchFilter {
     this.queryModel,
     this.projectId,
     this.organizationId,
+    this.moduleId,
     this.scope,
     this.severities = const [],
     this.mode = RuleSearchMode.hybrid,
@@ -42,6 +44,7 @@ class RuleSearchFilter {
       queryModel: queryModel ?? this.queryModel,
       projectId: projectId,
       organizationId: organizationId,
+      moduleId: moduleId,
       scope: scope,
       severities: severities,
       mode: mode,

@@ -12,6 +12,7 @@ class RuleEntity {
   final IdVO id;
   final IdVO? organizationId;
   final IdVO? projectId;
+  final IdVO? moduleId;
   final String key;
   final String scope;
   final TextVO title;
@@ -35,6 +36,7 @@ class RuleEntity {
     required this.id,
     this.organizationId,
     this.projectId,
+    this.moduleId,
     required this.key,
     required this.scope,
     required this.title,
@@ -62,6 +64,7 @@ class RuleEntity {
     IdVO? id,
     IdVO? organizationId,
     IdVO? projectId,
+    IdVO? moduleId,
     String? key,
     String? scope,
     TextVO? title,
@@ -80,6 +83,7 @@ class RuleEntity {
       id: id ?? this.id,
       organizationId: organizationId ?? this.organizationId,
       projectId: projectId ?? this.projectId,
+      moduleId: moduleId ?? this.moduleId,
       key: key ?? this.key,
       scope: scope ?? this.scope,
       title: title ?? this.title,
@@ -103,6 +107,7 @@ class RuleEntity {
         other.id == id &&
         other.organizationId == organizationId &&
         other.projectId == projectId &&
+        other.moduleId == moduleId &&
         other.key == key &&
         other.scope == scope &&
         other.title == title &&
@@ -120,6 +125,7 @@ class RuleEntity {
         id,
         organizationId,
         projectId,
+        moduleId,
         key,
         scope,
         title,

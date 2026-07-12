@@ -403,6 +403,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           id: const IdVO.empty(),
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           key: '${a['key'] ?? ''}',
           scope: '${a['scope'] ?? ''}',
           title: TextVO('${a['title'] ?? ''}'),
@@ -476,6 +477,7 @@ Capture is automatic — hooks record the session, each user request, and your w
         final a = args ?? const {};
         final result = await injector.get<RulesForTaskUsecase>()(RulesForTaskQuery(
           projectId: IdVO('${a['projectId'] ?? ''}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           scope: a['scope']?.toString(),
           limit: _clampLimit(a['limit'], fallback: 50, max: 100),
         ));
@@ -511,6 +513,7 @@ Capture is automatic — hooks record the session, each user request, and your w
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
           organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           scope: a['scope']?.toString(),
           severities: _stringList(a['severities']).map(RuleSeverity.parse).toList(),
           limit: _clampLimit(a['limit'], fallback: 10),

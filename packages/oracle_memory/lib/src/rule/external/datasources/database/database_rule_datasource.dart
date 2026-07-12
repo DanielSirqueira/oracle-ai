@@ -23,13 +23,13 @@ class DatabaseRuleDatasource implements RuleDatasource {
   // `embedding::text` so DataRowType.toVector() can parse it (driver returns
   // the vector type as binary).
   static const _columns =
-      'id, organization_id, project_id, key, scope, title, content, severity, priority, tags, '
-      'embedding::text AS embedding, embedding_model, is_latest, supersedes, created_at, updated_at';
+      'id, organization_id, project_id, module_id, key, scope, title, content, severity, priority, '
+      'tags, embedding::text AS embedding, embedding_model, is_latest, supersedes, created_at, updated_at';
 
   static const _columnsM =
-      'm.id, m.organization_id, m.project_id, m.key, m.scope, m.title, m.content, m.severity, '
-      'm.priority, m.tags, m.embedding::text AS embedding, m.embedding_model, m.is_latest, '
-      'm.supersedes, m.created_at, m.updated_at';
+      'm.id, m.organization_id, m.project_id, m.module_id, m.key, m.scope, m.title, m.content, '
+      'm.severity, m.priority, m.tags, m.embedding::text AS embedding, m.embedding_model, '
+      'm.is_latest, m.supersedes, m.created_at, m.updated_at';
 
   static const _rrfK = 60;
   static const _candidatePool = 50;
@@ -40,22 +40,29 @@ class DatabaseRuleDatasource implements RuleDatasource {
       // 1) Supersede the current latest rule with the same key in the same owner.
       final String supersedeSql;
       final Map<String, Object?> supersedeParams;
-      if (rule.projectId != null) {
+      // Supersede within the SAME owner level (module > project > organization).
+      if (rule.moduleId != null) {
         supersedeSql = 'UPDATE rules SET is_latest = false '
-            'WHERE is_latest AND key = :key AND project_id = :pid::uuid';
+            'WHERE is_latest AND key = :key AND module_id = :mid::uuid';
+        supersedeParams = {'key': rule.key, 'mid': rule.moduleId!.value};
+      } else if (rule.projectId != null) {
+        supersedeSql = 'UPDATE rules SET is_latest = false '
+            'WHERE is_latest AND key = :key AND module_id IS NULL AND project_id = :pid::uuid';
         supersedeParams = {'key': rule.key, 'pid': rule.projectId!.value};
       } else {
         supersedeSql = 'UPDATE rules SET is_latest = false '
-            'WHERE is_latest AND key = :key AND project_id IS NULL AND organization_id = :prodid::uuid';
+            'WHERE is_latest AND key = :key AND module_id IS NULL AND project_id IS NULL '
+            'AND organization_id = :prodid::uuid';
         supersedeParams = {'key': rule.key, 'prodid': rule.organizationId!.value};
       }
 
       // 2) Insert the new version.
       const insertSql =
-          'INSERT INTO rules (organization_id, project_id, key, scope, title, content, '
+          'INSERT INTO rules (organization_id, project_id, module_id, key, scope, title, content, '
           'severity, priority, tags, embedding, embedding_model, supersedes) '
-          'VALUES (:organization_id::uuid, :project_id::uuid, :key, :scope, :title, :content, '
-          ':severity, :priority, :tags, :embedding::vector(1024), :embedding_model, :supersedes::uuid) '
+          'VALUES (:organization_id::uuid, :project_id::uuid, :module_id::uuid, :key, :scope, :title, '
+          ':content, :severity, :priority, :tags, :embedding::vector(1024), :embedding_model, '
+          ':supersedes::uuid) '
           'RETURNING id, created_at, updated_at';
 
       final results = await _database.executeSavePoint([
@@ -150,22 +157,29 @@ class DatabaseRuleDatasource implements RuleDatasource {
   @override
   Future<List<RuleEntity>> rulesForTask(RulesForTaskQuery query) async {
     try {
-      final params = <String, Object?>{'pid': query.projectId.value, 'limit': query.limit};
+      final params = <String, Object?>{
+        'pid': query.projectId.value,
+        'mid': query.moduleId?.value,
+        'limit': query.limit,
+      };
       var scopeFilter = '';
       if (query.scope != null && query.scope!.trim().isNotEmpty) {
         scopeFilter = 'AND scope = :scope';
         params['scope'] = query.scope!.trim();
       }
 
-      // Inheritance: project rules + organization rules of the project's organization.
-      // Override: DISTINCT ON (key) keeps the project-scoped rule per key.
+      // Inheritance: module rules + project rules + organization rules of the
+      // project's organization. Override: DISTINCT ON (key) keeps the most
+      // specific version per key (module > project > organization).
       final sql = 'SELECT * FROM ('
           'SELECT DISTINCT ON (key) $_columns FROM rules '
           'WHERE is_latest '
-          'AND (project_id = :pid::uuid '
-          'OR (project_id IS NULL AND organization_id = (SELECT organization_id FROM projects WHERE id = :pid::uuid))) '
+          'AND ((:mid::uuid IS NOT NULL AND module_id = :mid::uuid) '
+          'OR project_id = :pid::uuid '
+          'OR (project_id IS NULL AND module_id IS NULL '
+          'AND organization_id = (SELECT organization_id FROM projects WHERE id = :pid::uuid))) '
           '$scopeFilter '
-          'ORDER BY key, (project_id IS NOT NULL) DESC'
+          'ORDER BY key, (module_id IS NOT NULL) DESC, (project_id IS NOT NULL) DESC'
           ') t '
           "ORDER BY (severity = 'required') DESC, priority ASC, title "
           'LIMIT :limit';
@@ -194,17 +208,20 @@ class DatabaseRuleDatasource implements RuleDatasource {
 
       final params = <String, Object?>{'limit': filter.limit};
       final scope = <String>['m.is_latest'];
-      if (filter.projectId != null && filter.organizationId != null) {
-        scope.add('(m.project_id = :pid::uuid OR m.organization_id = :prodid::uuid)');
+      final owners = <String>[];
+      if (filter.moduleId != null) {
+        owners.add('m.module_id = :mid::uuid');
+        params['mid'] = filter.moduleId!.value;
+      }
+      if (filter.projectId != null) {
+        owners.add('m.project_id = :pid::uuid');
         params['pid'] = filter.projectId!.value;
-        params['prodid'] = filter.organizationId!.value;
-      } else if (filter.projectId != null) {
-        scope.add('m.project_id = :pid::uuid');
-        params['pid'] = filter.projectId!.value;
-      } else if (filter.organizationId != null) {
-        scope.add('m.organization_id = :prodid::uuid');
+      }
+      if (filter.organizationId != null) {
+        owners.add('m.organization_id = :prodid::uuid');
         params['prodid'] = filter.organizationId!.value;
       }
+      if (owners.isNotEmpty) scope.add('(${owners.join(' OR ')})');
       if (filter.scope != null && filter.scope!.trim().isNotEmpty) {
         scope.add('m.scope = :rscope');
         params['rscope'] = filter.scope!.trim();
