@@ -23,6 +23,9 @@ class DatabaseCaptureMapper {
         externalId: r['external_id']?.toText(),
         cwd: r['cwd']?.toText(),
         createdAt: r['created_at']?.toDateTime(),
+        inputTokens: r['input_tokens']?.toInt() ?? 0,
+        outputTokens: r['output_tokens']?.toInt() ?? 0,
+        totalTokens: r['total_tokens']?.toInt() ?? 0,
       );
 
   // ── request ──

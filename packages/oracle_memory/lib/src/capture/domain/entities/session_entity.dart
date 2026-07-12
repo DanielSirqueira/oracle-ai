@@ -11,6 +11,11 @@ class SessionEntity {
   final String? cwd;
   final DateTime? createdAt;
 
+  /// Rolling token totals for the session (summed from completed turns).
+  final int inputTokens;
+  final int outputTokens;
+  final int totalTokens;
+
   const SessionEntity({
     required this.id,
     required this.projectId,
@@ -18,6 +23,9 @@ class SessionEntity {
     this.externalId,
     this.cwd,
     this.createdAt,
+    this.inputTokens = 0,
+    this.outputTokens = 0,
+    this.totalTokens = 0,
   });
 
   SessionEntity copyWith({IdVO? id, DateTime? createdAt}) {

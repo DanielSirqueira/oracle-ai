@@ -12,7 +12,8 @@ class DatabaseCaptureDatasource implements CaptureDatasource {
   final Database _database;
   const DatabaseCaptureDatasource({required Database database}) : _database = database;
 
-  static const _sessionColumns = 'id, project_id, agent, external_id, cwd, created_at';
+  static const _sessionColumns =
+      'id, project_id, agent, external_id, cwd, created_at, input_tokens, output_tokens, total_tokens';
   static const _messageColumns = 'id, request_id, role, content, token_count, created_at';
   // embedding cast to text so DataRowType.toVector() can parse it on read.
   static const _requestColumns =

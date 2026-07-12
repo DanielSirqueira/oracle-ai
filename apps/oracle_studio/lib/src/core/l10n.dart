@@ -251,6 +251,8 @@ const _pt = <String, String>{
   'skill.pruned': 'removidas',
   // sessions
   'sess.selectSession': 'Selecione uma sessão.',
+  'sess.tokensIn': 'entrada',
+  'sess.tokensOut': 'saída',
   'sess.selectRequest': 'Selecione uma demanda.',
   // search
   'search.hint': 'Buscar em todo o banco de memória (memórias, regras e skills)…',
@@ -589,6 +591,8 @@ const _en = <String, String>{
   'skill.syncFail': 'Sync failed',
   'skill.pruned': 'pruned',
   'sess.selectSession': 'Select a session.',
+  'sess.tokensIn': 'in',
+  'sess.tokensOut': 'out',
   'sess.selectRequest': 'Select a request.',
   'search.hint': 'Search the whole memory bank (memories, rules and skills)…',
   'search.prompt': 'Type and press Enter to search everything.',

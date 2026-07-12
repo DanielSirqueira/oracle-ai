@@ -91,6 +91,14 @@ class _SessionsPageState extends State<SessionsPage> {
                   title: Text(s.agent),
                   subtitle: Text(fmtDateTime(s.createdAt),
                       maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: s.totalTokens > 0
+                      ? Tooltip(
+                          message: '${l10n.t('sess.tokensIn')} ${fmtCompact(s.inputTokens)} · '
+                              '${l10n.t('sess.tokensOut')} ${fmtCompact(s.outputTokens)}',
+                          child: Text('${fmtCompact(s.totalTokens)} tok',
+                              style: Theme.of(context).textTheme.bodySmall),
+                        )
+                      : null,
                   onTap: () => _openSession(s),
                 );
               },
