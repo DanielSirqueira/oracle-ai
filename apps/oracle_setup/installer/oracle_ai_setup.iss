@@ -15,7 +15,7 @@
 ; Output: <repo>\dist\OracleAI-Setup.exe
 
 #define AppName "Oracle AI"
-#define AppVersion "0.1.0-beta"
+#define AppVersion "0.2.0-beta"
 #define AppPublisher "Daniel Sirqueira"
 #define ReleaseDir "..\build\windows\x64\runner\Release"
 

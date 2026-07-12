@@ -151,7 +151,7 @@ class SetupState extends ChangeNotifier {
   }
 
   /// Version stamped into the Add/Remove Programs entry.
-  static const installVersion = '0.1.0-beta';
+  static const installVersion = '0.2.0-beta';
   static const _publisher = 'Daniel Sirqueira';
 
   /// Escapes a value for a PowerShell single-quoted string.
