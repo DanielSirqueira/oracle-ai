@@ -13,6 +13,7 @@ import '../features/dashboard/dashboard_page.dart';
 import '../features/duplicates/duplicates_page.dart';
 import '../features/handoffs/handoffs_page.dart';
 import '../features/memories/memories_page.dart';
+import '../features/modules/modules_page.dart';
 import '../features/search_history/search_history_page.dart';
 import '../features/rules/rules_page.dart';
 import '../features/search/search_page.dart';
@@ -47,6 +48,7 @@ const _navGroups = <_NavGroup>[
     _Nav(Icons.psychology_outlined, Icons.psychology, 'nav.memories', 'nav.memoriesHint'),
     _Nav(Icons.rule_outlined, Icons.rule, 'nav.rules', 'nav.rulesHint'),
     _Nav(Icons.school_outlined, Icons.school, 'nav.skills', 'nav.skillsHint'),
+    _Nav(Icons.widgets_outlined, Icons.widgets, 'nav.modules', 'nav.modulesHint'),
   ]),
   _NavGroup('nav.groupActivity', [
     _Nav(Icons.forum_outlined, Icons.forum, 'nav.sessions', 'nav.sessionsHint'),
@@ -162,6 +164,7 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
       MemoriesPage(project: _selected),
       RulesPage(project: _selected),
       SkillsPage(project: _selected),
+      ModulesPage(connection: widget.connection, project: _selected),
       SessionsPage(project: _selected),
       HandoffsPage(project: _selected),
       SearchHistoryPage(project: _selected),
