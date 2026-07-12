@@ -13,6 +13,7 @@ import '../features/dashboard/dashboard_page.dart';
 import '../features/duplicates/duplicates_page.dart';
 import '../features/handoffs/handoffs_page.dart';
 import '../features/memories/memories_page.dart';
+import '../features/search_history/search_history_page.dart';
 import '../features/rules/rules_page.dart';
 import '../features/search/search_page.dart';
 import '../features/sessions/sessions_page.dart';
@@ -50,6 +51,7 @@ const _navGroups = <_NavGroup>[
   _NavGroup('nav.groupActivity', [
     _Nav(Icons.forum_outlined, Icons.forum, 'nav.sessions', 'nav.sessionsHint'),
     _Nav(Icons.swap_horiz_outlined, Icons.swap_horiz, 'nav.handoffs', 'nav.handoffsHint'),
+    _Nav(Icons.manage_search_outlined, Icons.manage_search, 'nav.searchHistory', 'nav.searchHistoryHint'),
   ]),
   _NavGroup('nav.groupSystem', [
     _Nav(Icons.content_copy_outlined, Icons.content_copy, 'nav.duplicates', 'nav.duplicatesHint'),
@@ -162,6 +164,7 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
       SkillsPage(project: _selected),
       SessionsPage(project: _selected),
       HandoffsPage(project: _selected),
+      SearchHistoryPage(project: _selected),
       DuplicatesPage(connection: widget.connection, project: _selected),
       BackupPage(connection: widget.connection, daemon: widget.daemon),
       SettingsPage(connection: widget.connection, daemon: widget.daemon),
