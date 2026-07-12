@@ -315,6 +315,7 @@ Capture is automatic — hooks record the session, each user request, and your w
       callback: ({args, extra}) async {
         final a = args ?? const {};
         final full = a['full'] == true;
+        final sw = Stopwatch()..start();
         final result = await injector.get<SearchMemoriesUsecase>()(MemorySearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
@@ -325,7 +326,15 @@ Capture is automatic — hooks record the session, each user request, and your w
           limit: _clampLimit(a['limit'], fallback: 10),
         ));
         return result.fold(
-          (list) => _ok(list.map((e) => _memoryHit(e, full: full)).toList()),
+          (list) {
+            _logSearch(
+                tool: 'memory',
+                query: '${a['query'] ?? ''}',
+                scope: _scopeOf(a),
+                results: [for (final e in list) {'id': e.memory.id.value, 'score': e.score}],
+                latencyMs: sw.elapsedMilliseconds);
+            return _ok(list.map((e) => _memoryHit(e, full: full)).toList());
+          },
           _err,
         );
       },
@@ -509,6 +518,7 @@ Capture is automatic — hooks record the session, each user request, and your w
       callback: ({args, extra}) async {
         final a = args ?? const {};
         final full = a['full'] == true;
+        final sw = Stopwatch()..start();
         final result = await injector.get<SearchRulesUsecase>()(RuleSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
@@ -519,7 +529,15 @@ Capture is automatic — hooks record the session, each user request, and your w
           limit: _clampLimit(a['limit'], fallback: 10),
         ));
         return result.fold(
-          (list) => _ok(list.map((e) => _ruleHit(e, full: full)).toList()),
+          (list) {
+            _logSearch(
+                tool: 'rule',
+                query: '${a['query'] ?? ''}',
+                scope: _scopeOf(a),
+                results: [for (final e in list) {'id': e.rule.id.value, 'score': e.score}],
+                latencyMs: sw.elapsedMilliseconds);
+            return _ok(list.map((e) => _ruleHit(e, full: full)).toList());
+          },
           _err,
         );
       },
@@ -626,6 +644,7 @@ Capture is automatic — hooks record the session, each user request, and your w
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
+        final sw = Stopwatch()..start();
         final result = await injector.get<SearchSkillsUsecase>()(SkillSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
@@ -633,6 +652,15 @@ Capture is automatic — hooks record the session, each user request, and your w
           moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
           limit: _clampLimit(a['limit'], fallback: 10),
         ));
+        final sk = result.getOrNull();
+        if (sk != null) {
+          _logSearch(
+              tool: 'skill',
+              query: '${a['query'] ?? ''}',
+              scope: _scopeOf(a),
+              results: [for (final e in sk) {'id': e.skill.id.value, 'score': e.score}],
+              latencyMs: sw.elapsedMilliseconds);
+        }
         return result.fold(
           (list) => _ok(list
               .map((e) => {
@@ -802,6 +830,7 @@ Capture is automatic — hooks record the session, each user request, and your w
       callback: ({args, extra}) async {
         final a = args ?? const {};
         final full = a['full'] == true;
+        final sw = Stopwatch()..start();
         final result = await injector.get<SearchArchitectureUsecase>()(ArchitectureSearchFilter(
           query: '${a['query'] ?? ''}',
           projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
@@ -810,6 +839,15 @@ Capture is automatic — hooks record the session, each user request, and your w
           area: a['area']?.toString(),
           limit: _clampLimit(a['limit'], fallback: 10),
         ));
+        final arch = result.getOrNull();
+        if (arch != null) {
+          _logSearch(
+              tool: 'architecture',
+              query: '${a['query'] ?? ''}',
+              scope: _scopeOf(a),
+              results: [for (final e in arch) {'id': e.architecture.id.value, 'score': e.score}],
+              latencyMs: sw.elapsedMilliseconds);
+        }
         return result.fold(
           (list) => _ok(list.map((e) => _architectureHit(e, full: full)).toList()),
           _err,
@@ -1245,6 +1283,36 @@ Capture is automatic — hooks record the session, each user request, and your w
         'description': m.description?.value,
         'createdAt': m.createdAt?.toIso8601String(),
         'updatedAt': m.updatedAt?.toIso8601String(),
+      };
+
+  /// Fire-and-forget log of one agent recall (never blocks or fails the search).
+  static void _logSearch({
+    required String tool,
+    required String query,
+    required Map<String, dynamic> scope,
+    Map<String, dynamic> filters = const {},
+    required List<Map<String, dynamic>> results,
+    required int latencyMs,
+  }) {
+    try {
+      injector.get<LogSearchUsecase>()(AgentSearchEntity(
+        id: const IdVO.empty(),
+        tool: tool,
+        query: query,
+        scope: scope,
+        filters: filters,
+        results: results,
+        hits: results.length,
+        latencyMs: latencyMs,
+      ));
+    } catch (_) {/* logging is best-effort */}
+  }
+
+  /// The scope map (organization/project/module ids) stored with a search log.
+  static Map<String, dynamic> _scopeOf(Map<String, dynamic> a) => {
+        if (a['organizationId'] != null) 'organizationId': '${a['organizationId']}',
+        if (a['projectId'] != null) 'projectId': '${a['projectId']}',
+        if (a['moduleId'] != null) 'moduleId': '${a['moduleId']}',
       };
 
   /// A cwd relative to its git root — the module subpath (empty at the root).

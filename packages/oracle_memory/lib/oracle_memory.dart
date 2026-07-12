@@ -30,6 +30,17 @@ export 'src/module/external/datasources/database/database_module_datasource.dart
 export 'src/module/external/mappers/database/database_module_mapper.dart';
 export 'src/module/module_module.dart';
 
+// --- agent_search (recall history) ---
+export 'src/agent_search/domain/entities/agent_search_entity.dart';
+export 'src/agent_search/domain/errors/agent_search_failure.dart';
+export 'src/agent_search/domain/repositories/agent_search_repository.dart';
+export 'src/agent_search/domain/usecases/log_search_usecase.dart';
+export 'src/agent_search/domain/usecases/recent_searches_usecase.dart';
+export 'src/agent_search/infra/datasources/agent_search_datasource.dart';
+export 'src/agent_search/infra/repositories/agent_search_repository_impl.dart';
+export 'src/agent_search/external/datasources/database/database_agent_search_datasource.dart';
+export 'src/agent_search/agent_search_module.dart';
+
 // --- memory ---
 export 'src/memory/domain/dtos/filters/memory_search_filter.dart';
 export 'src/memory/domain/dtos/memory_neighbor.dart';

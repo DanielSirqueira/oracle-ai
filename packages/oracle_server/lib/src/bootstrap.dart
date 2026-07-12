@@ -158,6 +158,7 @@ class Bootstrap {
       OrganizationModule(),
       ProjectModule(),
       ModuleModule(),
+      AgentSearchModule(),
       ArchitectureModule(),
       RuleModule(),
       SkillModule(),
