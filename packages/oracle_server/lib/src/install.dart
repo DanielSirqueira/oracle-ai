@@ -101,20 +101,34 @@ Treat it as your long-term memory: recall before you re-derive, and record durab
 Prefer recalled facts over re-reading files; trust but verify — memory can be stale, so re-check before
 acting on a claim that names a specific file, symbol, or value.
 
+Scope hierarchy: **organization -> project -> module**. A project has many modules (a service, layer, or
+package). Anchor knowledge at the RIGHT level and recall unions all three (most specific first). Never
+register a submodule as its own project.
+
 ## Start of every task
 1. Resolve the project — call `oracle_project_resolve` with the absolute repo path (your cwd). Reuse the
    returned `projectId` for every other call this session.
-2. Load the rules — call `oracle_rules_for_task` (projectId, optional scope). Treat `required` rules as
-   mandatory and `recommended` as strong defaults.
-3. Recall context — before exploring, `oracle_memory_search` and `oracle_architecture_get` / `_search`
-   for what's relevant. If the request feels familiar, `oracle_request_search` finds past user demands
-   like it; `oracle_request_messages` then shows how each was handled.
-4. Pick up open work — `oracle_handoff_pending`, and `oracle_handoff_accept` the one you continue.
+2. Resolve the module — if you're working inside a subpackage/service/layer (a subpath of the repo root),
+   call `oracle_module_resolve` (projectId + your cwd) to get a `moduleId`. Reuse it so module-specific
+   knowledge scopes to the module — NOT the whole project, and NEVER a separate fake project. At the repo
+   root, there's no module (the work is project-level) — skip this.
+3. Load the rules — call `oracle_rules_for_task` (projectId, plus `moduleId` when set, optional scope).
+   Module rules override project rules override organization rules. Treat `required` as mandatory,
+   `recommended` as strong defaults.
+4. Recall context — before exploring, `oracle_memory_search` and `oracle_architecture_search` (pass
+   `projectId` AND `moduleId` when you have one — recall returns module + project + organization knowledge,
+   most specific ranked first). If the request feels familiar, `oracle_request_search` finds past user
+   demands like it; `oracle_request_messages` shows how each was handled.
+5. Pick up open work — `oracle_handoff_pending`, and `oracle_handoff_accept` the one you continue.
 
 > Capture is automatic when hooks are installed — they record your session, each user request, and your
 > work as `Session -> Request -> Messages`. You never log those by hand; just consolidate durable memories.
 
 ## While working
+- Scope every save to the right level: pass `moduleId` for knowledge specific to the module you're in,
+  `projectId` for project-wide knowledge, or `organizationId` for something true across the whole
+  organization. Most saves are module- or project-level. This applies to memories, rules, architecture
+  and skills alike.
 - Save a durable, non-obvious learning the moment you have one, with `oracle_memory_save`:
   - `tier`: `episodic` (this task) / `semantic` (lasting knowledge) / `procedural` (a how-to)
   - `kind`: `decision` / `gotcha` / `rule` / `fact`
@@ -137,6 +151,7 @@ acting on a claim that names a specific file, symbol, or value.
 
 ## Tool cheat-sheet (intent -> tool)
 - Map cwd -> a stable projectId ............ `oracle_project_resolve`
+- Map a subpath -> a moduleId .............. `oracle_module_resolve` (list: `oracle_module_list`)
 - Get the rules that apply to the task ..... `oracle_rules_for_task`
 - Recall a past fact / decision / gotcha ... `oracle_memory_search`
 - Find a past user demand like this one .... `oracle_request_search` -> `oracle_request_messages`
