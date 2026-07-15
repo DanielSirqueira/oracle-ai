@@ -37,7 +37,7 @@ Future<void> main(List<String> args) async {
   if (args.contains('install-hooks')) {
     printInstallHooks(
       host: env['ORACLE_HTTP_HOST'] ?? '127.0.0.1',
-      port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 49500,
+      port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500,
       token: env['ORACLE_HOOK_TOKEN'],
     );
     return;
@@ -77,7 +77,7 @@ Future<void> main(List<String> args) async {
     if (runHooks) {
       hooks = HooksServer(
         host: env['ORACLE_HTTP_HOST'] ?? '127.0.0.1',
-        port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 49500,
+        port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500,
         // Config comes from the merged .env map (loadEnv), NOT Platform.environment
         // — a `.env`-only ORACLE_HOOK_TOKEN would otherwise be silently ignored and
         // the endpoint would accept unauthenticated writes while looking protected.

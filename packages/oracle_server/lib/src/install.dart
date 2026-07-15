@@ -59,7 +59,7 @@ $codexToml
 ''';
 }
 
-String hooksJson({String host = '127.0.0.1', int port = 49500, String? token}) {
+String hooksJson({String host = '127.0.0.1', int port = 47500, String? token}) {
   final url = 'http://$host:$port/hook';
   final trimmedToken = token?.trim() ?? '';
   final hasToken = trimmedToken.isNotEmpty;
@@ -172,7 +172,7 @@ void printInstallMcp({String? command}) {
   stdout.writeln(mcpJson(command: command));
 }
 
-void printInstallHooks({String host = '127.0.0.1', int port = 49500, String? token}) {
+void printInstallHooks({String host = '127.0.0.1', int port = 47500, String? token}) {
   stdout
     ..writeln('# Merge the "hooks" block into your Claude Code settings.json.')
     ..writeln('# SessionStart + UserPromptSubmit are SYNCHRONOUS (they inject recalled')

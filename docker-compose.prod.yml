@@ -3,7 +3,7 @@ name: oracle_ai_prod
 # Production topology: ONE shared hooks daemon + the database.
 #
 #   agents (Claude Code / Codex on the host)
-#     │  hooks (http) ───────────────► oracle (serve-hooks daemon) :49500
+#     │  hooks (http) ───────────────► oracle (serve-hooks daemon) :47500
 #     │  MCP   (stdio) ─ spawned per agent (host binary `serve-mcp` OR
 #     │                   `docker exec -i oracle_ai_prod-oracle-1 \
 #     │                    /app/oracle_ai serve-mcp`) ─┐
@@ -53,7 +53,7 @@ services:
       # Bind 0.0.0.0 INSIDE the container so the published port is reachable
       # from the host (127.0.0.1 inside the container would not be).
       ORACLE_HTTP_HOST: 0.0.0.0
-      ORACLE_HTTP_PORT: "49500"
+      ORACLE_HTTP_PORT: "47500"
       # The /hook endpoint reads AND writes long-term memory; require a shared
       # secret. Mandatory once the published port is not strictly loopback.
       ORACLE_HOOK_TOKEN: ${ORACLE_HOOK_TOKEN:-}
@@ -70,7 +70,7 @@ services:
     ports:
       # Loopback-only by default; override ORACLE_HTTP_BIND=0.0.0.0 for LAN agents
       # (and then ORACLE_HOOK_TOKEN above is mandatory).
-      - "${ORACLE_HTTP_BIND:-127.0.0.1}:${ORACLE_HTTP_PORT:-49500}:49500"  # hooks reachable from host agents
+      - "${ORACLE_HTTP_BIND:-127.0.0.1}:${ORACLE_HTTP_PORT:-47500}:47500"  # hooks reachable from host agents
     restart: unless-stopped
 
 volumes:

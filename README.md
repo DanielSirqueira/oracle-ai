@@ -397,7 +397,7 @@ All via environment variables (`.env` is loaded; process env overrides it). Key 
 | `ORACLE_EMBEDDING_PROVIDER` | `local` | `local` (offline) / `gemini` / `openai` / `voyage`. |
 | `ORACLE_EMBEDDING_DIM` | `1024` | Must match the schema's `vector(1024)`. |
 | `GEMINI_API_KEY` / `OPENAI_API_KEY` / `VOYAGE_API_KEY` | — | For the chosen provider. |
-| `ORACLE_HTTP_HOST` / `ORACLE_HTTP_PORT` | 127.0.0.1 / 49500 | Hook receiver endpoint. |
+| `ORACLE_HTTP_HOST` / `ORACLE_HTTP_PORT` | 127.0.0.1 / 47500 | Hook receiver endpoint (keep below 49152 on Windows — the dynamic range above is OS-reserved). |
 | `ORACLE_MAINTENANCE_ON_STARTUP` | `false` | Run the decay/dedup sweep once on boot. |
 | `ORACLE_MAINTENANCE_INTERVAL_MINUTES` | `0` | Run the sweep every N minutes (0 = off). |
 | `ORACLE_METRICS_ENABLED` / `ORACLE_METRICS_LABEL` | `true` / `default` | Measurement harness + experiment tag. |

@@ -506,7 +506,7 @@ volumes:
     b
       ..writeln()
       ..writeln('ORACLE_HTTP_HOST=127.0.0.1')
-      ..writeln('ORACLE_HTTP_PORT=49500');
+      ..writeln('ORACLE_HTTP_PORT=47500');
     if (hookToken.isNotEmpty) {
       b.writeln('ORACLE_HOOK_TOKEN=${SecretProtector.protect(hookToken)}');
     }
@@ -676,5 +676,5 @@ volumes:
   String get agentPrompt => agentProtocol().trim();
 
   String get hooksSnippet =>
-      hooksJson(host: '127.0.0.1', port: 49500, token: hookToken.isEmpty ? null : hookToken);
+      hooksJson(host: '127.0.0.1', port: 47500, token: hookToken.isEmpty ? null : hookToken);
 }

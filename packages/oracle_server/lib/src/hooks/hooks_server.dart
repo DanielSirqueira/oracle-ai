@@ -56,7 +56,7 @@ class HooksServer {
 
   HooksServer({
     this.host = '127.0.0.1',
-    this.port = 49500,
+    this.port = 47500,
     RecallService recall = const RecallService(),
     bool? metricsEnabled,
     String? metricsLabel,

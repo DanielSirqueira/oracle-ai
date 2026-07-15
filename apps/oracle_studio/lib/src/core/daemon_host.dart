@@ -62,7 +62,7 @@ class DaemonHost extends ChangeNotifier {
     final env = connection.env;
     final server = HooksServer(
       host: env['ORACLE_HTTP_HOST'] ?? '127.0.0.1',
-      port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 49500,
+      port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500,
       hookToken: env['ORACLE_HOOK_TOKEN'],
       metricsEnabled: env['ORACLE_METRICS_ENABLED'] == null
           ? null
@@ -83,11 +83,20 @@ class DaemonHost extends ChangeNotifier {
         _scheduler = MaintenanceScheduler(interval: Duration(minutes: intervalMin))..start();
       }
     } on SocketException catch (e) {
-      // Another daemon (e.g. a Docker container or a console `oracle_ai`) already
-      // holds the port. Keep retrying so the Studio AUTOMATICALLY takes over the
-      // moment that process stops — no restart or manual toggle needed.
-      hooksStatus = 'porta ocupada (${e.osError?.message ?? e.message}) — '
-          'outro processo serve os hooks; assumo automaticamente quando ele sair';
+      // Two distinct failures land here:
+      //  • access denied (Win WSAEACCES 10013 / POSIX EACCES 13): the port sits in
+      //    a range the OS reserves — on Windows that's the dynamic range (>=49152,
+      //    carved up by WinNAT/Hyper-V). Retrying is futile; the user must pick a
+      //    port below 49152. Say so plainly instead of "port busy".
+      //  • in use: another daemon (Docker/console) holds it — keep retrying so the
+      //    Studio AUTOMATICALLY takes over the moment that process stops.
+      final code = e.osError?.errorCode;
+      final accessDenied = code == 10013 || code == 13;
+      hooksStatus = accessDenied
+          ? 'porta ${server.port} reservada pelo Windows — escolha uma porta abaixo '
+              'de 49152 nas configurações (a faixa dinâmica acima é reservada pelo sistema)'
+          : 'porta ${server.port} ocupada (${e.osError?.message ?? e.message}) — '
+              'outro processo serve os hooks; assumo automaticamente quando ele sair';
       _scheduleHooksRetry();
     }
   }

@@ -37,7 +37,7 @@ ORACLE_DB_PORT=5435
 ORACLE_DB_NAME=oracle_db          # default; you can omit it
 ORACLE_DB_AUTO_CREATE=true        # create the db if missing
 ORACLE_EMBEDDING_PROVIDER=local   # or gemini/openai/voyage (+ the matching *_API_KEY)
-ORACLE_HTTP_PORT=49500            # hook receiver port
+ORACLE_HTTP_PORT=47500            # hook receiver port
 ORACLE_METRICS_ENABLED=true
 ORACLE_METRICS_LABEL=oracle       # experiment tag (see §6)
 ```
@@ -180,14 +180,14 @@ per-agent MCP processes run `serve-mcp` (no hooks).
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml logs -f oracle   # "hooks HTTP on 0.0.0.0:49500"
+docker compose -f docker-compose.prod.yml logs -f oracle   # "hooks HTTP on 0.0.0.0:47500"
 ```
 
 `docker-compose.prod.yml` brings up **db** (pgvector, named volume, published port for host-native MCP) and
-**oracle** (`command: ["serve-hooks"]`, `ORACLE_HTTP_HOST=0.0.0.0`, publishes `49500`,
+**oracle** (`command: ["serve-hooks"]`, `ORACLE_HTTP_HOST=0.0.0.0`, publishes `47500`,
 `ORACLE_MAINTENANCE_INTERVAL_MINUTES=30`, `restart: unless-stopped`).
 
-- **Hooks (host):** same `install-hooks` (they point at `http://127.0.0.1:49500/hook`, now served by the daemon).
+- **Hooks (host):** same `install-hooks` (they point at `http://127.0.0.1:47500/hook`, now served by the daemon).
 - **MCP per agent** — two `.mcp.json` options:
   - **(a) Host-native binary** — connects to the published DB:
     ```jsonc

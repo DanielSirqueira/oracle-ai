@@ -41,7 +41,7 @@ services:
       ORACLE_DB_AUTO_CREATE: "false"   # the db service already created it
       # Bind 0.0.0.0 INSIDE the container so the published port is reachable.
       ORACLE_HTTP_HOST: 0.0.0.0
-      ORACLE_HTTP_PORT: "49500"
+      ORACLE_HTTP_PORT: "47500"
       # The /hook endpoint can read AND write long-term memory. Set a shared
       # secret so only callers with it can POST (required whenever the published
       # port is not strictly loopback).
@@ -57,7 +57,7 @@ services:
     ports:
       # Loopback-only by default; override ORACLE_HTTP_BIND=0.0.0.0 for LAN access
       # (and then ORACLE_HOOK_TOKEN above becomes mandatory).
-      - "${ORACLE_HTTP_BIND:-127.0.0.1}:49500:49500"   # agent hooks (host) -> this daemon
+      - "${ORACLE_HTTP_BIND:-127.0.0.1}:47500:47500"   # agent hooks (host) -> this daemon
     restart: unless-stopped
 
 volumes:

@@ -292,7 +292,7 @@ const _pt = <String, String>{
   'set.title': 'Configurações',
   'set.daemon': 'Daemon em segundo plano',
   'set.daemonExplain':
-      'Com isto ligado, o próprio Studio é o receptor de hooks em http://127.0.0.1:49500/hook — dispensa Docker e o oracle_ai.exe de console. Mantenha o Studio aberto (ele fica na bandeja) e ligue "Iniciar com o Windows" para os hooks estarem sempre no ar. Se a porta estiver ocupada por outro processo, o Studio assume automaticamente quando ele sair.',
+      'Com isto ligado, o próprio Studio é o receptor de hooks em http://127.0.0.1:47500/hook — dispensa Docker e o oracle_ai.exe de console. Mantenha o Studio aberto (ele fica na bandeja) e ligue "Iniciar com o Windows" para os hooks estarem sempre no ar. Use uma porta abaixo de 49152 (o Windows reserva a faixa dinâmica acima disso); se estiver ocupada por outro processo, o Studio assume automaticamente quando ele sair.',
   'set.hostToggle': 'Hospedar hooks + manutenção neste app',
   'set.autostart': 'Iniciar com o Windows',
   'set.autostartSub': 'Abre o Studio (na bandeja) no login — hooks e backups sempre ativos.',
@@ -644,7 +644,7 @@ const _en = <String, String>{
   'set.title': 'Settings',
   'set.daemon': 'Background daemon',
   'set.daemonExplain':
-      'When on, the Studio itself is the hook receiver at http://127.0.0.1:49500/hook — no Docker or console oracle_ai.exe needed. Keep the Studio open (it lives in the tray) and turn on "Start with Windows" so hooks are always up. If the port is held by another process, the Studio takes over automatically when it stops.',
+      'When on, the Studio itself is the hook receiver at http://127.0.0.1:47500/hook — no Docker or console oracle_ai.exe needed. Keep the Studio open (it lives in the tray) and turn on "Start with Windows" so hooks are always up. Use a port below 49152 (Windows reserves the dynamic range above that); if another process holds it, the Studio takes over automatically when it stops.',
   'set.hostToggle': 'Host hooks + maintenance in this app',
   'set.autostart': 'Start with Windows',
   'set.autostartSub': 'Opens the Studio (in the tray) at login — hooks and backups always on.',

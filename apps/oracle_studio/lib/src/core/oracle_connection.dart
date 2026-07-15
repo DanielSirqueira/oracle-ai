@@ -61,16 +61,22 @@ class OracleConnection extends ChangeNotifier {
   }
 
   /// Finds the `.env`: `ORACLE_ENV_PATH` wins; otherwise walk up from the
-  /// working directory (dev: apps/oracle_studio → repo root) and from the
-  /// executable's directory (a packaged Studio sits next to its config).
+  /// executable's directory FIRST (a packaged Studio sits next to its config),
+  /// then from the working directory as a dev fallback.
+  ///
+  /// Exe-first matters for the installed app: launching with an unrelated cwd
+  /// (a shell open in some repo, or "start with Windows") must NOT let a stray
+  /// `.env` there hijack the install's own config. In dev this still resolves to
+  /// the repo `.env` — walking up from build/.../Release reaches the repo root
+  /// too — so the order change is transparent for development.
   static String? _findEnvFile() {
     final override = Platform.environment['ORACLE_ENV_PATH'];
     if (override != null && override.trim().isNotEmpty && File(override).existsSync()) {
       return override;
     }
     for (final start in [
-      Directory.current.path,
       File(Platform.resolvedExecutable).parent.path,
+      Directory.current.path,
     ]) {
       var dir = Directory(start);
       // Deep enough to reach the repo root even from the built exe's folder

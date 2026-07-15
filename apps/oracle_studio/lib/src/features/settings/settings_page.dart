@@ -41,7 +41,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late String _provider = _env('ORACLE_EMBEDDING_PROVIDER', 'local');
   late final _apiKey = TextEditingController(text: _providerKeyValue());
   late final _httpHost = TextEditingController(text: _env('ORACLE_HTTP_HOST', '127.0.0.1'));
-  late final _httpPort = TextEditingController(text: _env('ORACLE_HTTP_PORT', '49500'));
+  late final _httpPort = TextEditingController(text: _env('ORACLE_HTTP_PORT', '47500'));
   late final _token = TextEditingController(text: _env('ORACLE_HOOK_TOKEN', ''));
   late final _maintMin =
       TextEditingController(text: _env('ORACLE_MAINTENANCE_INTERVAL_MINUTES', '30'));
@@ -171,7 +171,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final mcpSnippet = server.mcpJson(command: binPath);
     final hooksSnippet = server.hooksJson(
       host: _httpHost.text.trim(),
-      port: int.tryParse(_httpPort.text.trim()) ?? 49500,
+      port: int.tryParse(_httpPort.text.trim()) ?? 47500,
       token: _token.text.trim().isEmpty ? null : _token.text.trim(),
     );
 
