@@ -144,6 +144,15 @@ Future<void> _runForwardHook(List<String> args, Map<String, String> env) async {
   try {
     final ai = args.indexOf('--agent');
     final agent = (ai >= 0 && ai + 1 < args.length) ? args[ai + 1] : 'unknown';
+
+    // The receiver's host/port/token belong to the INSTALL, not to whatever
+    // project the agent happens to be running in — and the agent spawns us with
+    // its own cwd, which often has an unrelated `.env`. Always prefer the `.env`
+    // sitting next to this binary so the bridge targets the installed daemon.
+    final exeEnvPath =
+        '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}.env';
+    if (File(exeEnvPath).existsSync()) env = loadEnv(path: exeEnvPath);
+
     final host = env['ORACLE_HTTP_HOST'] ?? '127.0.0.1';
     final port = int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500;
     final token = env['ORACLE_HOOK_TOKEN']?.trim();
