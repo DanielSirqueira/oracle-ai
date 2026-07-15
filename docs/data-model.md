@@ -34,6 +34,33 @@ a request, not directly to a session (`Project → Session → Request → Messa
 Enumerations are enforced by `CHECK` constraints: memory `tier` ∈ {episodic, semantic, procedural}, `kind` ∈
 {decision, gotcha, rule, fact}; rule `severity` ∈ {required, recommended}; message `role`; handoff `status`.
 
+## RFC — multi-agent spec review (v2.1.0)
+
+Ten tables back the RFC deliberation engine (migration `v2.1.0/001_rfc`), following the same conventions as the
+rest of the schema: uuid PK, `timestamptz`, `vector(1024)` + `embedding_model`, generated `fts`,
+`is_latest`/`supersedes`, an owner `CHECK` across `organization_id`/`project_id`/`module_id`, and HNSW + GIN
+indexes.
+
+| Table | Purpose | Notable columns |
+|---|---|---|
+| `rfcs` | RFC header (a spec published for review) | `organization_id?`/`project_id?`/`module_id?` (owner CHECK), `title`, `rfc_type`, `status`, `current_version_id` (FK → `rfc_versions`), `author_agent`, `round_count`, `supersedes` |
+| `rfc_versions` | One consolidation round of the document | `rfc_id`, `version_no`, `summary`, `embedding`, `fts`, `is_latest`, `supersedes` |
+| `rfc_sections` | The sectioned body (the checklist) | `version_id`, `section_key`, `content`, `required`, `coverage` (missing/thin/covered), `embedding`, `fts` |
+| `rfc_comments` | A structured finding (the core) | `rfc_id`, `version_id`, `section_id?`, `type`, `severity`, `problem`, `proposed_solution`, `confidence`, `status`, `verified`, `parent_comment_id`, `embedding` (dedup/novelty), `fts` |
+| `rfc_comment_evidence` | Verifiable grounding for a finding | `comment_id`, `kind`, `ref_kind` (oracle_entity/file/external), `ref_id?` (polymorphic), `locator`, `excerpt`, `resolved` |
+| `rfc_comment_relations` | Typed argumentation graph | `from_comment`, `to_comment`, `relation`, `ground`, `reason`, `evidence` (jsonb) |
+| `rfc_comment_resolutions` | Finding resolution + audit | `comment_id`, `decision`, `ground`, `reason`, `rule_id?` |
+| `rfc_rounds` | A review round | `rfc_id`, `version_id?`, `round_no`, `participants` (text[]), `new_criticals`, `new_majors`, `novelty_score` |
+| `rfc_decisions` | Decisions (incl. product) + write-back | `rfc_id`, `question`, `chosen_option`, `rationale`, `comment_ids` (jsonb), `human_approved`, `memory_id?` (→ `memories`) |
+| `rfc_participants` | Per-(agent,role) calibration substrate | `rfc_id`, `agent`, `role`, `model`, `comments_posted`, `accepted`, `invalidated` |
+
+**Status lifecycle** (`rfcs.status` CHECK): `draft → open_for_comments → in_review ⇄ in_consolidation`, with
+`awaiting_human` (product decision / unresolved conflict) and `stalled` (budget) branches, terminating in
+`approved`/`rejected`, later `superseded`/`obsolete`. **Evidence gating:** a finding is `verified` only when it
+cites an entity that resolves (an `oracle_entity` id that exists, or a `file`+`excerpt` that matches);
+`oracle_rfc_finalize` approves only with **0 verified criticals + every required section covered**, then writes
+each decision back to `memories(kind=decision)` — closing the learning loop.
+
 ## Migrations
 
 | Version | Adds |
@@ -46,6 +73,7 @@ Enumerations are enforced by `CHECK` constraints: memory `tier` ∈ {episodic, s
 | `v1.5.0/001_search_hygiene` | `requests.embedding_model`; a stored generated `fts` column + GIN on `architectures` (was an inline per-row tsvector). |
 | `v1.6.0/001_memory_key` | `memories.key` — the same stable-key identity rules have, so an agent can supersede a memory by key. |
 | `v1.7.0/001_skills` | `skills` table (central versioned skill library) + HNSW/GIN/partial-unique indexes. |
+| `v2.1.0/001_rfc` | The 10 RFC tables (multi-agent spec review) + HNSW/GIN/partial-unique indexes; embedded migrations regenerated. |
 
 The runner records applied migrations and checksums in `_migrations`, serializes with `_migrations_lock` (an
 advisory lock with a 2-minute stale-takeover), runs each migration transactionally, and is **forward-fix**

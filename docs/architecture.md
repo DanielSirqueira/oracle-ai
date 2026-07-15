@@ -25,7 +25,7 @@ return `ResultDart<Success, Failure>` — errors are values, not exceptions, acr
 |---|---|
 | `oracle_core` | Pure-Dart base: `Database` (PostgreSQL connection pool), `SqlStatement` / `SqlValue` / `SqlVector` (pgvector), `DatabaseConfig`, DI (`injector`, `Module`), value objects (`IdVO`, `TextVO`), typed failures, and the embeddings service. Re-exports `result_dart`. |
 | `oracle_migration` | Versioned migration system ported to the project: discovers `v{semver}/{seq}_{name}/{seq}.sql`, checksums (SHA-256), an advisory lock with stale-takeover, transactional application, forward-fix. |
-| `oracle_memory` | The domain — **10 DDD feature slices**. |
+| `oracle_memory` | The domain — DDD feature slices (memory, rules, architecture, skills, capture, handoff, maintenance, metrics, **`rfc` spec review**, …). |
 | `oracle_server` | Process entrypoint, MCP server, hook receiver, recall service, maintenance scheduler, install generators. |
 
 ## Feature slices (`oracle_memory`)
@@ -41,6 +41,7 @@ return `ResultDart<Success, Failure>` — errors are values, not exceptions, acr
 | `handoff` | Continuity baton between sessions/agents (summary, open questions, next steps, files touched). |
 | `maintenance` | Deterministic sweep (decay + dedup) + lint. No LLM. |
 | `metrics` | Measurement harness: per-session token & compaction metrics, aggregated A/B by label. |
+| `rfc` | Multi-agent spec review: sectioned RFCs, structured findings, resolvable evidence, rounds (novelty), decisions, and a finalize gate that writes decisions back to memory. |
 
 ## Runtime topology
 

@@ -11,7 +11,7 @@ Deeper material that complements the top-level [README](../README.md). Organized
 ## Reference — look things up
 - [data-model.md](data-model.md) — the PostgreSQL + pgvector schema: tables, migrations, indexing, hybrid
   search, and the lifecycle model.
-- [mcp-tools.md](mcp-tools.md) — the 39 MCP tools, grouped by domain, with their arguments.
+- [mcp-tools.md](mcp-tools.md) — the MCP tools (incl. the 13 `oracle_rfc_*` spec-review tools), grouped by domain, with their arguments.
 
 ## Guides — get things done
 - [agent-integration.md](agent-integration.md) — how Oracle plugs into agent hosts (hooks + MCP), the recall

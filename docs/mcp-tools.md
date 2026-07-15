@@ -1,7 +1,8 @@
 # MCP tools (reference)
 
-> The 39 tools exposed by the MCP server (stdio). Each is wired to a use case via DI; arguments map to the use
-> case input, and the result is returned as JSON (errors carry `isError`).
+> The tools exposed by the MCP server (stdio) — including the 13 `oracle_rfc_*` review tools. Each is wired to
+> a use case via DI; arguments map to the use case input, and the result is returned as JSON (errors carry
+> `isError`).
 
 The server also advertises static MCP **`instructions`** that the client auto-injects once at connect time —
 short standing guidance on how to use these tools. For the agent-facing operating protocol, see
@@ -87,6 +88,31 @@ No per-agent folder duplication; `oracle_ai sync-skills [dir]` materializes it t
 | `oracle_skill_get` | `id?` \| `key?`, `projectId?`, `productId?` | Full content. A key resolves project → product → global (override). Bumps usage. |
 | `oracle_skill_list` | `projectId?`, `productId?`, `limit?` | Inventory (global + scoped), name+description only. |
 | `oracle_skill_retire` | `id`, `reason?`, `hard?` | Soft retire (audit) or hard delete. |
+
+## RFC — multi-agent spec review
+
+Publish a technical spec as a **sectioned RFC**, gather structured, evidence-grounded findings from several
+agents, consolidate into versions, and gate completion on verified blockers + required-section coverage. The
+value order is: verifiable evidence > checklist coverage > model diversity > debate rounds. `oracle_rfc_get`
+returns a `grounding` block (applicable project rules + prior decisions, by id) so reviewers cite REAL Oracle
+entities instead of hallucinating; an unverified critical never gates completion. See
+[data-model.md](data-model.md) §RFC for the tables.
+
+| Tool | Args | Description |
+|---|---|---|
+| `oracle_rfc_open` | `title`, `sections`, `organizationId?`, `projectId?`, `moduleId?`, `rfcType?`, `summary?`, `authorAgent?` | Publish a sectioned spec for review (opens `open_for_comments`). Each `sections[]` = `{key, content, required?, coverage?}`. |
+| `oracle_rfc_list_open` | `organizationId?`, `projectId?`, `moduleId?`, `limit?` | Discover RFCs still open for review (`open_for_comments`/`in_review`), scope union, most specific first. |
+| `oracle_rfc_get` | `id` | RFC bundle: header + latest version + sections + open findings + a **`grounding`** block (rules + prior decisions, by id). |
+| `oracle_rfc_comment` | `rfcId`, `versionId`, `problem`, `sectionId?`, `type?`, `severity?`, `proposedSolution?`, `reviewerRole?`, `area?`, `anchorQuote?`, `rationale?`, `impact?`, `confidence?`, `roundNo?`, `authorAgent?` | Post a STRUCTURED finding. `gap`/`inconsistency`/`bug`/`blocker` require a `proposedSolution`; near-duplicates auto-demoted. |
+| `oracle_rfc_evidence_add` | `commentId`, `kind`, `refKind?`, `refId?`, `locator?`, `excerpt?` | Ground a finding: an `oracle_entity` id must EXIST, or a `file` must exist + contain the `excerpt`, to resolve → verifies the comment. |
+| `oracle_rfc_relate` | `fromComment`, `toComment`, `relation`, `ground?`, `reason?` | Typed contestation (`supports`/`refutes`/`duplicates`/`supersedes`/`refines`/`depends_on`). |
+| `oracle_rfc_resolve` | `commentId`, `decision`, `ground?`, `reason?`, `ruleId?`, `resolverAgent?` | Resolve a finding (`accepted`/`rejected`/`deferred`/`duplicate`); sets the comment status. |
+| `oracle_rfc_round_start` | `rfcId`, `versionId?`, `roundNo?`, `participants?` | Start a review round (`roundNo` 0 = auto-next). |
+| `oracle_rfc_round_close` | `rfcId`, `roundNo` | Close a round: computes `novelty_score` + new critical/major tallies. |
+| `oracle_rfc_revise` | `rfcId`, `versionNo`, `sections`, `summary?`, `authorAgent?` | Consolidate a new version (retires the prior, bumps the round). |
+| `oracle_rfc_decide` | `rfcId`, `question`, `chosenOption?`, `rationale?`, `commentIds?`, `humanApproved?` | Record a decision; `humanApproved` is the gate for product calls. |
+| `oracle_rfc_status` | `rfcId` | Readiness snapshot: `blockingCriticals` (verified), `openMajors`, required coverage, `checklistComplete`. |
+| `oracle_rfc_finalize` | `rfcId` | Approve when ready (0 verified criticals + required covered), else park in `awaiting_human`; writes decisions back to memory. |
 
 ## Measurement
 

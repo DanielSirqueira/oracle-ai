@@ -149,6 +149,22 @@ register a submodule as its own project.
   (`summary`, `openQuestions`, `nextSteps`, `filesTouched`) so the next session continues without
   re-explaining.
 
+## Specs & reviews (RFCs)
+Before implementing a non-trivial spec — or when asked to review one — use the RFC flow: a structured,
+evidence-grounded review that hardens a spec before any code is written.
+- Author: publish the spec as a SECTIONED RFC with `oracle_rfc_open` (mark the sections your rfc_type
+  requires + their coverage). It opens for review.
+- Review: find open RFCs with `oracle_rfc_list_open`; read one with `oracle_rfc_get` — it returns the RFC
+  PLUS a `grounding` block (project rules + prior decisions, each with an id). Post STRUCTURED findings with
+  `oracle_rfc_comment` (a gap/inconsistency/bug/blocker MUST carry a proposedSolution). GROUND every finding
+  with `oracle_rfc_evidence_add`, citing a real rule/memory/architecture id (from the grounding block) or a
+  file+excerpt — an unverified finding does NOT gate completion, so never post hallucinated blockers.
+- Contest / settle: `oracle_rfc_relate` (supports|refutes|…), `oracle_rfc_resolve` (accept/reject a finding).
+- Consolidate: `oracle_rfc_revise` publishes a new version; `oracle_rfc_round_start`/`oracle_rfc_round_close`
+  bracket a round. Record decisions with `oracle_rfc_decide` (`humanApproved` is the gate for product calls).
+- Finalize: `oracle_rfc_status` shows readiness; `oracle_rfc_finalize` approves ONLY when no verified critical
+  is open and every required section is covered, and writes the decisions back to memory.
+
 ## Tool cheat-sheet (intent -> tool)
 - Map cwd -> a stable projectId ............ `oracle_project_resolve`
 - Map a subpath -> a moduleId .............. `oracle_module_resolve` (list: `oracle_module_list`)
@@ -162,6 +178,10 @@ register a submodule as its own project.
 - Hand off open work to the next session ... `oracle_handoff_begin`
 - Pick up the previous session's handoff ... `oracle_handoff_pending` / `oracle_handoff_accept`
 - Forget wrong / obsolete memory ........... `oracle_memory_forget`
+- Publish a spec for multi-agent review .... `oracle_rfc_open`
+- Discover / read an open RFC .............. `oracle_rfc_list_open` / `oracle_rfc_get`
+- Post a grounded review finding .......... `oracle_rfc_comment` + `oracle_rfc_evidence_add`
+- Consolidate / finalize an RFC ........... `oracle_rfc_revise` / `oracle_rfc_finalize`
 ''';
 
 // ─────────────────────────────────────────────────────────────────────────────
