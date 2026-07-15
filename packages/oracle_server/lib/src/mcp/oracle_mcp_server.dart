@@ -1322,8 +1322,11 @@ Capture is automatic — hooks record the session, each user request, and your w
 
     server.tool(
       'oracle_rfc_get',
-      description: 'Get an RFC bundle: header + latest version + its sections + open findings. Read '
-          'this before reviewing so you comment against the current version and section ids.',
+      description: 'Get an RFC bundle for review: header + latest version + its sections + open '
+          'findings, PLUS a `grounding` block — project rules and prior decisions relevant to the '
+          'RFC content, each with its id — so your findings cite REAL Oracle entities as evidence '
+          '(oracle_rfc_evidence_add) instead of guessing. Read this before reviewing so you comment '
+          'against the current version and section ids.',
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'id': {'type': 'string'}
@@ -1333,7 +1336,11 @@ Capture is automatic — hooks record the session, each user request, and your w
       callback: ({args, extra}) async {
         final a = args ?? const {};
         final result = await injector.get<GetRfcUsecase>()(IdVO('${a['id'] ?? ''}'));
-        return result.fold((b) => _ok(_rfcBundleJson(b)), _err);
+        if (result.isError()) return _err(result.exceptionOrNull()!);
+        final bundle = result.getOrThrow();
+        final json = _rfcBundleJson(bundle);
+        json['grounding'] = await _rfcGrounding(bundle);
+        return _ok(json);
       },
     );
 
@@ -2165,6 +2172,62 @@ Capture is automatic — hooks record the session, each user request, and your w
         'sections': b.sections.map(_rfcSectionJson).toList(),
         'comments': b.comments.map(_rfcCommentJson).toList(),
       };
+
+  /// Retrieval grounding for a reviewer: project rules and prior decisions
+  /// relevant to the RFC content, each with its id, so findings can cite real
+  /// entities as evidence instead of hallucinating. Best-effort — a failed or
+  /// empty search degrades to empty lists and never fails the get.
+  static Future<Map<String, dynamic>> _rfcGrounding(RfcBundle b) async {
+    final rfc = b.rfc;
+    // Concise retrieval signal — title + summary. The semantic leg (query
+    // embedding vs stored rule/memory vectors) carries relevance; a longer query
+    // would only over-constrain the lexical AND leg.
+    final query = [rfc.title.value, b.version?.summary.value ?? '']
+        .where((s) => s.trim().isNotEmpty)
+        .join('\n');
+    final rules = <Map<String, dynamic>>[];
+    final decisions = <Map<String, dynamic>>[];
+    if (query.trim().isEmpty) return {'rules': rules, 'decisions': decisions};
+    try {
+      final r = await injector.get<SearchRulesUsecase>()(RuleSearchFilter(
+        query: query,
+        organizationId: rfc.organizationId,
+        projectId: rfc.projectId,
+        moduleId: rfc.moduleId,
+        limit: 8,
+      ));
+      r.fold((list) {
+        for (final e in list) {
+          rules.add({
+            'id': e.rule.id.value,
+            'title': e.rule.title.value,
+            'severity': e.rule.severity.code,
+            'snippet': _snippet(e.rule.content.value, 300),
+          });
+        }
+      }, (_) {});
+    } catch (_) {/* grounding is best-effort */}
+    try {
+      final m = await injector.get<SearchMemoriesUsecase>()(MemorySearchFilter(
+        query: query,
+        organizationId: rfc.organizationId,
+        projectId: rfc.projectId,
+        moduleId: rfc.moduleId,
+        kinds: const [MemoryKind.decision],
+        limit: 5,
+      ));
+      m.fold((list) {
+        for (final e in list) {
+          decisions.add({
+            'id': e.memory.id.value,
+            'title': e.memory.title.value,
+            'snippet': _snippet(e.memory.body.value, 300),
+          });
+        }
+      }, (_) {});
+    } catch (_) {/* best-effort */}
+    return {'rules': rules, 'decisions': decisions};
+  }
 
   static Map<String, dynamic> _rfcEvidenceJson(RfcEvidenceEntity e) => {
         'id': e.id.value,
