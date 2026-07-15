@@ -17,6 +17,7 @@ class DaemonHost extends ChangeNotifier {
   HooksServer? _hooks;
   MaintenanceScheduler? _scheduler;
   Timer? _backupTimer;
+  Timer? _hooksRetry;
 
   bool get hooksRunning => _hooks != null;
   String hooksStatus = 'desligado';
@@ -47,6 +48,8 @@ class DaemonHost extends ChangeNotifier {
 
   Future<void> _applyHooks() async {
     if (!settings.hostHooks || connection.status != OracleConnectionStatus.connected) {
+      _hooksRetry?.cancel();
+      _hooksRetry = null;
       await _hooks?.stop();
       _hooks = null;
       _scheduler?.stop();
@@ -69,6 +72,8 @@ class DaemonHost extends ChangeNotifier {
     try {
       await server.start();
       _hooks = server;
+      _hooksRetry?.cancel(); // bound — stop retrying
+      _hooksRetry = null;
       hooksStatus = 'ativo em ${server.host}:${server.port}';
       // The maintenance scheduler belongs to whoever owns the hooks (one place,
       // no per-agent duplication) — same rule the console daemon followed.
@@ -78,10 +83,29 @@ class DaemonHost extends ChangeNotifier {
         _scheduler = MaintenanceScheduler(interval: Duration(minutes: intervalMin))..start();
       }
     } on SocketException catch (e) {
-      hooksStatus =
-          'porta ocupada (${e.osError?.message ?? e.message}) — outro daemon já serve os hooks; '
-          'encerre o oracle_ai.exe de console para o Studio assumir';
+      // Another daemon (e.g. a Docker container or a console `oracle_ai`) already
+      // holds the port. Keep retrying so the Studio AUTOMATICALLY takes over the
+      // moment that process stops — no restart or manual toggle needed.
+      hooksStatus = 'porta ocupada (${e.osError?.message ?? e.message}) — '
+          'outro processo serve os hooks; assumo automaticamente quando ele sair';
+      _scheduleHooksRetry();
     }
+  }
+
+  /// While hosting is enabled but the port is busy, re-attempt binding every few
+  /// seconds so the Studio self-heals into the hook receiver when the port frees.
+  void _scheduleHooksRetry() {
+    _hooksRetry ??= Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (_hooks != null ||
+          !settings.hostHooks ||
+          connection.status != OracleConnectionStatus.connected) {
+        _hooksRetry?.cancel();
+        _hooksRetry = null;
+        return;
+      }
+      await _applyHooks();
+      notifyListeners();
+    });
   }
 
   void _applyBackupTimer() {
@@ -137,6 +161,7 @@ class DaemonHost extends ChangeNotifier {
 
   Future<void> shutdown() async {
     _backupTimer?.cancel();
+    _hooksRetry?.cancel();
     _scheduler?.stop();
     await _hooks?.stop();
   }
