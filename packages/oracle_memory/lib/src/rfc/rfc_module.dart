@@ -7,6 +7,7 @@ import 'domain/usecases/close_round_usecase.dart';
 import 'domain/usecases/finalize_rfc_usecase.dart';
 import 'domain/usecases/get_rfc_usecase.dart';
 import 'domain/usecases/list_open_rfcs_usecase.dart';
+import 'domain/usecases/list_rfcs_usecase.dart';
 import 'domain/usecases/open_rfc_usecase.dart';
 import 'domain/usecases/record_decision_usecase.dart';
 import 'domain/usecases/relate_comments_usecase.dart';
@@ -29,6 +30,7 @@ class RfcModule extends Module {
       ..addLazySingleton<OpenRfcUsecase>(OpenRfcUsecaseImpl.new)
       ..addLazySingleton<GetRfcUsecase>(GetRfcUsecaseImpl.new)
       ..addLazySingleton<ListOpenRfcsUsecase>(ListOpenRfcsUsecaseImpl.new)
+      ..addLazySingleton<ListRfcsUsecase>(ListRfcsUsecaseImpl.new)
       ..addLazySingleton<AddCommentUsecase>(AddCommentUsecaseImpl.new)
       ..addLazySingleton<AddEvidenceUsecase>(AddEvidenceUsecaseImpl.new)
       ..addLazySingleton<ReviseRfcUsecase>(ReviseRfcUsecaseImpl.new)

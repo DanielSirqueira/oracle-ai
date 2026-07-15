@@ -40,6 +40,15 @@ abstract interface class RfcRepository {
     int limit,
   });
 
+  /// All RFCs in scope regardless of status (for management/console views),
+  /// most specific scope first, newest first. Same scope union as [listOpenRfcs].
+  AsyncResultDart<List<RfcEntity>, RfcFailure> listRfcs({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    int limit,
+  });
+
   /// Appends a structured finding to an RFC. Returns it with id/timestamps.
   AsyncResultDart<RfcCommentEntity, RfcFailure> addComment(RfcCommentEntity comment);
 

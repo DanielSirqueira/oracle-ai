@@ -63,6 +63,25 @@ class RfcRepositoryImpl implements RfcRepository {
   }
 
   @override
+  AsyncResultDart<List<RfcEntity>, RfcFailure> listRfcs({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    int limit = 100,
+  }) async {
+    try {
+      return Success(await _datasource.listRfcs(
+        organizationId: organizationId,
+        projectId: projectId,
+        moduleId: moduleId,
+        limit: limit,
+      ));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
   AsyncResultDart<RfcCommentEntity, RfcFailure> addComment(RfcCommentEntity comment) async {
     try {
       return Success(await _datasource.addComment(comment));

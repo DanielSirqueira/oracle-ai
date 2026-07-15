@@ -86,6 +86,7 @@ export 'src/rfc/domain/usecases/close_round_usecase.dart';
 export 'src/rfc/domain/usecases/finalize_rfc_usecase.dart';
 export 'src/rfc/domain/usecases/get_rfc_usecase.dart';
 export 'src/rfc/domain/usecases/list_open_rfcs_usecase.dart';
+export 'src/rfc/domain/usecases/list_rfcs_usecase.dart';
 export 'src/rfc/domain/usecases/open_rfc_usecase.dart';
 export 'src/rfc/domain/usecases/record_decision_usecase.dart';
 export 'src/rfc/domain/usecases/relate_comments_usecase.dart';

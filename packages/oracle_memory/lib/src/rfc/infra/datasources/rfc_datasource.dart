@@ -36,6 +36,14 @@ abstract interface class RfcDatasource {
     int? limit,
   });
 
+  /// All RFCs in scope regardless of status, scope union, most-specific first.
+  Future<List<RfcEntity>> listRfcs({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    int? limit,
+  });
+
   Future<RfcCommentEntity> addComment(RfcCommentEntity comment);
 
   /// Attaches evidence to a finding, resolving an `oracle_entity` reference

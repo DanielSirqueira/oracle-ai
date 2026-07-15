@@ -236,6 +236,41 @@ class DatabaseRfcDatasource implements RfcDatasource {
   }
 
   @override
+  Future<List<RfcEntity>> listRfcs({
+    IdVO? organizationId,
+    IdVO? projectId,
+    IdVO? moduleId,
+    int? limit,
+  }) async {
+    try {
+      final params = <String, Object?>{'lim': limit ?? 100};
+      final owners = <String>[];
+      if (moduleId != null) {
+        owners.add('module_id = :mid::uuid');
+        params['mid'] = moduleId.value;
+      }
+      if (projectId != null) {
+        owners.add('project_id = :pid::uuid');
+        params['pid'] = projectId.value;
+      }
+      if (organizationId != null) {
+        owners.add('organization_id = :prodid::uuid');
+        params['prodid'] = organizationId.value;
+      }
+      final where = owners.isEmpty ? '' : 'WHERE (${owners.join(' OR ')}) ';
+      final result = await _database.select(SqlStatement(
+        'SELECT $_rfcColumns FROM rfcs $where'
+        'ORDER BY (module_id IS NOT NULL) DESC, (project_id IS NOT NULL) DESC, '
+        'updated_at DESC LIMIT :lim',
+        params,
+      ));
+      return result.rows.map(DatabaseRfcMapper.fromRow).toList();
+    } on DatabaseFailure catch (error) {
+      throw DatasourceRfcFailure(errorMessage: error.errorMessage, stackTrace: StackTrace.current);
+    }
+  }
+
+  @override
   Future<RfcCommentEntity> addComment(RfcCommentEntity comment) async {
     try {
       final result = await _database.executeUpdate(SqlStatement(
