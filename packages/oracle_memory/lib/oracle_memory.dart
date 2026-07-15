@@ -62,6 +62,37 @@ export 'src/memory/external/datasources/database/database_memory_datasource.dart
 export 'src/memory/external/mappers/database/database_memory_mapper.dart';
 export 'src/memory/memory_module.dart';
 
+// --- rfc ---
+export 'src/rfc/domain/dtos/rfc_bundle.dart';
+export 'src/rfc/domain/dtos/rfc_comment_neighbor.dart';
+export 'src/rfc/domain/dtos/rfc_status_report.dart';
+export 'src/rfc/domain/entities/rfc_comment_entity.dart';
+export 'src/rfc/domain/entities/rfc_entity.dart';
+export 'src/rfc/domain/entities/rfc_evidence_entity.dart';
+export 'src/rfc/domain/entities/rfc_section_entity.dart';
+export 'src/rfc/domain/entities/rfc_version_entity.dart';
+export 'src/rfc/domain/enums/rfc_comment_type.dart';
+export 'src/rfc/domain/enums/rfc_severity.dart';
+export 'src/rfc/domain/enums/rfc_status.dart';
+export 'src/rfc/domain/errors/rfc_failure.dart';
+export 'src/rfc/domain/repositories/rfc_repository.dart';
+export 'src/rfc/domain/usecases/add_comment_usecase.dart';
+export 'src/rfc/domain/usecases/add_evidence_usecase.dart';
+export 'src/rfc/domain/usecases/get_rfc_usecase.dart';
+export 'src/rfc/domain/usecases/list_open_rfcs_usecase.dart';
+export 'src/rfc/domain/usecases/open_rfc_usecase.dart';
+export 'src/rfc/domain/usecases/revise_rfc_usecase.dart';
+export 'src/rfc/domain/usecases/rfc_status_usecase.dart';
+export 'src/rfc/infra/datasources/rfc_datasource.dart';
+export 'src/rfc/infra/repositories/rfc_repository_impl.dart';
+export 'src/rfc/external/datasources/database/database_rfc_datasource.dart';
+export 'src/rfc/external/mappers/database/database_rfc_comment_mapper.dart';
+export 'src/rfc/external/mappers/database/database_rfc_evidence_mapper.dart';
+export 'src/rfc/external/mappers/database/database_rfc_mapper.dart';
+export 'src/rfc/external/mappers/database/database_rfc_section_mapper.dart';
+export 'src/rfc/external/mappers/database/database_rfc_version_mapper.dart';
+export 'src/rfc/rfc_module.dart';
+
 // --- rule ---
 export 'src/rule/domain/dtos/filters/rule_search_filter.dart';
 export 'src/rule/domain/dtos/rule_neighbor.dart';

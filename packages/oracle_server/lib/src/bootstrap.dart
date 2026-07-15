@@ -163,6 +163,7 @@ class Bootstrap {
       RuleModule(),
       SkillModule(),
       MemoryModule(),
+      RfcModule(),
       CaptureModule(),
       HandoffModule(),
       MaintenanceModule(),

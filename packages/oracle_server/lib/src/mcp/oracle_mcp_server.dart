@@ -39,6 +39,13 @@ re-derive, record durable learnings as you go.
   task context; load the winner with `oracle_skill_get` (searches return name+description only — cheap).
   Save reusable know-how with `oracle_skill_save` (stable kebab-case key; omit project/organization for a
   global skill; re-saving the same key updates it).
+- RFCs (spec review): before implementing a non-trivial spec, publish it with `oracle_rfc_open` (a SECTIONED
+  body: mark required sections + coverage). Reviewing agents find open RFCs with `oracle_rfc_list_open`, read
+  with `oracle_rfc_get`, and post STRUCTURED findings with `oracle_rfc_comment` — each grounded (a
+  gap/bug/blocker needs a proposedSolution). Back a finding with `oracle_rfc_evidence_add` — evidence must
+  RESOLVE to a real entity (a cited rule/memory/architecture/rfc by id) to verify it; unverified criticals
+  don't gate completion. Consolidate a round with `oracle_rfc_revise`; check readiness
+  with `oracle_rfc_status` (0 open criticals + required sections covered are necessary, not sufficient).
 - At the end of a task / before context compaction, write a handoff with `oracle_handoff_begin`.
 - Keep memory healthy: retire/forget what is wrong or obsolete. Bad memory is worse than none.
 Capture is automatic — hooks record the session, each user request, and your work (messages) as
@@ -1220,6 +1227,281 @@ Capture is automatic — hooks record the session, each user request, and your w
         return result.fold((list) => _ok(list.map(_sessionMetricJson).toList()), _err);
       },
     );
+
+    // --- rfc (multi-agent spec review) ---
+    server.tool(
+      'oracle_rfc_open',
+      description: 'Open an RFC (Request for Comments) — publish a technical spec for multi-agent '
+          'review. Provide the SECTIONED body: each sections[] entry is a checklist section '
+          '(context, problem, business_rules, data_model, acceptance_criteria, ...). Mark the '
+          'sections your rfc_type requires with required=true and set coverage (missing|thin|covered) '
+          'so completion can be gated. Anchors on organization/project/module like memories.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'projectId': {'type': 'string'},
+          'organizationId': {'type': 'string'},
+          'moduleId': {'type': 'string'},
+          'title': {'type': 'string'},
+          'rfcType': {
+            'type': 'string',
+            'description': 'Checklist profile: backend|frontend|fullstack|data|infra|generic'
+          },
+          'authorAgent': {
+            'type': 'string',
+            'description': "Author agent id (e.g. 'claude-code', 'codex'). Default claude-code."
+          },
+          'summary': {'type': 'string', 'description': 'Executive summary of v1 (embedded for recall).'},
+          'sections': {
+            'type': 'array',
+            'description': 'Sectioned body. Each item: {key, content, required?, coverage?}. '
+                'coverage = missing|thin|covered.',
+            'items': {
+              'type': 'object',
+              'properties': {
+                'key': {'type': 'string'},
+                'content': {'type': 'string'},
+                'required': {'type': 'boolean'},
+                'coverage': {'type': 'string'},
+              },
+            },
+          },
+        },
+        required: ['title', 'sections'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final author = '${a['authorAgent'] ?? 'claude-code'}';
+        final rfc = RfcEntity(
+          id: const IdVO.empty(),
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
+          title: TextVO('${a['title'] ?? ''}'),
+          rfcType: '${a['rfcType'] ?? 'generic'}',
+          authorAgent: author,
+        );
+        final version = RfcVersionEntity(
+          id: const IdVO.empty(),
+          rfcId: const IdVO.empty(),
+          versionNo: 1,
+          summary: TextVO('${a['summary'] ?? ''}'),
+          authorAgent: author,
+        );
+        final result = await injector.get<OpenRfcUsecase>()(rfc, version, _rfcSectionsArg(a['sections']));
+        return result.fold((r) => _ok(_rfcJson(r)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_list_open',
+      description: 'List RFCs still open for review (open_for_comments | in_review) in scope — how a '
+          'reviewing agent discovers what to review. A module scope also surfaces its project and '
+          'organization RFCs (most specific first).',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'organizationId': {'type': 'string'},
+          'projectId': {'type': 'string'},
+          'moduleId': {'type': 'string'},
+          'limit': {'type': 'integer', 'description': 'Default 50, max 200'},
+        },
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<ListOpenRfcsUsecase>()(
+          organizationId: a['organizationId'] == null ? null : IdVO('${a['organizationId']}'),
+          projectId: a['projectId'] == null ? null : IdVO('${a['projectId']}'),
+          moduleId: a['moduleId'] == null ? null : IdVO('${a['moduleId']}'),
+          limit: _clampLimit(a['limit'], fallback: 50, max: 200),
+        );
+        return result.fold((list) => _ok(list.map(_rfcJson).toList()), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_get',
+      description: 'Get an RFC bundle: header + latest version + its sections + open findings. Read '
+          'this before reviewing so you comment against the current version and section ids.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'id': {'type': 'string'}
+        },
+        required: ['id'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<GetRfcUsecase>()(IdVO('${a['id'] ?? ''}'));
+        return result.fold((b) => _ok(_rfcBundleJson(b)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_comment',
+      description: 'Post a structured technical finding on an RFC — NOT chat. A finding must name the '
+          'problem; gap/inconsistency/bug/blocker findings must also carry a proposedSolution. '
+          'Anchor it to a section (sectionId) when possible. Near-duplicate findings on the same RFC '
+          'are auto-demoted to status=duplicate and linked to the original.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'rfcId': {'type': 'string'},
+          'versionId': {'type': 'string'},
+          'sectionId': {
+            'type': 'string',
+            'description': 'Section this finding anchors to (strong anchor).'
+          },
+          'authorAgent': {'type': 'string'},
+          'reviewerRole': {
+            'type': 'string',
+            'description': 'architect|dba|security|backend|frontend|ux|infra|qa|domain|critic|consolidator'
+          },
+          'type': {
+            'type': 'string',
+            'description': 'gap|inconsistency|risk|bug|question|improvement|blocker|nit'
+          },
+          'severity': {'type': 'string', 'description': 'critical|major|minor|info'},
+          'area': {'type': 'string'},
+          'anchorQuote': {'type': 'string', 'description': 'Quoted excerpt of the section this refers to.'},
+          'problem': {'type': 'string'},
+          'rationale': {'type': 'string'},
+          'impact': {'type': 'string'},
+          'proposedSolution': {
+            'type': 'string',
+            'description': 'Required for gap/inconsistency/bug/blocker findings.'
+          },
+          'confidence': {'type': 'number', 'description': '0..1 self-declared confidence.'},
+          'roundNo': {'type': 'integer'},
+        },
+        required: ['rfcId', 'versionId', 'problem'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final comment = RfcCommentEntity(
+          id: const IdVO.empty(),
+          rfcId: IdVO('${a['rfcId'] ?? ''}'),
+          versionId: IdVO('${a['versionId'] ?? ''}'),
+          sectionId: a['sectionId'] == null ? null : IdVO('${a['sectionId']}'),
+          authorAgent: '${a['authorAgent'] ?? 'claude-code'}',
+          reviewerRole: a['reviewerRole']?.toString(),
+          type: RfcCommentType.parse('${a['type'] ?? 'improvement'}'),
+          severity: RfcSeverity.parse('${a['severity'] ?? 'info'}'),
+          area: a['area']?.toString(),
+          anchorQuote: a['anchorQuote']?.toString(),
+          problem: TextVO('${a['problem'] ?? ''}'),
+          rationale: TextVO('${a['rationale'] ?? ''}'),
+          impact: TextVO('${a['impact'] ?? ''}'),
+          proposedSolution: TextVO('${a['proposedSolution'] ?? ''}'),
+          confidence: (a['confidence'] as num?)?.toDouble() ?? 0.5,
+          roundNo: (a['roundNo'] as num?)?.toInt() ?? 0,
+        );
+        final result = await injector.get<AddCommentUsecase>()(comment);
+        return result.fold((c) => _ok(_rfcCommentJson(c)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_evidence_add',
+      description: 'Attach verifiable evidence to a finding — the anti-hallucination core. An '
+          'oracle_entity reference (a cited rule/memory/decision/architecture/prior_rfc by refId) '
+          'must EXIST in the Oracle or `resolved` stays false and the finding is NOT verified — an '
+          'unverified critical does not gate completion. file/external references are recorded but '
+          'not resolved in this pass. Resolving evidence flips the comment to verified.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'commentId': {'type': 'string'},
+          'kind': {
+            'type': 'string',
+            'description': 'rule|memory|decision|architecture|code|api_contract|test|log|data_model|'
+                'diagram|business_req|prior_rfc'
+          },
+          'refKind': {
+            'type': 'string',
+            'description': 'oracle_entity|file|external (default oracle_entity)'
+          },
+          'refId': {
+            'type': 'string',
+            'description': 'Id of the cited rule/memory/architecture/rfc when refKind=oracle_entity. '
+                'Must resolve to a real entity or the evidence stays unresolved.'
+          },
+          'locator': {'type': 'string', 'description': 'path:lines or URI for file/external.'},
+          'excerpt': {'type': 'string', 'description': 'Literal quoted text.'},
+        },
+        required: ['commentId', 'kind'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final evidence = RfcEvidenceEntity(
+          id: const IdVO.empty(),
+          commentId: IdVO('${a['commentId'] ?? ''}'),
+          kind: '${a['kind'] ?? ''}',
+          refKind: '${a['refKind'] ?? 'oracle_entity'}',
+          refId: a['refId'] == null ? null : IdVO('${a['refId']}'),
+          locator: a['locator']?.toString(),
+          excerpt: a['excerpt']?.toString(),
+        );
+        final result = await injector.get<AddEvidenceUsecase>()(evidence);
+        return result.fold((e) => _ok(_rfcEvidenceJson(e)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_revise',
+      description: 'Consolidate a new RFC version (one review round). Supply the RFC id, the new '
+          'versionNo, an updated summary and the FULL sectioned body — accepted findings folded in, '
+          'invalidated ones removed. Retires the prior version and bumps the round.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'rfcId': {'type': 'string'},
+          'versionNo': {'type': 'integer'},
+          'summary': {'type': 'string'},
+          'authorAgent': {'type': 'string'},
+          'sections': {
+            'type': 'array',
+            'description': 'Full sectioned body of the new version. Each: {key, content, required?, coverage?}.',
+            'items': {
+              'type': 'object',
+              'properties': {
+                'key': {'type': 'string'},
+                'content': {'type': 'string'},
+                'required': {'type': 'boolean'},
+                'coverage': {'type': 'string'},
+              },
+            },
+          },
+        },
+        required: ['rfcId', 'versionNo', 'sections'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final version = RfcVersionEntity(
+          id: const IdVO.empty(),
+          rfcId: IdVO('${a['rfcId'] ?? ''}'),
+          versionNo: (a['versionNo'] as num?)?.toInt() ?? 1,
+          summary: TextVO('${a['summary'] ?? ''}'),
+          authorAgent: '${a['authorAgent'] ?? 'claude-code'}',
+        );
+        final result =
+            await injector.get<ReviseRfcUsecase>()(version, _rfcSectionsArg(a['sections']));
+        return result.fold((v) => _ok(_rfcVersionJson(v)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_status',
+      description: 'Completion snapshot of an RFC: open critical/major findings and required-section '
+          'coverage of the current version. 0 open criticals + checklist covered are NECESSARY '
+          '(not sufficient) to move toward approval — the full review loop also needs novelty to '
+          'settle and product decisions to be human-approved.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'rfcId': {'type': 'string'}
+        },
+        required: ['rfcId'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<RfcStatusUsecase>()(IdVO('${a['rfcId'] ?? ''}'));
+        return result.fold((s) => _ok(_rfcStatusJson(s)), _err);
+      },
+    );
   }
 
   // ── helpers ──
@@ -1586,5 +1868,112 @@ Capture is automatic — hooks record the session, each user request, and your w
         'content': _snippet(m.content.value, 600),
         'tokenCount': m.tokenCount,
         'createdAt': m.createdAt?.toIso8601String(),
+      };
+
+  // ── rfc ──
+
+  /// Parses the tool's `sections` array (list of {key, content, required?,
+  /// coverage?}) into section entities. Ids/versionId are wired by the datasource.
+  static List<RfcSectionEntity> _rfcSectionsArg(Object? raw) {
+    if (raw is! List) return const [];
+    return raw.whereType<Map<String, dynamic>>().map((s) {
+      return RfcSectionEntity(
+        id: const IdVO.empty(),
+        versionId: const IdVO.empty(),
+        sectionKey: '${s['key'] ?? ''}',
+        content: TextVO('${s['content'] ?? ''}'),
+        required: s['required'] == true,
+        coverage: '${s['coverage'] ?? 'missing'}',
+      );
+    }).toList();
+  }
+
+  static Map<String, dynamic> _rfcJson(RfcEntity r) => {
+        'id': r.id.value,
+        'organizationId': r.organizationId?.value,
+        'projectId': r.projectId?.value,
+        'moduleId': r.moduleId?.value,
+        'title': r.title.value,
+        'rfcType': r.rfcType,
+        'status': r.status.code,
+        'currentVersionId': r.currentVersionId?.value,
+        'authorAgent': r.authorAgent,
+        'roundCount': r.roundCount,
+        'supersedes': r.supersedes?.value,
+        'createdAt': r.createdAt?.toIso8601String(),
+        'updatedAt': r.updatedAt?.toIso8601String(),
+      };
+
+  static Map<String, dynamic> _rfcVersionJson(RfcVersionEntity v) => {
+        'id': v.id.value,
+        'rfcId': v.rfcId.value,
+        'versionNo': v.versionNo,
+        'summary': v.summary.value,
+        'isLatest': v.isLatest,
+        'supersedes': v.supersedes?.value,
+        'authorAgent': v.authorAgent,
+        'createdAt': v.createdAt?.toIso8601String(),
+      };
+
+  static Map<String, dynamic> _rfcSectionJson(RfcSectionEntity s) => {
+        'id': s.id.value,
+        'versionId': s.versionId.value,
+        'key': s.sectionKey,
+        'content': s.content.value,
+        'required': s.required,
+        'coverage': s.coverage,
+      };
+
+  static Map<String, dynamic> _rfcCommentJson(RfcCommentEntity c) => {
+        'id': c.id.value,
+        'rfcId': c.rfcId.value,
+        'versionId': c.versionId.value,
+        'sectionId': c.sectionId?.value,
+        'authorAgent': c.authorAgent,
+        'reviewerRole': c.reviewerRole,
+        'type': c.type.code,
+        'severity': c.severity.code,
+        'area': c.area,
+        'anchorQuote': c.anchorQuote,
+        'problem': c.problem.value,
+        'rationale': c.rationale.value,
+        'impact': c.impact.value,
+        'proposedSolution': c.proposedSolution.value,
+        'confidence': c.confidence,
+        'status': c.status,
+        'parentCommentId': c.parentCommentId?.value,
+        'verified': c.verified,
+        'roundNo': c.roundNo,
+        'createdAt': c.createdAt?.toIso8601String(),
+      };
+
+  static Map<String, dynamic> _rfcBundleJson(RfcBundle b) => {
+        'rfc': _rfcJson(b.rfc),
+        'version': b.version == null ? null : _rfcVersionJson(b.version!),
+        'sections': b.sections.map(_rfcSectionJson).toList(),
+        'comments': b.comments.map(_rfcCommentJson).toList(),
+      };
+
+  static Map<String, dynamic> _rfcEvidenceJson(RfcEvidenceEntity e) => {
+        'id': e.id.value,
+        'commentId': e.commentId.value,
+        'kind': e.kind,
+        'refKind': e.refKind,
+        'refId': e.refId?.value,
+        'locator': e.locator,
+        'excerpt': e.excerpt,
+        'resolved': e.resolved,
+        'resolvedAt': e.resolvedAt?.toIso8601String(),
+        'createdAt': e.createdAt?.toIso8601String(),
+      };
+
+  static Map<String, dynamic> _rfcStatusJson(RfcStatusReport s) => {
+        'openCriticals': s.openCriticals,
+        'blockingCriticals': s.blockingCriticals,
+        'openMajors': s.openMajors,
+        'totalComments': s.totalComments,
+        'requiredSections': s.requiredSections,
+        'coveredRequired': s.coveredRequired,
+        'checklistComplete': s.checklistComplete,
       };
 }
