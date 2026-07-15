@@ -164,6 +164,214 @@ register a submodule as its own project.
 - Forget wrong / obsolete memory ........... `oracle_memory_forget`
 ''';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-agent integration matrix
+//
+// Every supported agent wired to Oracle from ONE source of truth: where its MCP
+// config lives, the exact snippet, whether/how it can drive the capture hooks,
+// and which instruction file carries the protocol. Both the installer wizard and
+// Oracle Studio render their per-agent tabs from `agentIntegrations()`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// How an agent can reach Oracle's hook receiver for automatic capture/injection.
+enum HookSupport {
+  /// Native HTTP hooks — the agent POSTs straight to the receiver (Claude Code).
+  http,
+
+  /// Command-only hooks — the agent runs our `forward-hook` bridge, which relays
+  /// the event JSON to the receiver (Codex, Cursor, Gemini CLI, VS Code Copilot).
+  bridge,
+
+  /// No lifecycle hooks — recall/capture is manual through the MCP tools + the
+  /// protocol in the instruction file (Windsurf, Antigravity).
+  none,
+}
+
+/// One agent's complete wiring. Text is language-neutral (paths + config); the
+/// UIs wrap it with localized section labels.
+class AgentIntegration {
+  /// Stable slug — also the `forward-hook --agent <id>` capture tag.
+  final String id;
+  final String name;
+
+  /// Where the MCP server config file lives (Windows path; note macOS/Linux in UI).
+  final String mcpFile;
+
+  /// The exact block to paste into [mcpFile].
+  final String mcpSnippet;
+
+  /// Optional one-line CLI that writes the MCP config for you (null if none).
+  final String? mcpCli;
+
+  final HookSupport hooks;
+
+  /// Where the hooks config lives (null when [hooks] is [HookSupport.none]).
+  final String? hooksFile;
+
+  /// The exact hooks block to paste into [hooksFile] (null when unsupported).
+  final String? hooksSnippet;
+
+  /// The instruction file that should carry [agentProtocol] for this agent.
+  final String instructionFile;
+
+  const AgentIntegration({
+    required this.id,
+    required this.name,
+    required this.mcpFile,
+    required this.mcpSnippet,
+    this.mcpCli,
+    required this.hooks,
+    this.hooksFile,
+    this.hooksSnippet,
+    required this.instructionFile,
+  });
+}
+
+const _enc = JsonEncoder.withIndent('  ');
+
+/// The shell command an agent's command-hook runs to relay one event: the quoted
+/// CLI path + `forward-hook`, tagged with the agent id so capture attributes the
+/// session. Quoting matters — the installed path contains a space ("Oracle AI").
+String _bridgeCommand(String command, String id) => '"$command" forward-hook --agent $id';
+
+Map<String, Object> _cmdHook(String bridge, {String? matcher}) => {
+      if (matcher != null) 'matcher': matcher,
+      'hooks': [
+        {'type': 'command', 'command': bridge},
+      ],
+    };
+
+/// Claude-shaped command hooks (Codex `~/.codex/hooks.json`, VS Code
+/// `.claude/settings.json`): a `hooks` map keyed by PascalCase events.
+String _claudeShapeCommandHooks(String bridge, List<String> events) => _enc.convert({
+      'hooks': {
+        for (final e in events) e: [_cmdHook(bridge, matcher: e == 'PostToolUse' ? '*' : null)],
+      },
+    });
+
+/// Cursor `.cursor/hooks.json`: `{version, hooks:{<camelCaseEvent>:[{command,type}]}}`.
+String _cursorHooks(String bridge) {
+  List<Map<String, String>> e() => [
+        {'command': bridge, 'type': 'command'},
+      ];
+  return _enc.convert({
+    'version': 1,
+    'hooks': {
+      'sessionStart': e(),
+      'beforeSubmitPrompt': e(),
+      'afterFileEdit': e(),
+      'afterShellExecution': e(),
+      'afterMCPExecution': e(),
+      'stop': e(),
+    },
+  });
+}
+
+/// Gemini CLI hooks (same `~/.gemini/settings.json`, under `hooks`): Gemini names
+/// tool events `AfterTool` and has no prompt-submit event.
+String _geminiHooks(String bridge) => _enc.convert({
+      'hooks': {
+        'SessionStart': [_cmdHook(bridge)],
+        'AfterTool': [_cmdHook(bridge, matcher: '*')],
+        'SessionEnd': [_cmdHook(bridge)],
+      },
+    });
+
+/// VS Code Copilot MCP config uses the top-level `servers` key (not `mcpServers`).
+String _vscodeMcp(String command) => _enc.convert({
+      'servers': {
+        'oracle-ai': {'type': 'stdio', 'command': command, 'args': <String>[]},
+      },
+    });
+
+/// Codex MCP config is TOML. Literal (single-quoted) string keeps Windows
+/// backslashes verbatim.
+String _codexMcp(String command) => "[mcp_servers.oracle-ai]\ncommand = '$command'\nargs = []";
+
+/// The full per-agent matrix. [command] is the installed CLI path; [host]/[port]/
+/// [token] describe the running hook receiver (from the installed `.env`).
+List<AgentIntegration> agentIntegrations({
+  required String command,
+  String host = '127.0.0.1',
+  int port = 47500,
+  String? token,
+}) {
+  final mcpStd = mcpJson(command: command); // standard {mcpServers:{oracle-ai:{…}}}
+  String bridge(String id) => _bridgeCommand(command, id);
+  return [
+    AgentIntegration(
+      id: 'claude-code',
+      name: 'Claude Code',
+      mcpFile: r'.mcp.json (project root) · ~/.claude.json (global)',
+      mcpSnippet: mcpStd,
+      mcpCli: 'claude mcp add oracle-ai -- "$command"',
+      hooks: HookSupport.http,
+      hooksFile: r'~/.claude/settings.json ("hooks" block)',
+      hooksSnippet: hooksJson(host: host, port: port, token: token),
+      instructionFile: 'CLAUDE.md',
+    ),
+    AgentIntegration(
+      id: 'codex',
+      name: 'Codex CLI',
+      mcpFile: r'~/.codex/config.toml ([mcp_servers.oracle-ai] block)',
+      mcpSnippet: _codexMcp(command),
+      mcpCli: 'codex mcp add oracle-ai -- "$command"',
+      hooks: HookSupport.bridge,
+      hooksFile: r'~/.codex/hooks.json',
+      hooksSnippet: _claudeShapeCommandHooks(
+          bridge('codex'), const ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd']),
+      instructionFile: 'AGENTS.md',
+    ),
+    AgentIntegration(
+      id: 'cursor',
+      name: 'Cursor',
+      mcpFile: r'.cursor/mcp.json (project) · ~/.cursor/mcp.json (global)',
+      mcpSnippet: mcpStd,
+      hooks: HookSupport.bridge,
+      hooksFile: r'.cursor/hooks.json (project) · ~/.cursor/hooks.json (global)',
+      hooksSnippet: _cursorHooks(bridge('cursor')),
+      instructionFile: 'AGENTS.md',
+    ),
+    AgentIntegration(
+      id: 'gemini',
+      name: 'Gemini CLI',
+      mcpFile: r'~/.gemini/settings.json (project: .gemini/settings.json)',
+      mcpSnippet: mcpStd,
+      hooks: HookSupport.bridge,
+      hooksFile: r'~/.gemini/settings.json (same file, "hooks" block)',
+      hooksSnippet: _geminiHooks(bridge('gemini')),
+      instructionFile: 'GEMINI.md',
+    ),
+    AgentIntegration(
+      id: 'vscode',
+      name: 'VS Code (Copilot)',
+      mcpFile: r'.vscode/mcp.json (top-level key: "servers")',
+      mcpSnippet: _vscodeMcp(command),
+      hooks: HookSupport.bridge,
+      hooksFile: r'.claude/settings.json (Copilot reads Claude format)',
+      hooksSnippet: _claudeShapeCommandHooks(
+          bridge('vscode'), const ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop']),
+      instructionFile: '.github/copilot-instructions.md',
+    ),
+    AgentIntegration(
+      id: 'windsurf',
+      name: 'Windsurf',
+      mcpFile: r'~/.codeium/windsurf/mcp_config.json (global)',
+      mcpSnippet: mcpStd,
+      hooks: HookSupport.none,
+      instructionFile: 'AGENTS.md',
+    ),
+    AgentIntegration(
+      id: 'antigravity',
+      name: 'Antigravity',
+      mcpFile: r'~/.gemini/config/mcp_config.json',
+      mcpSnippet: mcpStd,
+      hooks: HookSupport.none,
+      instructionFile: 'AGENTS.md',
+    ),
+  ];
+}
+
 void printInstallMcp({String? command}) {
   stdout.writeln('# Merge into .mcp.json (project root) — the Oracle AI MCP server.');
   if (command == null) {

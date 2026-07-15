@@ -313,11 +313,25 @@ const _pt = <String, String>{
   'set.runningNow': 'Executando…',
   'set.lastBackup': 'Último backup',
   'set.agents': 'Integração de agentes',
-  'set.agentsDesc': 'Adicione o servidor MCP abaixo ao seu agente. Veja onde fica o arquivo de configuração de cada agente na tabela.',
+  'set.agentsDesc': 'Escolha o agente e copie a configuração de MCP e de hooks dele. O protocolo (no fim) é o mesmo para todos.',
   'set.targetsTitle': 'Onde configurar cada agente',
   'set.mcpTitle': '.mcp.json (raiz do projeto do agente)',
   'set.hooksTitle': 'settings.json do Claude Code (bloco "hooks")',
   'set.promptTitle': 'Prompt para o agente (CLAUDE.md / AGENTS.md)',
+  // per-agent tabs
+  'ag.mcp': 'Servidor MCP',
+  'ag.cli': 'Atalho CLI',
+  'ag.hooks': 'Hooks (captura automática)',
+  'ag.hooksHttp': 'Este agente faz POST direto no receptor de hooks — nenhuma ponte necessária.',
+  'ag.hooksBridge':
+      'Os hooks deste agente rodam um comando: usamos o "oracle_ai forward-hook" para repassar o evento ao receptor. Precisa do Oracle Studio (ou do daemon) hospedando o receptor. Captura funciona; o recall automático varia por agente — na dúvida, use as ferramentas MCP.',
+  'ag.hooksNone':
+      'Este agente não tem hooks de ciclo de vida. Use as ferramentas MCP + o protocolo abaixo para recuperar e registrar manualmente.',
+  'ag.instr': 'Arquivo de instruções',
+  'ag.instrBody': 'Cole o protocolo (no fim desta seção) em:',
+  'ag.badgeHttp': 'Hooks nativos (HTTP)',
+  'ag.badgeBridge': 'Hooks via ponte',
+  'ag.badgeNone': 'Sem hooks',
   'set.promptDesc':
       'Cole este protocolo no arquivo de instruções do seu agente para ensiná-lo a usar a Oracle: '
           'recuperar antes de re-deduzir, registrar o que é durável e passar adiante o que ficou aberto.',
@@ -665,11 +679,25 @@ const _en = <String, String>{
   'set.runningNow': 'Running…',
   'set.lastBackup': 'Last backup',
   'set.agents': 'Agent integration',
-  'set.agentsDesc': 'Add the MCP server below to your agent. See where each agent keeps its config file in the table.',
+  'set.agentsDesc': 'Pick your agent and copy its MCP and hooks config. The protocol (at the end) is the same for all.',
   'set.targetsTitle': 'Where to configure each agent',
   'set.mcpTitle': '.mcp.json (agent project root)',
   'set.hooksTitle': 'Claude Code settings.json ("hooks" block)',
   'set.promptTitle': 'Prompt for your agent (CLAUDE.md / AGENTS.md)',
+  // per-agent tabs
+  'ag.mcp': 'MCP server',
+  'ag.cli': 'CLI shortcut',
+  'ag.hooks': 'Hooks (automatic capture)',
+  'ag.hooksHttp': 'This agent POSTs straight to the hook receiver — no bridge needed.',
+  'ag.hooksBridge':
+      'This agent\'s hooks run a command: we use "oracle_ai forward-hook" to relay the event to the receiver. Needs Oracle Studio (or the daemon) hosting the receiver. Capture works; automatic recall varies by agent — when unsure, use the MCP tools.',
+  'ag.hooksNone':
+      'This agent has no lifecycle hooks. Use the MCP tools + the protocol below to recall and record manually.',
+  'ag.instr': 'Instruction file',
+  'ag.instrBody': 'Paste the protocol (at the end of this section) into:',
+  'ag.badgeHttp': 'Native hooks (HTTP)',
+  'ag.badgeBridge': 'Hooks via bridge',
+  'ag.badgeNone': 'No hooks',
   'set.promptDesc':
       "Paste this protocol into your agent's instruction file to teach it the Oracle workflow: "
           'recall before re-deriving, record what is durable, and hand off what is open.',

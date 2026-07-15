@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'agent_tabs.dart';
 import 'core/brand.dart';
 import 'core/l10n.dart';
 import 'setup_state.dart';
@@ -534,13 +535,12 @@ class _SetupWizardState extends State<SetupWizard> {
     final s = _state;
     return ListView(children: [
       GradientTitle(l10n.t('agents.title')),
-      const SizedBox(height: 12),
-      _snippet(context, l10n.t('agents.mcp'), s.mcpSnippet),
-      const SizedBox(height: 12),
-      _snippet(context, l10n.t('agents.targetsTitle'), s.agentTargets),
-      const SizedBox(height: 12),
-      _snippet(context, l10n.t('agents.hooks'), s.hooksSnippet),
-      const SizedBox(height: 12),
+      const SizedBox(height: 8),
+      Text(l10n.t('agents.intro'),
+          style: const TextStyle(fontSize: 12, color: OracleBrand.gray400, height: 1.4)),
+      const SizedBox(height: 16),
+      AgentTabs(agents: s.agents),
+      const SizedBox(height: 20),
       Text(l10n.t('agents.promptIntro'),
           style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
       const SizedBox(height: 8),

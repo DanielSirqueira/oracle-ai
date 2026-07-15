@@ -131,7 +131,9 @@ class HooksServer {
       return Response.badRequest(body: 'invalid request body');
     }
 
-    final event = '${p['hook_event_name'] ?? p['event'] ?? ''}';
+    p = _normalize(p);
+    final rawEvent = '${p['hook_event_name'] ?? p['event'] ?? ''}';
+    final event = _canonicalEvent(rawEvent);
     final cwd = '${p['cwd'] ?? ''}';
 
     switch (event) {
@@ -152,6 +154,66 @@ class HooksServer {
       default:
         return _ok(const {});
     }
+  }
+
+  /// Canonicalizes an incoming hook event name to the ones the receiver acts on.
+  /// Agents name the same lifecycle moment differently — Cursor uses camelCase
+  /// (`sessionStart`, `beforeSubmitPrompt`, `stop`, `after*`), Gemini uses
+  /// `AfterTool`, Claude Code / Codex / VS Code use PascalCase. Unknown names
+  /// pass through (→ default → 200 no-op). Legacy snake_case names are NOT
+  /// remapped here — they keep their existing capture-only behavior below.
+  static String _canonicalEvent(String raw) => switch (raw) {
+        'sessionStart' => 'SessionStart',
+        'beforeSubmitPrompt' => 'UserPromptSubmit',
+        'stop' => 'Stop',
+        'postToolUse' ||
+        'afterFileEdit' ||
+        'afterShellExecution' ||
+        'afterMCPExecution' ||
+        'AfterTool' =>
+          'PostToolUse',
+        'postCompact' => 'PostCompact',
+        'sessionEnd' => 'SessionEnd',
+        _ => raw,
+      };
+
+  /// Fills canonical payload keys from agent-specific aliases so the capture path
+  /// (which reads `cwd`, `session_id`, `tool_name`, `tool_response`,
+  /// `last_assistant_message`) works no matter which agent sent the event.
+  static Map<String, dynamic> _normalize(Map<String, dynamic> p) {
+    // Working directory — Cursor sends `workspace_roots: [..]` instead of `cwd`.
+    if ('${p['cwd'] ?? ''}'.trim().isEmpty) {
+      final roots = p['workspace_roots'];
+      p['cwd'] = (roots is List && roots.isNotEmpty)
+          ? '${roots.first}'
+          : (p['project_dir'] ?? p['worktree'] ?? '');
+    }
+    // Session identity — Cursor `conversation_id`, Codex notify `thread-id`.
+    p['session_id'] ??= p['conversation_id'] ??
+        p['thread_id'] ??
+        p['thread-id'] ??
+        p['threadId'] ??
+        p['externalSessionId'];
+    // Tool result — Cursor `tool_output`/`result_json`/`output`.
+    p['tool_response'] ??= p['tool_output'] ?? p['result_json'] ?? p['output'];
+    // Final assistant text — Codex notify hyphenates it.
+    p['last_assistant_message'] ??= p['last-assistant-message'];
+
+    // Tool events with no tool name (Cursor shell/file hooks): synthesize one so
+    // the captured message reads sensibly, and back-fill a response body.
+    final raw = '${p['hook_event_name'] ?? p['event'] ?? ''}';
+    if ('${p['tool_name'] ?? ''}'.trim().isEmpty) {
+      p['tool_name'] = switch (raw) {
+        'afterShellExecution' => 'shell',
+        'afterFileEdit' => 'edit',
+        _ => p['tool_name'],
+      };
+    }
+    if ('${p['tool_response'] ?? ''}'.trim().isEmpty) {
+      if (raw == 'afterShellExecution') p['tool_response'] = p['command'];
+      if (raw == 'afterFileEdit') p['tool_response'] = p['file_path'];
+    }
+    return p;
   }
 
   // ── inject events (synchronous) ──

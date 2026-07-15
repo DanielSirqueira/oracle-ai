@@ -677,4 +677,14 @@ volumes:
 
   String get hooksSnippet =>
       hooksJson(host: '127.0.0.1', port: 47500, token: hookToken.isEmpty ? null : hookToken);
+
+  /// The full per-agent integration matrix (MCP + hooks + instruction file for
+  /// Claude Code, Codex, Cursor, Gemini, VS Code, Windsurf, Antigravity) — the
+  /// wizard's per-agent tabs render from this.
+  List<AgentIntegration> get agents => agentIntegrations(
+        command: installedCli,
+        host: '127.0.0.1',
+        port: 47500,
+        token: hookToken.isEmpty ? null : hookToken,
+      );
 }

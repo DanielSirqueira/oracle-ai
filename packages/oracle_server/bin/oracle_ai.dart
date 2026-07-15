@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:oracle_core/oracle_core.dart';
@@ -13,6 +14,8 @@ import 'package:oracle_server/oracle_server.dart';
 ///   oracle_ai serve-mcp     # migrate + MCP (stdio) only — no hooks (the daemon owns them)
 ///   oracle_ai install-mcp [binary-path]   # print the .mcp.json snippet
 ///   oracle_ai install-hooks               # print the settings.json hooks snippet
+///   oracle_ai forward-hook [--agent id]   # relay a stdin hook event to the receiver
+///                                         # (bridge for command-only agent hooks)
 ///   oracle_ai backup-db [path]            # write a portable data seed, then exit
 ///   oracle_ai restore-db [path] [--force] # restore a data seed (only if empty, unless --force)
 ///   oracle_ai sync-skills [dir]           # materialize the central skill library to
@@ -40,6 +43,15 @@ Future<void> main(List<String> args) async {
       port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500,
       token: env['ORACLE_HOOK_TOKEN'],
     );
+    return;
+  }
+  // Bridge for agents whose hooks run a COMMAND (not native HTTP) — Codex,
+  // Cursor, Gemini CLI, VS Code. They pipe the event JSON on our stdin; we relay
+  // it to the local hook receiver and echo the receiver's reply on stdout (so
+  // inject-style hooks still get their context). ALWAYS exit 0 and never hang —
+  // a down receiver must not block the agent.
+  if (args.contains('forward-hook')) {
+    await _runForwardHook(args, env);
     return;
   }
 
@@ -117,6 +129,54 @@ Future<void> main(List<String> args) async {
     exitCode = 1;
   } finally {
     await database?.dispose();
+  }
+}
+
+/// Relays a hook event to the local receiver on behalf of a command-only agent.
+///
+/// Reads the event JSON from stdin, tags it with the agent name (`--agent <id>`,
+/// default `unknown`) when the payload doesn't already carry one, POSTs it to
+/// `http://HOST:PORT/hook` with the bearer token, and writes the receiver's body
+/// to stdout. Every failure path is swallowed and the process still exits 0:
+/// hooks sit in the agent's critical path, so the bridge must be invisible when
+/// the daemon is down or slow.
+Future<void> _runForwardHook(List<String> args, Map<String, String> env) async {
+  try {
+    final ai = args.indexOf('--agent');
+    final agent = (ai >= 0 && ai + 1 < args.length) ? args[ai + 1] : 'unknown';
+    final host = env['ORACLE_HTTP_HOST'] ?? '127.0.0.1';
+    final port = int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500;
+    final token = env['ORACLE_HOOK_TOKEN']?.trim();
+
+    final raw = await stdin.fold<List<int>>(<int>[], (acc, chunk) => acc..addAll(chunk));
+
+    // Inject the agent id so capture attributes the session correctly, but only
+    // when the payload is a JSON object missing one — otherwise forward verbatim.
+    List<int> body = raw;
+    try {
+      final decoded = jsonDecode(utf8.decode(raw));
+      if (decoded is Map<String, dynamic> && (decoded['agent'] == null)) {
+        decoded['agent'] = agent;
+        body = utf8.encode(jsonEncode(decoded));
+      }
+    } catch (_) {/* not JSON (or empty) — relay the raw bytes */}
+
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final req = await client.postUrl(Uri.parse('http://$host:$port/hook'));
+      req.headers.contentType = ContentType.json;
+      if (token != null && token.isNotEmpty) {
+        req.headers.set('Authorization', 'Bearer $token');
+      }
+      req.add(body);
+      final resp = await req.close().timeout(const Duration(seconds: 6));
+      final reply = await resp.transform(utf8.decoder).join();
+      if (reply.isNotEmpty) stdout.write(reply);
+    } finally {
+      client.close(force: true);
+    }
+  } catch (_) {
+    // Never surface a bridge failure to the agent.
   }
 }
 

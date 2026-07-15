@@ -14,8 +14,8 @@ import '../../core/fmt.dart';
 import '../../core/l10n.dart';
 import '../../core/oracle_connection.dart';
 import '../../core/settings_store.dart';
+import '../../widgets/agent_tabs.dart';
 import '../../widgets/editor_dialog.dart';
-import '../../widgets/markdown_view.dart';
 
 /// Settings, Untitled-UI style: structured sections with label/description
 /// rows. The .env is edited through a FORM (merge-saved, comments preserved);
@@ -168,9 +168,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final binPath = widget.connection.envDir == null
         ? 'oracle_ai.exe'
         : '${widget.connection.envDir}${Platform.pathSeparator}oracle_ai.exe';
-    final mcpSnippet = server.mcpJson(command: binPath);
-    final hooksSnippet = server.hooksJson(
-      host: _httpHost.text.trim(),
+    final agents = server.agentIntegrations(
+      command: binPath,
+      host: _httpHost.text.trim().isEmpty ? '127.0.0.1' : _httpHost.text.trim(),
       port: int.tryParse(_httpPort.text.trim()) ?? 47500,
       token: _token.text.trim().isEmpty ? null : _token.text.trim(),
     );
@@ -456,26 +456,13 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 16),
 
-          // ── agent integration ──
+          // ── agent integration (per-agent tabs) ──
           SectionCard(
             title: l10n.t('set.agents'),
             description: l10n.t('set.agentsDesc'),
             children: [
-              SettingRow(
-                label: l10n.t('set.mcpTitle'),
-                stacked: true,
-                control: _snippet(mcpSnippet, () => _copy(mcpSnippet, '.mcp.json')),
-              ),
-              SettingRow(
-                label: l10n.t('set.targetsTitle'),
-                stacked: true,
-                control: MarkdownView(server.agentTargetsMarkdown(command: binPath)),
-              ),
-              SettingRow(
-                label: l10n.t('set.hooksTitle'),
-                stacked: true,
-                control: _snippet(hooksSnippet, () => _copy(hooksSnippet, '"hooks"')),
-              ),
+              AgentTabs(agents: agents, onCopy: _copy),
+              const SizedBox(height: 24),
               SettingRow(
                 label: l10n.t('set.promptTitle'),
                 description: l10n.t('set.promptDesc'),
