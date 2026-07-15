@@ -4,10 +4,15 @@ import '../../domain/dtos/rfc_bundle.dart';
 import '../../domain/dtos/rfc_comment_neighbor.dart';
 import '../../domain/dtos/rfc_status_report.dart';
 import '../../domain/entities/rfc_comment_entity.dart';
+import '../../domain/entities/rfc_decision_entity.dart';
 import '../../domain/entities/rfc_entity.dart';
 import '../../domain/entities/rfc_evidence_entity.dart';
+import '../../domain/entities/rfc_relation_entity.dart';
+import '../../domain/entities/rfc_resolution_entity.dart';
+import '../../domain/entities/rfc_round_entity.dart';
 import '../../domain/entities/rfc_section_entity.dart';
 import '../../domain/entities/rfc_version_entity.dart';
+import '../../domain/enums/rfc_status.dart';
 import '../../domain/errors/rfc_failure.dart';
 import '../../domain/repositories/rfc_repository.dart';
 import '../datasources/rfc_datasource.dart';
@@ -114,6 +119,80 @@ class RfcRepositoryImpl implements RfcRepository {
   AsyncResultDart<RfcStatusReport, RfcFailure> rfcStatus(IdVO rfcId) async {
     try {
       return Success(await _datasource.rfcStatus(rfcId));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<RfcRelationEntity, RfcFailure> addRelation(RfcRelationEntity relation) async {
+    try {
+      return Success(await _datasource.addRelation(relation));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<RfcResolutionEntity, RfcFailure> resolveComment(
+      RfcResolutionEntity resolution) async {
+    try {
+      return Success(await _datasource.resolveComment(resolution));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<RfcRoundEntity, RfcFailure> startRound(RfcRoundEntity round) async {
+    try {
+      return Success(await _datasource.startRound(round));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<RfcRoundEntity, RfcFailure> closeRound(IdVO rfcId, int roundNo) async {
+    try {
+      return Success(await _datasource.closeRound(rfcId, roundNo));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<RfcDecisionEntity, RfcFailure> recordDecision(RfcDecisionEntity decision) async {
+    try {
+      return Success(await _datasource.recordDecision(decision));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<RfcEntity, RfcFailure> setStatus(IdVO rfcId, RfcStatus status) async {
+    try {
+      return Success(await _datasource.setStatus(rfcId, status));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<List<RfcDecisionEntity>, RfcFailure> listDecisions(IdVO rfcId) async {
+    try {
+      return Success(await _datasource.listDecisions(rfcId));
+    } on RfcFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
+  AsyncResultDart<Unit, RfcFailure> setDecisionMemory(IdVO decisionId, IdVO memoryId) async {
+    try {
+      await _datasource.setDecisionMemory(decisionId, memoryId);
+      return const Success(unit);
     } on RfcFailure catch (failure) {
       return Failure(failure);
     }

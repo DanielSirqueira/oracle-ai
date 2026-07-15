@@ -4,10 +4,15 @@ import '../dtos/rfc_bundle.dart';
 import '../dtos/rfc_comment_neighbor.dart';
 import '../dtos/rfc_status_report.dart';
 import '../entities/rfc_comment_entity.dart';
+import '../entities/rfc_decision_entity.dart';
 import '../entities/rfc_entity.dart';
 import '../entities/rfc_evidence_entity.dart';
+import '../entities/rfc_relation_entity.dart';
+import '../entities/rfc_resolution_entity.dart';
+import '../entities/rfc_round_entity.dart';
 import '../entities/rfc_section_entity.dart';
 import '../entities/rfc_version_entity.dart';
+import '../enums/rfc_status.dart';
 import '../errors/rfc_failure.dart';
 
 /// Business contract for multi-agent RFC review.
@@ -66,4 +71,36 @@ abstract interface class RfcRepository {
 
   /// Completion snapshot of an RFC (open blockers + required-section coverage).
   AsyncResultDart<RfcStatusReport, RfcFailure> rfcStatus(IdVO rfcId);
+
+  /// Adds a typed edge to the argumentation graph between two findings — a
+  /// refutation must be grounded too. Returns it with id/timestamps.
+  AsyncResultDart<RfcRelationEntity, RfcFailure> addRelation(RfcRelationEntity relation);
+
+  /// Records a finding's outcome and, in the same savepoint, stamps the comment's
+  /// own status with the resolution's [RfcResolutionEntity.decision]. Returns the
+  /// resolution with id/timestamps.
+  AsyncResultDart<RfcResolutionEntity, RfcFailure> resolveComment(RfcResolutionEntity resolution);
+
+  /// Opens a review round. When [RfcRoundEntity.roundNo] <= 0 the next round
+  /// number is computed for the RFC. Returns the round with id/round_no/started_at.
+  AsyncResultDart<RfcRoundEntity, RfcFailure> startRound(RfcRoundEntity round);
+
+  /// Closes round [roundNo] of [rfcId]: computes new criticals/majors and the
+  /// novelty score over the round's latest comments, stamps `ended_at`, and
+  /// returns the updated round.
+  AsyncResultDart<RfcRoundEntity, RfcFailure> closeRound(IdVO rfcId, int roundNo);
+
+  /// Records an important/product decision on an RFC. Returns it with
+  /// id/timestamps.
+  AsyncResultDart<RfcDecisionEntity, RfcFailure> recordDecision(RfcDecisionEntity decision);
+
+  /// Moves the RFC to [status] (`updated_at` bumped). Returns the updated header.
+  AsyncResultDart<RfcEntity, RfcFailure> setStatus(IdVO rfcId, RfcStatus status);
+
+  /// The decisions recorded on [rfcId], oldest first.
+  AsyncResultDart<List<RfcDecisionEntity>, RfcFailure> listDecisions(IdVO rfcId);
+
+  /// Links a recorded decision to the memory it was written back to (the
+  /// learning write-back).
+  AsyncResultDart<Unit, RfcFailure> setDecisionMemory(IdVO decisionId, IdVO memoryId);
 }

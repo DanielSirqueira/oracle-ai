@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:mcp_dart/mcp_dart.dart' as mcp;
 import 'package:oracle_core/oracle_core.dart';
@@ -43,9 +44,11 @@ re-derive, record durable learnings as you go.
   body: mark required sections + coverage). Reviewing agents find open RFCs with `oracle_rfc_list_open`, read
   with `oracle_rfc_get`, and post STRUCTURED findings with `oracle_rfc_comment` — each grounded (a
   gap/bug/blocker needs a proposedSolution). Back a finding with `oracle_rfc_evidence_add` — evidence must
-  RESOLVE to a real entity (a cited rule/memory/architecture/rfc by id) to verify it; unverified criticals
-  don't gate completion. Consolidate a round with `oracle_rfc_revise`; check readiness
-  with `oracle_rfc_status` (0 open criticals + required sections covered are necessary, not sufficient).
+  RESOLVE (a cited rule/memory/architecture/rfc by id, or a file+excerpt) to verify it; unverified criticals
+  don't gate completion. Contest with `oracle_rfc_relate`, settle with `oracle_rfc_resolve`; bracket rounds
+  with `oracle_rfc_round_start`/`_round_close` (novelty). Consolidate with `oracle_rfc_revise`; record
+  decisions with `oracle_rfc_decide` (humanApproved gates product calls); check `oracle_rfc_status`; then
+  `oracle_rfc_finalize` — approves + writes decisions back to memory, or parks in awaiting_human.
 - At the end of a task / before context compaction, write a handoff with `oracle_handoff_begin`.
 - Keep memory healthy: retire/forget what is wrong or obsolete. Bad memory is worse than none.
 Capture is automatic — hooks record the session, each user request, and your work (messages) as
@@ -1401,9 +1404,10 @@ Capture is automatic — hooks record the session, each user request, and your w
       'oracle_rfc_evidence_add',
       description: 'Attach verifiable evidence to a finding — the anti-hallucination core. An '
           'oracle_entity reference (a cited rule/memory/decision/architecture/prior_rfc by refId) '
-          'must EXIST in the Oracle or `resolved` stays false and the finding is NOT verified — an '
-          'unverified critical does not gate completion. file/external references are recorded but '
-          'not resolved in this pass. Resolving evidence flips the comment to verified.',
+          'must EXIST in the Oracle, or a file reference (refKind=file) must point at a real file '
+          'whose content contains the excerpt, or `resolved` stays false and the finding is NOT '
+          'verified — an unverified critical does not gate completion. external (URI) references are '
+          'recorded but not resolved. Resolving evidence flips the comment to verified.',
       toolInputSchema: const mcp.ToolInputSchema(
         properties: {
           'commentId': {'type': 'string'},
@@ -1428,14 +1432,22 @@ Capture is automatic — hooks record the session, each user request, and your w
       ),
       callback: ({args, extra}) async {
         final a = args ?? const {};
+        final refKind = '${a['refKind'] ?? 'oracle_entity'}';
+        final locator = a['locator']?.toString();
+        final excerpt = a['excerpt']?.toString();
+        // file references resolve here (dart:io): the file must exist and, when an
+        // excerpt is given, contain it. oracle_entity refs are resolved in the
+        // datasource (SELECT EXISTS); external refs stay unresolved.
+        final fileResolved = refKind == 'file' && _fileEvidenceResolves(locator, excerpt);
         final evidence = RfcEvidenceEntity(
           id: const IdVO.empty(),
           commentId: IdVO('${a['commentId'] ?? ''}'),
           kind: '${a['kind'] ?? ''}',
-          refKind: '${a['refKind'] ?? 'oracle_entity'}',
+          refKind: refKind,
           refId: a['refId'] == null ? null : IdVO('${a['refId']}'),
-          locator: a['locator']?.toString(),
-          excerpt: a['excerpt']?.toString(),
+          locator: locator,
+          excerpt: excerpt,
+          resolved: fileResolved,
         );
         final result = await injector.get<AddEvidenceUsecase>()(evidence);
         return result.fold((e) => _ok(_rfcEvidenceJson(e)), _err);
@@ -1502,9 +1514,209 @@ Capture is automatic — hooks record the session, each user request, and your w
         return result.fold((s) => _ok(_rfcStatusJson(s)), _err);
       },
     );
+
+    server.tool(
+      'oracle_rfc_relate',
+      description: 'Link two findings in the argumentation graph — a typed edge with a reason. '
+          'Refuting is as demanding as asserting: a refutation must carry its own ground. Use to '
+          'connect a finding that supports/refutes/duplicates/supersedes/refines/depends_on another.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'fromComment': {'type': 'string'},
+          'toComment': {'type': 'string'},
+          'relation': {
+            'type': 'string',
+            'description': 'supports|refutes|duplicates|supersedes|refines|depends_on'
+          },
+          'ground': {
+            'type': 'string',
+            'description': 'architectural_conflict|business_rule|missing_evidence|out_of_scope|'
+                'factual_error|redundant'
+          },
+          'reason': {'type': 'string'},
+        },
+        required: ['fromComment', 'toComment', 'relation'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final relation = RfcRelationEntity(
+          id: const IdVO.empty(),
+          fromComment: IdVO('${a['fromComment'] ?? ''}'),
+          toComment: IdVO('${a['toComment'] ?? ''}'),
+          relation: '${a['relation'] ?? ''}',
+          ground: a['ground']?.toString(),
+          reason: TextVO('${a['reason'] ?? ''}'),
+        );
+        final result = await injector.get<RelateCommentsUsecase>()(relation);
+        return result.fold((r) => _ok(_rfcRelationJson(r)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_resolve',
+      description: 'Resolve a finding: record its outcome (accepted|rejected|deferred|duplicate) with '
+          'a reason, and stamp the comment with that status. May cite the required rule (ruleId) that '
+          'invalidated the finding.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'commentId': {'type': 'string'},
+          'decision': {
+            'type': 'string',
+            'description': 'accepted|rejected|deferred|duplicate'
+          },
+          'ground': {'type': 'string'},
+          'reason': {'type': 'string'},
+          'resolverAgent': {'type': 'string'},
+          'ruleId': {'type': 'string', 'description': 'Rule that invalidated the finding.'},
+        },
+        required: ['commentId', 'decision'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final resolution = RfcResolutionEntity(
+          id: const IdVO.empty(),
+          commentId: IdVO('${a['commentId'] ?? ''}'),
+          resolverAgent: '${a['resolverAgent'] ?? 'claude-code'}',
+          decision: '${a['decision'] ?? ''}',
+          ground: a['ground']?.toString(),
+          reason: TextVO('${a['reason'] ?? ''}'),
+          ruleId: a['ruleId'] == null ? null : IdVO('${a['ruleId']}'),
+        );
+        final result = await injector.get<ResolveCommentUsecase>()(resolution);
+        return result.fold((r) => _ok(_rfcResolutionJson(r)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_round_start',
+      description: 'Open a review round on an RFC. Pass roundNo=0 to auto-number it to the next round. '
+          'Record the participants (agents/roles) that will review this round.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'rfcId': {'type': 'string'},
+          'versionId': {'type': 'string'},
+          'roundNo': {'type': 'integer', 'description': '0 = auto next round number.'},
+          'participants': {
+            'type': 'array',
+            'description': 'Agents/roles reviewing this round.',
+            'items': {'type': 'string'},
+          },
+        },
+        required: ['rfcId'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final round = RfcRoundEntity(
+          id: const IdVO.empty(),
+          rfcId: IdVO('${a['rfcId'] ?? ''}'),
+          versionId: a['versionId'] == null ? null : IdVO('${a['versionId']}'),
+          roundNo: (a['roundNo'] as num?)?.toInt() ?? 0,
+          participants: _stringList(a['participants']),
+        );
+        final result = await injector.get<StartRoundUsecase>()(round);
+        return result.fold((r) => _ok(_rfcRoundJson(r)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_round_close',
+      description: 'Close a review round: computes the novelty_score (non-duplicated fraction of the '
+          'round) plus the new criticals/majors over the round\'s latest findings, and stamps its end. '
+          'Novelty settling is one of the necessary signals to move an RFC toward approval.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'rfcId': {'type': 'string'},
+          'roundNo': {'type': 'integer'},
+        },
+        required: ['rfcId', 'roundNo'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<CloseRoundUsecase>()(
+          rfcId: IdVO('${a['rfcId'] ?? ''}'),
+          roundNo: (a['roundNo'] as num?)?.toInt() ?? 0,
+        );
+        return result.fold((r) => _ok(_rfcRoundJson(r)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_decide',
+      description: 'Record an important/product decision on an RFC — the question, the chosen option, '
+          'the rationale, and the findings (commentIds) that motivated it. humanApproved=true is the '
+          'human gate for product decisions.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'rfcId': {'type': 'string'},
+          'question': {'type': 'string'},
+          'chosenOption': {'type': 'string'},
+          'rationale': {'type': 'string'},
+          'commentIds': {
+            'type': 'array',
+            'description': 'Findings that motivated the decision.',
+            'items': {'type': 'string'},
+          },
+          'humanApproved': {'type': 'boolean', 'description': 'Human gate for product decisions.'},
+        },
+        required: ['rfcId', 'question'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final decision = RfcDecisionEntity(
+          id: const IdVO.empty(),
+          rfcId: IdVO('${a['rfcId'] ?? ''}'),
+          question: TextVO('${a['question'] ?? ''}'),
+          chosenOption: TextVO('${a['chosenOption'] ?? ''}'),
+          rationale: TextVO('${a['rationale'] ?? ''}'),
+          commentIds: _stringList(a['commentIds']),
+          humanApproved: a['humanApproved'] == true,
+        );
+        final result = await injector.get<RecordDecisionUsecase>()(decision);
+        return result.fold((d) => _ok(_rfcDecisionJson(d)), _err);
+      },
+    );
+
+    server.tool(
+      'oracle_rfc_finalize',
+      description: 'Finalize an RFC. Enforces the termination gate: no VERIFIED critical finding open '
+          'AND every required section covered. If the gate holds but a decision is not humanApproved, '
+          'the RFC moves to awaiting_human (an agent never self-approves a product decision). When it '
+          'passes, the RFC is approved and its decisions are written back to long-term memory '
+          '(kind=decision), closing the loop. Returns an error listing blockers when not ready.',
+      toolInputSchema: const mcp.ToolInputSchema(
+        properties: {
+          'rfcId': {'type': 'string'}
+        },
+        required: ['rfcId'],
+      ),
+      callback: ({args, extra}) async {
+        final a = args ?? const {};
+        final result = await injector.get<FinalizeRfcUsecase>()(IdVO('${a['rfcId'] ?? ''}'));
+        return result.fold((r) => _ok(_rfcJson(r)), _err);
+      },
+    );
   }
 
   // ── helpers ──
+
+  /// Resolves a file evidence reference: the file in [locator] must exist and,
+  /// when an [excerpt] is given, contain it (whitespace-normalized). [locator]
+  /// may carry a trailing `:line` / `:start-end` range, which is stripped.
+  static bool _fileEvidenceResolves(String? locator, String? excerpt) {
+    if (locator == null || locator.trim().isEmpty) return false;
+    var path = locator.trim();
+    final range = RegExp(r'^(.*?):\d+(?:-\d+)?$').firstMatch(path);
+    if (range != null) path = range.group(1)!;
+    final file = File(path);
+    if (!file.existsSync()) return false;
+    if (excerpt == null || excerpt.trim().isEmpty) return true;
+    try {
+      String norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
+      return norm(file.readAsStringSync()).contains(norm(excerpt));
+    } catch (_) {
+      return false;
+    }
+  }
 
   static List<String> _stringList(Object? value) =>
       value is List ? value.map((e) => e.toString()).toList() : const [];
@@ -1975,5 +2187,52 @@ Capture is automatic — hooks record the session, each user request, and your w
         'requiredSections': s.requiredSections,
         'coveredRequired': s.coveredRequired,
         'checklistComplete': s.checklistComplete,
+      };
+
+  static Map<String, dynamic> _rfcRelationJson(RfcRelationEntity r) => {
+        'id': r.id.value,
+        'fromComment': r.fromComment.value,
+        'toComment': r.toComment.value,
+        'relation': r.relation,
+        'ground': r.ground,
+        'reason': r.reason.value,
+        'evidence': r.evidence,
+        'createdAt': r.createdAt?.toIso8601String(),
+      };
+
+  static Map<String, dynamic> _rfcResolutionJson(RfcResolutionEntity r) => {
+        'id': r.id.value,
+        'commentId': r.commentId.value,
+        'resolverAgent': r.resolverAgent,
+        'decision': r.decision,
+        'ground': r.ground,
+        'reason': r.reason.value,
+        'ruleId': r.ruleId?.value,
+        'decidedAt': r.decidedAt?.toIso8601String(),
+      };
+
+  static Map<String, dynamic> _rfcRoundJson(RfcRoundEntity r) => {
+        'id': r.id.value,
+        'rfcId': r.rfcId.value,
+        'versionId': r.versionId?.value,
+        'roundNo': r.roundNo,
+        'participants': r.participants,
+        'newCriticals': r.newCriticals,
+        'newMajors': r.newMajors,
+        'noveltyScore': r.noveltyScore,
+        'startedAt': r.startedAt?.toIso8601String(),
+        'endedAt': r.endedAt?.toIso8601String(),
+      };
+
+  static Map<String, dynamic> _rfcDecisionJson(RfcDecisionEntity d) => {
+        'id': d.id.value,
+        'rfcId': d.rfcId.value,
+        'question': d.question.value,
+        'chosenOption': d.chosenOption.value,
+        'rationale': d.rationale.value,
+        'commentIds': d.commentIds,
+        'humanApproved': d.humanApproved,
+        'memoryId': d.memoryId?.value,
+        'createdAt': d.createdAt?.toIso8601String(),
       };
 }

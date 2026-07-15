@@ -4,10 +4,15 @@ import '../../domain/dtos/rfc_bundle.dart';
 import '../../domain/dtos/rfc_comment_neighbor.dart';
 import '../../domain/dtos/rfc_status_report.dart';
 import '../../domain/entities/rfc_comment_entity.dart';
+import '../../domain/entities/rfc_decision_entity.dart';
 import '../../domain/entities/rfc_entity.dart';
 import '../../domain/entities/rfc_evidence_entity.dart';
+import '../../domain/entities/rfc_relation_entity.dart';
+import '../../domain/entities/rfc_resolution_entity.dart';
+import '../../domain/entities/rfc_round_entity.dart';
 import '../../domain/entities/rfc_section_entity.dart';
 import '../../domain/entities/rfc_version_entity.dart';
+import '../../domain/enums/rfc_status.dart';
 
 /// Data-access contract for multi-agent RFC review. Implementations **throw**
 /// typed failures; the repository wraps them in a `ResultDart`.
@@ -57,4 +62,30 @@ abstract interface class RfcDatasource {
   );
 
   Future<RfcStatusReport> rfcStatus(IdVO rfcId);
+
+  /// Adds a typed edge to the argumentation graph between two findings.
+  Future<RfcRelationEntity> addRelation(RfcRelationEntity relation);
+
+  /// Records a finding's outcome and, in one savepoint, stamps the comment's own
+  /// status with the resolution's decision.
+  Future<RfcResolutionEntity> resolveComment(RfcResolutionEntity resolution);
+
+  /// Opens a review round, computing the next round number when roundNo <= 0.
+  Future<RfcRoundEntity> startRound(RfcRoundEntity round);
+
+  /// Closes round [roundNo] of [rfcId]: computes new criticals/majors + novelty
+  /// score over the round's latest comments and stamps `ended_at`.
+  Future<RfcRoundEntity> closeRound(IdVO rfcId, int roundNo);
+
+  /// Records an important/product decision on an RFC.
+  Future<RfcDecisionEntity> recordDecision(RfcDecisionEntity decision);
+
+  /// Moves the RFC to [status], bumping `updated_at`.
+  Future<RfcEntity> setStatus(IdVO rfcId, RfcStatus status);
+
+  /// The decisions recorded on [rfcId], oldest first.
+  Future<List<RfcDecisionEntity>> listDecisions(IdVO rfcId);
+
+  /// Links a recorded decision to the memory it was written back to.
+  Future<void> setDecisionMemory(IdVO decisionId, IdVO memoryId);
 }
