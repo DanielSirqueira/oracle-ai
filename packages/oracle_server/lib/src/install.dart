@@ -318,8 +318,10 @@ List<AgentIntegration> agentIntegrations({
       mcpCli: 'codex mcp add oracle-ai -- "$command"',
       hooks: HookSupport.bridge,
       hooksFile: r'~/.codex/hooks.json',
+      // Codex has no SessionEnd event; Stop covers turn end. PostCompact mirrors
+      // Claude's config so compaction summaries are captured too.
       hooksSnippet: _claudeShapeCommandHooks(
-          bridge('codex'), const ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd']),
+          bridge('codex'), const ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'PostCompact', 'Stop']),
       instructionFile: 'AGENTS.md',
     ),
     AgentIntegration(
