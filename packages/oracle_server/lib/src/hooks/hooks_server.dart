@@ -181,19 +181,33 @@ class HooksServer {
   /// (which reads `cwd`, `session_id`, `tool_name`, `tool_response`,
   /// `last_assistant_message`) works no matter which agent sent the event.
   static Map<String, dynamic> _normalize(Map<String, dynamic> p) {
-    // Working directory — Cursor sends `workspace_roots: [..]` instead of `cwd`.
+    // Working directory — Cursor sends `workspace_roots: [..]`, Antigravity sends
+    // `workspacePaths: [..]`; neither sends `cwd`.
     if ('${p['cwd'] ?? ''}'.trim().isEmpty) {
-      final roots = p['workspace_roots'];
+      final roots = p['workspace_roots'] ?? p['workspacePaths'];
       p['cwd'] = (roots is List && roots.isNotEmpty)
           ? '${roots.first}'
           : (p['project_dir'] ?? p['worktree'] ?? '');
     }
-    // Session identity — Cursor `conversation_id`, Codex notify `thread-id`.
+    // Session identity — Cursor `conversation_id`, Antigravity `conversationId`,
+    // Codex notify `thread-id`.
     p['session_id'] ??= p['conversation_id'] ??
+        p['conversationId'] ??
         p['thread_id'] ??
         p['thread-id'] ??
         p['threadId'] ??
         p['externalSessionId'];
+    // Tool call — Antigravity nests it: `toolCall.name` + `toolCall.args`.
+    final toolCall = p['toolCall'];
+    if (toolCall is Map) {
+      p['tool_name'] ??= toolCall['name'];
+      final targs = toolCall['args'];
+      if ('${p['tool_response'] ?? ''}'.trim().isEmpty && targs != null) {
+        p['tool_response'] = (targs is Map && targs['CommandLine'] != null)
+            ? targs['CommandLine']
+            : jsonEncode(targs);
+      }
+    }
     // Tool result — Cursor `tool_output`/`result_json`/`output`.
     p['tool_response'] ??= p['tool_output'] ?? p['result_json'] ?? p['output'];
     // Final assistant text — Codex notify hyphenates it.

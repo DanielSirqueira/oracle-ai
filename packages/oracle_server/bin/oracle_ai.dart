@@ -144,6 +144,8 @@ Future<void> _runForwardHook(List<String> args, Map<String, String> env) async {
   try {
     final ai = args.indexOf('--agent');
     final agent = (ai >= 0 && ai + 1 < args.length) ? args[ai + 1] : 'unknown';
+    final ei = args.indexOf('--event');
+    final eventArg = (ei >= 0 && ei + 1 < args.length) ? args[ei + 1] : null;
 
     // The receiver's host/port/token belong to the INSTALL, not to whatever
     // project the agent happens to be running in — and the agent spawns us with
@@ -159,13 +161,28 @@ Future<void> _runForwardHook(List<String> args, Map<String, String> env) async {
 
     final raw = await stdin.fold<List<int>>(<int>[], (acc, chunk) => acc..addAll(chunk));
 
-    // Inject the agent id so capture attributes the session correctly, but only
-    // when the payload is a JSON object missing one — otherwise forward verbatim.
+    // Enrich the payload so capture works even for agents whose hooks send a
+    // sparse event (Antigravity carries no event name or cwd in the JSON — the
+    // event is implied by which hook fired, and it runs the hook in the
+    // workspace dir). Only fill what's missing; otherwise forward verbatim.
     List<int> body = raw;
     try {
       final decoded = jsonDecode(utf8.decode(raw));
-      if (decoded is Map<String, dynamic> && (decoded['agent'] == null)) {
-        decoded['agent'] = agent;
+      if (decoded is Map<String, dynamic>) {
+        decoded['agent'] ??= agent;
+        // The event name — passed via --event when the agent omits it.
+        if (eventArg != null &&
+            '${decoded['hook_event_name'] ?? decoded['event'] ?? ''}'.trim().isEmpty) {
+          decoded['hook_event_name'] = eventArg;
+        }
+        // Working directory — some agents put the project in the hook process's
+        // cwd rather than the payload. Fall back to it so the project resolves.
+        final hasCwd = '${decoded['cwd'] ?? ''}'.trim().isNotEmpty ||
+            (decoded['workspace_roots'] is List &&
+                (decoded['workspace_roots'] as List).isNotEmpty) ||
+            (decoded['workspacePaths'] is List &&
+                (decoded['workspacePaths'] as List).isNotEmpty);
+        if (!hasCwd) decoded['cwd'] = Directory.current.path;
         body = utf8.encode(jsonEncode(decoded));
       }
     } catch (_) {/* not JSON (or empty) — relay the raw bytes */}
@@ -180,7 +197,10 @@ Future<void> _runForwardHook(List<String> args, Map<String, String> env) async {
       req.add(body);
       final resp = await req.close().timeout(const Duration(seconds: 6));
       final reply = await resp.transform(utf8.decoder).join();
-      if (reply.isNotEmpty) stdout.write(reply);
+      // Most agents inject our reply (or ignore it). Antigravity would misread
+      // the Claude-shaped body as a hook decision — it's an inspect/never-block
+      // hook there, so stay silent (empty stdout + exit 0 = "allow").
+      if (reply.isNotEmpty && agent != 'antigravity') stdout.write(reply);
     } finally {
       client.close(force: true);
     }

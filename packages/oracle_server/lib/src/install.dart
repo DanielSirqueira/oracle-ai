@@ -297,6 +297,28 @@ String _geminiHooks(String bridge) => _enc.convert({
       },
     });
 
+/// Antigravity `~/.gemini/config/hooks.json`: top-level NAMED groups (not a
+/// `hooks` key), each event → `[{matcher, hooks:[{type,command,timeout}]}]`.
+/// Its events are PascalCase but distinct (no SessionStart/UserPromptSubmit); the
+/// payload carries no event name, so each command passes `--event` explicitly.
+/// Capture-only here: PostToolUse + Stop (Antigravity's payload has no inline
+/// prompt/response — those live in a separate transcript file).
+String _antigravityHooks(String command) {
+  String cmd(String ev) => '"$command" forward-hook --agent antigravity --event $ev';
+  Map<String, Object> entry(String ev, {String? matcher}) => {
+        if (matcher != null) 'matcher': matcher,
+        'hooks': [
+          {'type': 'command', 'command': cmd(ev), 'timeout': 30},
+        ],
+      };
+  return _enc.convert({
+    'oracle-ai': {
+      'PostToolUse': [entry('PostToolUse', matcher: '*')],
+      'Stop': [entry('Stop')],
+    },
+  });
+}
+
 /// VS Code Copilot MCP config uses the top-level `servers` key (not `mcpServers`).
 String _vscodeMcp(String command) => _enc.convert({
       'servers': {
@@ -388,7 +410,9 @@ List<AgentIntegration> agentIntegrations({
       name: 'Antigravity',
       mcpFile: r'~/.gemini/config/mcp_config.json',
       mcpSnippet: mcpStd,
-      hooks: HookSupport.none,
+      hooks: HookSupport.bridge,
+      hooksFile: r'~/.gemini/config/hooks.json',
+      hooksSnippet: _antigravityHooks(command),
       instructionFile: 'AGENTS.md',
     ),
   ];
