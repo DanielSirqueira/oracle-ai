@@ -9,6 +9,7 @@ import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
 import '../../widgets/markdown_view.dart';
+import '../../widgets/records_toolbar.dart';
 
 /// Browse and finalize the RFCs (technical specs published for multi-agent
 /// review) in scope for the selected project. Opening seeds a canonical
@@ -30,6 +31,8 @@ class _RfcsPageState extends State<RfcsPage> {
   RfcEntity? _selected;
   Future<List<RfcEntity>>? _future;
   _RfcFilter _filter = _RfcFilter.all;
+  int _detailRefresh = 0;
+  final _query = TextEditingController();
 
   @override
   void initState() {
@@ -41,6 +44,7 @@ class _RfcsPageState extends State<RfcsPage> {
   @override
   void dispose() {
     widget.project.removeListener(_reload);
+    _query.dispose();
     super.dispose();
   }
 
@@ -48,7 +52,10 @@ class _RfcsPageState extends State<RfcsPage> {
     final project = widget.project.value;
     if (project == null) return;
     setState(() {
-      _selected = select;
+      // Keep the current selection on plain reloads (e.g. after finalize) so the
+      // detail refreshes in place instead of dropping back to "select one".
+      _selected = select ?? _selected;
+      _detailRefresh++;
       _future = injector
           .get<ListRfcsUsecase>()(
             organizationId: project.organizationId,
@@ -88,10 +95,22 @@ class _RfcsPageState extends State<RfcsPage> {
       context,
       title: l10n.t('rfc.newTitle'),
       fields: (context, setState) => [
-        FieldRow(l10n.t('rfc.fieldTitle'), title, description: l10n.t('rfc.fieldTitleDesc')),
-        FieldRow(l10n.t('rfc.fieldType'), rfcType, description: l10n.t('rfc.fieldTypeDesc')),
-        FieldRow(l10n.t('rfc.fieldSummary'), summary,
-            maxLines: 8, description: l10n.t('rfc.fieldSummaryDesc')),
+        FieldRow(
+          l10n.t('rfc.fieldTitle'),
+          title,
+          description: l10n.t('rfc.fieldTitleDesc'),
+        ),
+        FieldRow(
+          l10n.t('rfc.fieldType'),
+          rfcType,
+          description: l10n.t('rfc.fieldTypeDesc'),
+        ),
+        FieldRow(
+          l10n.t('rfc.fieldSummary'),
+          summary,
+          maxLines: 8,
+          description: l10n.t('rfc.fieldSummaryDesc'),
+        ),
       ],
       onSave: () async {
         if (title.text.trim().isEmpty) return l10n.t('rfc.titleRequired');
@@ -100,7 +119,9 @@ class _RfcsPageState extends State<RfcsPage> {
           organizationId: project.organizationId,
           projectId: project.id,
           title: TextVO(title.text.trim()),
-          rfcType: rfcType.text.trim().isEmpty ? 'generic' : rfcType.text.trim(),
+          rfcType: rfcType.text.trim().isEmpty
+              ? 'generic'
+              : rfcType.text.trim(),
           authorAgent: 'oracle-studio',
         );
         final version = RfcVersionEntity(
@@ -128,7 +149,11 @@ class _RfcsPageState extends State<RfcsPage> {
               coverage: 'missing',
             ),
         ];
-        final result = await injector.get<OpenRfcUsecase>()(rfc, version, sections);
+        final result = await injector.get<OpenRfcUsecase>()(
+          rfc,
+          version,
+          sections,
+        );
         return result.fold((created) {
           _created = created;
           return null;
@@ -158,87 +183,118 @@ class _RfcsPageState extends State<RfcsPage> {
     if (!mounted) return;
     result.fold(
       (updated) {
-        showSnack(context, '${l10n.t('rfc.finalized')} ${_statusLabel(updated.status)}.');
+        showSnack(
+          context,
+          '${l10n.t('rfc.finalized')} ${_statusLabel(updated.status)}.',
+        );
         _reload();
       },
       (f) {
         final blockers = f.fields.map((e) => e.message).join(' · ');
-        showSnack(context, blockers.isEmpty
-            ? '${l10n.t('common.failure')}: ${f.errorMessage}'
-            : '${f.errorMessage}: $blockers');
+        showSnack(
+          context,
+          blockers.isEmpty
+              ? '${l10n.t('common.failure')}: ${f.errorMessage}'
+              : '${f.errorMessage}: $blockers',
+        );
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_future == null) return Center(child: Text(l10n.t('common.selectProject')));
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              Text(l10n.t('rfc.header'), style: Theme.of(context).textTheme.titleMedium),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: _createRfc,
-                icon: const Icon(Icons.add),
-                label: Text(l10n.t('rfc.new')),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Row(children: [
-            for (final f in _RfcFilter.values)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(_filterLabel(f)),
-                  selected: _filter == f,
-                  onSelected: (_) => setState(() => _filter = f),
+    if (_future == null) {
+      return Center(child: Text(l10n.t('common.selectProject')));
+    }
+    return AsyncView<List<RfcEntity>>(
+      future: _future!,
+      onRetry: _reload,
+      builder: (context, rfcs) {
+        final q = _query.text.trim().toLowerCase();
+        final filtered = rfcs
+            .where(
+              (rfc) =>
+                  _matchesFilter(rfc) &&
+                  (q.isEmpty ||
+                      rfc.title.value.toLowerCase().contains(q) ||
+                      rfc.rfcType.toLowerCase().contains(q)),
+            )
+            .toList();
+        return Column(
+          children: [
+            RecordsToolbar(
+              title: l10n.t('nav.rfcs'),
+              description: l10n.t('nav.rfcsHint'),
+              searchController: _query,
+              onSearchChanged: (_) => setState(() {}),
+              onRefresh: _reload,
+              resultCount: filtered.length,
+              filters: [
+                for (final f in _RfcFilter.values)
+                  ChoiceChip(
+                    label: Text(_filterLabel(f)),
+                    selected: _filter == f,
+                    onSelected: (_) => setState(() => _filter = f),
+                  ),
+              ],
+              actions: [
+                FilledButton.icon(
+                  onPressed: _createRfc,
+                  icon: const Icon(Icons.add),
+                  label: Text(l10n.t('rfc.new')),
                 ),
-              ),
-          ]),
-        ),
-        Expanded(
-          child: AsyncView<List<RfcEntity>>(
-            future: _future!,
-            builder: (context, rfcs) {
-              final filtered = rfcs.where(_matchesFilter).toList();
-              if (filtered.isEmpty) {
-                return Center(child: Text(l10n.t('rfc.empty')));
-              }
-              return MasterDetail(
-                master: ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (context, i) {
-                    final r = filtered[i];
-                    return ListTile(
-                      selected: _selected?.id.value == r.id.value,
-                      leading: const Icon(Icons.reviews_outlined, size: 20),
-                      title: Text(r.title.value, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      subtitle: Text('${r.rfcType} · ${fmtDateTime(r.updatedAt ?? r.createdAt)}',
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                      trailing: StatusBadge(_statusLabel(r.status), color: _statusColor(r.status)),
-                      onTap: () => setState(() => _selected = r),
-                    );
-                  },
-                ),
-                detail: _selected == null
-                    ? Center(child: Text(l10n.t('rfc.selectOne')))
-                    : _RfcDetail(
-                        key: ValueKey(_selected!.id.value),
-                        rfc: _selected!,
-                        onFinalize: () => _finalize(_selected!),
+              ],
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? RecordsEmptyState(
+                      title: l10n.t('records.noMatch'),
+                      description: l10n.t('records.noMatchHint'),
+                      icon: Icons.reviews_outlined,
+                    )
+                  : MasterDetail(
+                      master: ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (context, i) {
+                          final r = filtered[i];
+                          return ListTile(
+                            selected: _selected?.id.value == r.id.value,
+                            leading: const Icon(
+                              Icons.reviews_outlined,
+                              size: 20,
+                            ),
+                            title: Text(
+                              r.title.value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${r.rfcType} · ${fmtDateTime(r.updatedAt ?? r.createdAt)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: StatusBadge(
+                              _statusLabel(r.status),
+                              color: _statusColor(r.status),
+                            ),
+                            onTap: () => setState(() => _selected = r),
+                          );
+                        },
                       ),
-              );
-            },
-          ),
-        ),
-      ],
+                      detail: _selected == null
+                          ? Center(child: Text(l10n.t('rfc.selectOne')))
+                          : _RfcDetail(
+                              key: ValueKey(
+                                '${_selected!.id.value}#$_detailRefresh',
+                              ),
+                              rfc: _selected!,
+                              onFinalize: () => _finalize(_selected!),
+                            ),
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -276,9 +332,12 @@ class _RfcDetailState extends State<_RfcDetail> {
   }
 
   Future<(RfcBundle, RfcStatusReport)> _load() async {
-    final bundle = await injector.get<GetRfcUsecase>()(widget.rfc.id).then((r) => r.getOrThrow());
-    final status =
-        await injector.get<RfcStatusUsecase>()(widget.rfc.id).then((r) => r.getOrThrow());
+    final bundle = await injector.get<GetRfcUsecase>()(widget.rfc.id).then(
+      (r) => r.getOrThrow(),
+    );
+    final status = await injector.get<RfcStatusUsecase>()(widget.rfc.id).then(
+      (r) => r.getOrThrow(),
+    );
     return (bundle, status);
   }
 
@@ -301,50 +360,80 @@ class _RfcDetailState extends State<_RfcDetail> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                    child: Text(rfc.title.value,
-                        style: Theme.of(context).textTheme.titleLarge)),
-                StatusBadge(_statusLabel(rfc.status), color: _statusColor(rfc.status)),
+                  child: Text(
+                    rfc.title.value,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                StatusBadge(
+                  _statusLabel(rfc.status),
+                  color: _statusColor(rfc.status),
+                ),
               ],
             ),
             const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              MetaChip(rfc.rfcType, icon: Icons.category_outlined),
-              MetaChip('${l10n.t('rfc.round')} ${rfc.roundCount}', icon: Icons.loop),
-              MetaChip(rfc.authorAgent, icon: Icons.smart_toy_outlined),
-              MetaChip(fmtDateTime(rfc.updatedAt ?? rfc.createdAt), icon: Icons.schedule),
-            ]),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                MetaChip(rfc.rfcType, icon: Icons.category_outlined),
+                MetaChip(
+                  '${l10n.t('rfc.round')} ${rfc.roundCount}',
+                  icon: Icons.loop,
+                ),
+                MetaChip(rfc.authorAgent, icon: Icons.smart_toy_outlined),
+                MetaChip(
+                  fmtDateTime(rfc.updatedAt ?? rfc.createdAt),
+                  icon: Icons.schedule,
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             _ReadinessCard(status: status),
             const SizedBox(height: 16),
-            Row(children: [
-              FilledButton.icon(
-                onPressed: widget.onFinalize,
-                icon: const Icon(Icons.check_circle_outline),
-                label: Text(l10n.t('rfc.finalize')),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () => _copyPrompt(rfc, status),
-                icon: const Icon(Icons.content_copy_outlined),
-                label: Text(l10n.t('rfc.copyPrompt')),
-              ),
-            ]),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: widget.onFinalize,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: Text(l10n.t('rfc.finalize')),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _copyPrompt(rfc, status),
+                  icon: const Icon(Icons.content_copy_outlined),
+                  label: Text(l10n.t('rfc.copyPrompt')),
+                ),
+              ],
+            ),
             const Divider(height: 32),
-            Text(l10n.t('rfc.summaryTitle'), style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              l10n.t('rfc.summaryTitle'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             MarkdownView(bundle.version?.summary.value ?? ''),
             const Divider(height: 32),
-            Text('${l10n.t('rfc.sections')} (${bundle.sections.length})',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '${l10n.t('rfc.sections')} (${bundle.sections.length})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 4),
             for (final s in bundle.sections) _SectionTile(section: s),
             const Divider(height: 32),
-            Text('${l10n.t('rfc.findings')} (${bundle.comments.length})',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '${l10n.t('rfc.findings')} (${bundle.comments.length})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             if (bundle.comments.isEmpty)
-              Text(l10n.t('rfc.noFindings'),
-                  style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
+              Text(
+                l10n.t('rfc.noFindings'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: OracleBrand.gray400,
+                ),
+              ),
             for (final c in bundle.comments) _FindingCard(comment: c),
           ],
         );
@@ -368,19 +457,33 @@ class _ReadinessCard extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            StatusBadge(ready ? l10n.t('rfc.ready') : l10n.t('rfc.notReady'),
-                color: ready ? OracleBrand.success : OracleBrand.warning),
-            MetaChip('${l10n.t('rfc.blockingCriticals')}: ${status.blockingCriticals}',
-                icon: Icons.block),
-            MetaChip('${l10n.t('rfc.openMajors')}: ${status.openMajors}',
-                icon: Icons.priority_high),
-            MetaChip('${l10n.t('rfc.totalComments')}: ${status.totalComments}',
-                icon: Icons.forum_outlined),
-            MetaChip(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              StatusBadge(
+                ready ? l10n.t('rfc.ready') : l10n.t('rfc.notReady'),
+                color: ready ? OracleBrand.success : OracleBrand.warning,
+              ),
+              MetaChip(
+                '${l10n.t('rfc.blockingCriticals')}: ${status.blockingCriticals}',
+                icon: Icons.block,
+              ),
+              MetaChip(
+                '${l10n.t('rfc.openMajors')}: ${status.openMajors}',
+                icon: Icons.priority_high,
+              ),
+              MetaChip(
+                '${l10n.t('rfc.totalComments')}: ${status.totalComments}',
+                icon: Icons.forum_outlined,
+              ),
+              MetaChip(
                 '${l10n.t('rfc.requiredCovered')}: ${status.coveredRequired}/${status.requiredSections}',
-                icon: Icons.checklist),
-          ]),
+                icon: Icons.checklist,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -401,17 +504,25 @@ class _SectionTile extends StatelessWidget {
         tilePadding: const EdgeInsets.symmetric(horizontal: 4),
         childrenPadding: const EdgeInsets.only(left: 4, right: 4, bottom: 12),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        title: Row(children: [
-          Expanded(
-              child: Text(section.sectionKey,
-                  style: const TextStyle(fontWeight: FontWeight.w600))),
-          if (section.required)
-            const Padding(
-              padding: EdgeInsets.only(right: 8),
-              child: MetaChip('required', icon: Icons.gavel),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                section.sectionKey,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
-          StatusBadge(section.coverage, color: _coverageColor(section.coverage)),
-        ]),
+            if (section.required)
+              const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: MetaChip('required', icon: Icons.gavel),
+              ),
+            StatusBadge(
+              section.coverage,
+              color: _coverageColor(section.coverage),
+            ),
+          ],
+        ),
         children: [MarkdownView(section.content.value)],
       ),
     );
@@ -433,29 +544,53 @@ class _FindingCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              StatusBadge(comment.type.code, color: OracleBrand.blue),
-              StatusBadge(comment.severity.code, color: _severityColor(comment.severity)),
-              StatusBadge(
-                  comment.verified ? l10n.t('rfc.verified') : l10n.t('rfc.unverified'),
-                  color: comment.verified ? OracleBrand.success : OracleBrand.gray500),
-              MetaChip(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StatusBadge(comment.type.code, color: OracleBrand.blue),
+                StatusBadge(
+                  comment.severity.code,
+                  color: _severityColor(comment.severity),
+                ),
+                StatusBadge(
+                  comment.verified
+                      ? l10n.t('rfc.verified')
+                      : l10n.t('rfc.unverified'),
+                  color: comment.verified
+                      ? OracleBrand.success
+                      : OracleBrand.gray500,
+                ),
+                MetaChip(
                   comment.reviewerRole == null
                       ? comment.authorAgent
                       : '${comment.authorAgent} · ${comment.reviewerRole}',
-                  icon: Icons.person_outline),
-            ]),
+                  icon: Icons.person_outline,
+                ),
+              ],
+            ),
             const SizedBox(height: 10),
             if (comment.problem.value.trim().isNotEmpty) ...[
-              Text(l10n.t('rfc.problem'),
-                  style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
+              Text(
+                l10n.t('rfc.problem'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: OracleBrand.gray400,
+                ),
+              ),
               const SizedBox(height: 2),
               MarkdownView(comment.problem.value),
             ],
             if (comment.proposedSolution.value.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(l10n.t('rfc.solution'),
-                  style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
+              Text(
+                l10n.t('rfc.solution'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: OracleBrand.gray400,
+                ),
+              ),
               const SizedBox(height: 2),
               MarkdownView(comment.proposedSolution.value),
             ],

@@ -71,7 +71,9 @@ class OracleConnection extends ChangeNotifier {
   /// too — so the order change is transparent for development.
   static String? _findEnvFile() {
     final override = Platform.environment['ORACLE_ENV_PATH'];
-    if (override != null && override.trim().isNotEmpty && File(override).existsSync()) {
+    if (override != null &&
+        override.trim().isNotEmpty &&
+        File(override).existsSync()) {
       return override;
     }
     for (final start in [

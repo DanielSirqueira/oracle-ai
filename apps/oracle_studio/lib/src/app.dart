@@ -39,8 +39,10 @@ class _OracleStudioAppState extends State<OracleStudioApp> {
         debugShowCheckedModeBanner: false,
         theme: OracleBrand.theme(),
         home: switch (_connection.status) {
-          OracleConnectionStatus.connected =>
-            HomeShell(connection: _connection, daemon: _daemon),
+          OracleConnectionStatus.connected => HomeShell(
+            connection: _connection,
+            daemon: _daemon,
+          ),
           OracleConnectionStatus.error => _ErrorScreen(connection: _connection),
           _ => const _ConnectingScreen(),
         },
@@ -92,8 +94,10 @@ class _ErrorScreen extends StatelessWidget {
               const SizedBox(height: 16),
               GradientTitle(l10n.t('app.connectFailTitle')),
               const SizedBox(height: 8),
-              Text(connection.error ?? '—',
-                  style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                connection.error ?? '—',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               const SizedBox(height: 8),
               Text(
                 connection.envPath == null

@@ -1,6 +1,7 @@
 import 'package:oracle_core/oracle_core.dart';
 
 import 'domain/repositories/project_repository.dart';
+import 'domain/usecases/delete_project_usecase.dart';
 import 'domain/usecases/get_project_by_id_usecase.dart';
 import 'domain/usecases/list_projects_usecase.dart';
 import 'domain/usecases/register_project_usecase.dart';
@@ -20,6 +21,7 @@ class ProjectModule extends Module {
       ..addLazySingleton<RegisterProjectUsecase>(RegisterProjectUsecaseImpl.new)
       ..addLazySingleton<ResolveProjectUsecase>(ResolveProjectUsecaseImpl.new)
       ..addLazySingleton<GetProjectByIdUsecase>(GetProjectByIdUsecaseImpl.new)
-      ..addLazySingleton<ListProjectsUsecase>(ListProjectsUsecaseImpl.new);
+      ..addLazySingleton<ListProjectsUsecase>(ListProjectsUsecaseImpl.new)
+      ..addLazySingleton<DeleteProjectUsecase>(DeleteProjectUsecaseImpl.new);
   }
 }

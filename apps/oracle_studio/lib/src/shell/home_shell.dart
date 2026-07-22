@@ -11,6 +11,9 @@ import '../core/oracle_connection.dart';
 import '../features/backup/backup_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/duplicates/duplicates_page.dart';
+import '../features/flows/flows_page.dart';
+import '../features/flows/runs_page.dart';
+import '../features/flows/tasks_page.dart';
 import '../features/handoffs/handoffs_page.dart';
 import '../features/memories/memories_page.dart';
 import '../features/modules/modules_page.dart';
@@ -21,6 +24,7 @@ import '../features/search/search_page.dart';
 import '../features/sessions/sessions_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/skills/skills_page.dart';
+import '../widgets/editor_dialog.dart';
 
 /// One navigation entry (flat index shared with the page list).
 class _Nav {
@@ -42,25 +46,80 @@ class _NavGroup {
 /// the page list in [_HomeShellState.build], so keep the two in lockstep.
 const _navGroups = <_NavGroup>[
   _NavGroup('nav.groupOverview', [
-    _Nav(Icons.dashboard_outlined, Icons.dashboard, 'nav.dashboard', 'nav.dashboardHint'),
+    _Nav(
+      Icons.dashboard_outlined,
+      Icons.dashboard,
+      'nav.dashboard',
+      'nav.dashboardHint',
+    ),
     _Nav(Icons.search_outlined, Icons.search, 'nav.search', 'nav.searchHint'),
   ]),
   _NavGroup('nav.groupKnowledge', [
-    _Nav(Icons.psychology_outlined, Icons.psychology, 'nav.memories', 'nav.memoriesHint'),
+    _Nav(
+      Icons.psychology_outlined,
+      Icons.psychology,
+      'nav.memories',
+      'nav.memoriesHint',
+    ),
     _Nav(Icons.rule_outlined, Icons.rule, 'nav.rules', 'nav.rulesHint'),
     _Nav(Icons.reviews_outlined, Icons.reviews, 'nav.rfcs', 'nav.rfcsHint'),
     _Nav(Icons.school_outlined, Icons.school, 'nav.skills', 'nav.skillsHint'),
-    _Nav(Icons.widgets_outlined, Icons.widgets, 'nav.modules', 'nav.modulesHint'),
+    _Nav(
+      Icons.widgets_outlined,
+      Icons.widgets,
+      'nav.modules',
+      'nav.modulesHint',
+    ),
+  ]),
+  _NavGroup('nav.groupLoop', [
+    _Nav(
+      Icons.checklist_outlined,
+      Icons.checklist,
+      'nav.tasks',
+      'nav.tasksHint',
+    ),
+    _Nav(
+      Icons.account_tree_outlined,
+      Icons.account_tree,
+      'nav.flows',
+      'nav.flowsHint',
+    ),
+    _Nav(
+      Icons.play_circle_outline,
+      Icons.play_circle,
+      'nav.runs',
+      'nav.runsHint',
+    ),
   ]),
   _NavGroup('nav.groupActivity', [
     _Nav(Icons.forum_outlined, Icons.forum, 'nav.sessions', 'nav.sessionsHint'),
-    _Nav(Icons.swap_horiz_outlined, Icons.swap_horiz, 'nav.handoffs', 'nav.handoffsHint'),
-    _Nav(Icons.manage_search_outlined, Icons.manage_search, 'nav.searchHistory', 'nav.searchHistoryHint'),
+    _Nav(
+      Icons.swap_horiz_outlined,
+      Icons.swap_horiz,
+      'nav.handoffs',
+      'nav.handoffsHint',
+    ),
+    _Nav(
+      Icons.manage_search_outlined,
+      Icons.manage_search,
+      'nav.searchHistory',
+      'nav.searchHistoryHint',
+    ),
   ]),
   _NavGroup('nav.groupSystem', [
-    _Nav(Icons.content_copy_outlined, Icons.content_copy, 'nav.duplicates', 'nav.duplicatesHint'),
+    _Nav(
+      Icons.content_copy_outlined,
+      Icons.content_copy,
+      'nav.duplicates',
+      'nav.duplicatesHint',
+    ),
     _Nav(Icons.save_outlined, Icons.save, 'nav.backup', 'nav.backupHint'),
-    _Nav(Icons.settings_outlined, Icons.settings, 'nav.settings', 'nav.settingsHint'),
+    _Nav(
+      Icons.settings_outlined,
+      Icons.settings,
+      'nav.settings',
+      'nav.settingsHint',
+    ),
   ]),
 ];
 
@@ -81,7 +140,8 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener {
+class _HomeShellState extends State<HomeShell>
+    with TrayListener, WindowListener {
   int _index = 0;
   List<ProjectEntity> _projects = const [];
   final ValueNotifier<ProjectEntity?> _selected = ValueNotifier(null);
@@ -99,22 +159,64 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
     await windowManager.setPreventClose(true);
     await trayManager.setIcon('assets/tray_icon.ico');
     await trayManager.setToolTip(l10n.t('tray.tooltip'));
-    await trayManager.setContextMenu(Menu(items: [
-      MenuItem(key: 'open', label: l10n.t('tray.open')),
-      MenuItem(key: 'backup', label: l10n.t('tray.backup')),
-      MenuItem.separator(),
-      MenuItem(key: 'quit', label: l10n.t('tray.quit')),
-    ]));
+    await trayManager.setContextMenu(
+      Menu(
+        items: [
+          MenuItem(key: 'open', label: l10n.t('tray.open')),
+          MenuItem(key: 'backup', label: l10n.t('tray.backup')),
+          MenuItem.separator(),
+          MenuItem(key: 'quit', label: l10n.t('tray.quit')),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadProjects() async {
-    final result = await injector.get<ListProjectsUsecase>()(const ProjectFilter(limit: 200));
+    final result = await injector.get<ListProjectsUsecase>()(
+      const ProjectFilter(limit: 200),
+    );
     final projects = result.getOrDefault(const []);
     if (!mounted) return;
     setState(() {
       _projects = projects;
       _selected.value ??= projects.isEmpty ? null : projects.first;
     });
+  }
+
+  /// Deletes a project (everything scoped to it cascades) after an explicit
+  /// confirmation — the cleanup path for wrongly auto-registered projects
+  /// (worktrees/temp dirs captured before the canonicalization fix).
+  Future<void> _deleteProject(ProjectEntity p) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.t('shell.deleteProject')),
+        content: Text(
+          l10n
+              .t('shell.deleteProjectConfirm')
+              .replaceAll('{p}', p.name.value)
+              .replaceAll('{path}', p.repoPath ?? ''),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.t('common.cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: OracleBrand.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.t('shell.deleteProjectDo')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final result = await injector.get<DeleteProjectUsecase>()(p.id);
+    if (!mounted) return;
+    result.fold((_) {
+      if (_selected.value?.id.value == p.id.value) _selected.value = null;
+      _loadProjects();
+    }, (f) => showSnack(context, f.errorMessage));
   }
 
   // ── tray/window events ──
@@ -168,6 +270,9 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
       RfcsPage(project: _selected),
       SkillsPage(project: _selected),
       ModulesPage(connection: widget.connection, project: _selected),
+      TasksPage(project: _selected, daemon: widget.daemon),
+      FlowsPage(project: _selected),
+      RunsPage(project: _selected, daemon: widget.daemon),
       SessionsPage(project: _selected),
       HandoffsPage(project: _selected),
       SearchHistoryPage(project: _selected),
@@ -183,7 +288,8 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
             selectedIndex: _index,
             onSelect: (i) => setState(() => _index = i),
             daemon: widget.daemon,
-            connected: widget.connection.status == OracleConnectionStatus.connected,
+            connected:
+                widget.connection.status == OracleConnectionStatus.connected,
           ),
           Expanded(
             child: Column(
@@ -194,9 +300,12 @@ class _HomeShellState extends State<HomeShell> with TrayListener, WindowListener
                   projects: _projects,
                   selected: _selected,
                   envPath: widget.connection.envPath,
+                  onDeleteProject: _deleteProject,
                 ),
                 const Divider(height: 1),
-                Expanded(child: IndexedStack(index: _index, children: pages)),
+                Expanded(
+                  child: IndexedStack(index: _index, children: pages),
+                ),
               ],
             ),
           ),
@@ -234,18 +343,28 @@ class _Sidebar extends StatelessWidget {
           // brand header
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
-            child: Row(children: [
-              const OracleLogo(size: 34),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const GradientTitle('Oracle Studio', style: TextStyle(fontSize: 16)),
-                  Text(l10n.t('shell.tagline'),
-                      style: const TextStyle(fontSize: 11, color: OracleBrand.gray500)),
-                ],
-              ),
-            ]),
+            child: Row(
+              children: [
+                const OracleLogo(size: 34),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const GradientTitle(
+                      'Oracle Studio',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    Text(
+                      l10n.t('shell.tagline'),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: OracleBrand.gray500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const Divider(height: 1),
           // grouped nav
@@ -285,26 +404,40 @@ class _Sidebar extends StatelessWidget {
               animation: daemon,
               builder: (context, _) {
                 final online = connected;
-                return Row(children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: online ? OracleBrand.success : OracleBrand.gray500,
-                      shape: BoxShape.circle,
+                return Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: online
+                            ? OracleBrand.success
+                            : OracleBrand.gray500,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    online ? l10n.t('shell.connected') : l10n.t('shell.offline'),
-                    style: const TextStyle(fontSize: 12, color: OracleBrand.gray400),
-                  ),
-                  const Spacer(),
-                  Text(
-                    daemon.hooksRunning ? l10n.t('shell.daemonOn') : l10n.t('shell.daemonOff'),
-                    style: const TextStyle(fontSize: 11, color: OracleBrand.gray500),
-                  ),
-                ]);
+                    const SizedBox(width: 8),
+                    Text(
+                      online
+                          ? l10n.t('shell.connected')
+                          : l10n.t('shell.offline'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: OracleBrand.gray400,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      daemon.hooksRunning
+                          ? l10n.t('shell.daemonOn')
+                          : l10n.t('shell.daemonOff'),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: OracleBrand.gray500,
+                      ),
+                    ),
+                  ],
+                );
               },
             ),
           ),
@@ -331,29 +464,35 @@ class _NavTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
-        color: selected ? OracleBrand.violet.withValues(alpha: 0.16) : Colors.transparent,
+        color: selected
+            ? OracleBrand.violet.withValues(alpha: 0.16)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () => onSelect(index),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            child: Row(children: [
-              Icon(
-                selected ? nav.selectedIcon : nav.icon,
-                size: 19,
-                color: selected ? OracleBrand.violetSoft : OracleBrand.gray400,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                l10n.t(nav.labelKey),
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? OracleBrand.gray100 : OracleBrand.gray400,
+            child: Row(
+              children: [
+                Icon(
+                  selected ? nav.selectedIcon : nav.icon,
+                  size: 19,
+                  color: selected
+                      ? OracleBrand.violetSoft
+                      : OracleBrand.gray400,
                 ),
-              ),
-            ]),
+                const SizedBox(width: 12),
+                Text(
+                  l10n.t(nav.labelKey),
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: selected ? OracleBrand.gray100 : OracleBrand.gray400,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -369,12 +508,14 @@ class _TopBar extends StatelessWidget {
   final List<ProjectEntity> projects;
   final ValueNotifier<ProjectEntity?> selected;
   final String? envPath;
+  final Future<void> Function(ProjectEntity)? onDeleteProject;
   const _TopBar({
     required this.title,
     required this.subtitle,
     required this.projects,
     required this.selected,
     required this.envPath,
+    this.onDeleteProject,
   });
 
   @override
@@ -390,15 +531,24 @@ class _TopBar extends StatelessWidget {
               children: [
                 Text(title, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 1),
-                Text(subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: OracleBrand.gray500)),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: OracleBrand.gray500,
+                  ),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 16),
-          _ProjectSwitcher(projects: projects, selected: selected),
+          _ProjectSwitcher(
+            projects: projects,
+            selected: selected,
+            onDelete: onDeleteProject,
+          ),
         ],
       ),
     );
@@ -411,7 +561,15 @@ class _TopBar extends StatelessWidget {
 class _ProjectSwitcher extends StatelessWidget {
   final List<ProjectEntity> projects;
   final ValueNotifier<ProjectEntity?> selected;
-  const _ProjectSwitcher({required this.projects, required this.selected});
+
+  /// Deletes a project (with everything scoped to it) — used to clean up
+  /// wrongly auto-registered ones. Null hides the affordance.
+  final Future<void> Function(ProjectEntity)? onDelete;
+  const _ProjectSwitcher({
+    required this.projects,
+    required this.selected,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -427,10 +585,22 @@ class _ProjectSwitcher extends StatelessWidget {
             for (final p in projects)
               PopupMenuItem(
                 value: p,
-                child: _ProjectRow(project: p, selected: p.id.value == current?.id.value),
+                child: _ProjectRow(
+                  project: p,
+                  selected: p.id.value == current?.id.value,
+                  onDelete: onDelete == null
+                      ? null
+                      : () {
+                          Navigator.of(context).pop();
+                          onDelete!(p);
+                        },
+                ),
               ),
             if (projects.isEmpty)
-              PopupMenuItem(enabled: false, child: Text(l10n.t('shell.noProjects'))),
+              PopupMenuItem(
+                enabled: false,
+                child: Text(l10n.t('shell.noProjects')),
+              ),
           ],
           child: Container(
             constraints: const BoxConstraints(maxWidth: 400, minWidth: 240),
@@ -440,7 +610,10 @@ class _ProjectSwitcher extends StatelessWidget {
               // the interactive project switcher, not just a label.
               color: OracleBrand.gray800,
               borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: OracleBrand.violet.withValues(alpha: 0.55), width: 1.5),
+              border: Border.all(
+                color: OracleBrand.violet.withValues(alpha: 0.55),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: OracleBrand.violet.withValues(alpha: 0.18),
@@ -449,50 +622,67 @@ class _ProjectSwitcher extends StatelessWidget {
                 ),
               ],
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  gradient: OracleBrand.gradient,
-                  borderRadius: BorderRadius.circular(8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    gradient: OracleBrand.gradient,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.folder_rounded,
+                    size: 17,
+                    color: Colors.white,
+                  ),
                 ),
-                child: const Icon(Icons.folder_rounded, size: 17, color: Colors.white),
-              ),
-              const SizedBox(width: 11),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.t('shell.project').toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        letterSpacing: 0.8,
-                        fontWeight: FontWeight.w700,
-                        color: OracleBrand.violetSoft,
+                const SizedBox(width: 11),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.t('shell.project').toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w700,
+                          color: OracleBrand.violetSoft,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      current?.name.value ?? l10n.t('shell.project'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600, color: OracleBrand.gray100),
-                    ),
-                    Text(
-                      _pathOf(current),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: OracleBrand.gray400),
-                    ),
-                  ],
+                      const SizedBox(height: 1),
+                      Text(
+                        current?.name.value ?? l10n.t('shell.project'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: OracleBrand.gray100,
+                        ),
+                      ),
+                      Text(
+                        _pathOf(current),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: OracleBrand.gray400,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              const Icon(Icons.unfold_more, size: 18, color: OracleBrand.violetSoft),
-            ]),
+                const SizedBox(width: 10),
+                const Icon(
+                  Icons.unfold_more,
+                  size: 18,
+                  color: OracleBrand.violetSoft,
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -508,42 +698,68 @@ class _ProjectSwitcher extends StatelessWidget {
 class _ProjectRow extends StatelessWidget {
   final ProjectEntity project;
   final bool selected;
-  const _ProjectRow({required this.project, required this.selected});
+  final VoidCallback? onDelete;
+  const _ProjectRow({
+    required this.project,
+    required this.selected,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
     final path = project.repoPath;
     return SizedBox(
       width: 320,
-      child: Row(children: [
-        Icon(
-          selected ? Icons.check_circle : Icons.folder_outlined,
-          size: 18,
-          color: selected ? OracleBrand.violetSoft : OracleBrand.gray500,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(project.name.value,
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.check_circle : Icons.folder_outlined,
+            size: 18,
+            color: selected ? OracleBrand.violetSoft : OracleBrand.gray500,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  project.name.value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                      color: OracleBrand.gray100)),
-              Text(
-                (path == null || path.isEmpty) ? l10n.t('shell.noPath') : path,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: OracleBrand.gray500),
-              ),
-            ],
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: OracleBrand.gray100,
+                  ),
+                ),
+                Text(
+                  (path == null || path.isEmpty)
+                      ? l10n.t('shell.noPath')
+                      : path,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: OracleBrand.gray500,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ]),
+          if (onDelete != null)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: l10n.t('shell.deleteProject'),
+              icon: const Icon(
+                Icons.delete_outline,
+                size: 16,
+                color: OracleBrand.gray500,
+              ),
+              onPressed: onDelete,
+            ),
+        ],
+      ),
     );
   }
 }

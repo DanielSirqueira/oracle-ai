@@ -8,6 +8,7 @@ import '../../core/l10n.dart';
 import '../../core/oracle_connection.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/editor_dialog.dart';
+import '../../widgets/records_toolbar.dart';
 
 enum _DupKind { memories, rules }
 
@@ -18,7 +19,13 @@ class _DupMember {
   final String meta; // pre-formatted subtitle line
   final double keepScore; // higher = better candidate to keep
   final DateTime? createdAt;
-  const _DupMember(this.id, this.title, this.meta, this.keepScore, this.createdAt);
+  const _DupMember(
+    this.id,
+    this.title,
+    this.meta,
+    this.keepScore,
+    this.createdAt,
+  );
 }
 
 class _Pair {
@@ -42,7 +49,11 @@ class _DupCluster {
 class DuplicatesPage extends StatefulWidget {
   final OracleConnection connection;
   final ValueNotifier<ProjectEntity?> project;
-  const DuplicatesPage({super.key, required this.connection, required this.project});
+  const DuplicatesPage({
+    super.key,
+    required this.connection,
+    required this.project,
+  });
 
   @override
   State<DuplicatesPage> createState() => _DuplicatesPageState();
@@ -57,6 +68,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
   Future<List<_DupCluster>>? _future;
   bool _busy = false;
   final Map<String, String> _keep = {}; // clusterKey -> id to keep
+  final _query = TextEditingController();
 
   @override
   void initState() {
@@ -68,6 +80,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
   @override
   void dispose() {
     widget.project.removeListener(_reload);
+    _query.dispose();
     super.dispose();
   }
 
@@ -101,14 +114,16 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
         AND a.project_id = :pid::uuid AND b.project_id = :pid::uuid
         AND (a.embedding <=> b.embedding) < :maxd
       ORDER BY distance LIMIT 300''';
-    final res = await db.select(SqlStatement(sql, {'pid': pid, 'maxd': _maxDistance}));
+    final res = await db.select(
+      SqlStatement(sql, {'pid': pid, 'maxd': _maxDistance}),
+    );
     _DupMember mem(Map<String, dynamic> r, String p) {
       final imp = r['${p}_imp']?.toDouble() ?? 0;
       return _DupMember(
         r['${p}_id']?.toText() ?? '',
         r['${p}_title']?.toText() ?? '',
         '${r['${p}_kind']?.toText() ?? ''} · ${l10n.t('mem.importance').toLowerCase()} '
-            '${imp.toStringAsFixed(2)} · ${fmtDateTime(r['${p}_created']?.toDateTime())}',
+        '${imp.toStringAsFixed(2)} · ${fmtDateTime(r['${p}_created']?.toDateTime())}',
         imp, // higher importance = keep
         r['${p}_created']?.toDateTime(),
       );
@@ -116,7 +131,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
 
     return [
       for (final r in res.rows)
-        _Pair(mem(r, 'a'), mem(r, 'b'), r['distance']?.toDouble() ?? 1.0)
+        _Pair(mem(r, 'a'), mem(r, 'b'), r['distance']?.toDouble() ?? 1.0),
     ];
   }
 
@@ -133,14 +148,16 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
         AND a.project_id = :pid::uuid AND b.project_id = :pid::uuid
         AND (a.embedding <=> b.embedding) < :maxd
       ORDER BY distance LIMIT 300''';
-    final res = await db.select(SqlStatement(sql, {'pid': pid, 'maxd': _maxDistance}));
+    final res = await db.select(
+      SqlStatement(sql, {'pid': pid, 'maxd': _maxDistance}),
+    );
     _DupMember rule(Map<String, dynamic> r, String p) {
       final prio = r['${p}_prio']?.toInt() ?? 50;
       return _DupMember(
         r['${p}_id']?.toText() ?? '',
         r['${p}_title']?.toText() ?? '',
         '${r['${p}_key']?.toText() ?? ''} · ${l10n.t('rule.priority').toLowerCase()} '
-            '$prio · ${fmtDateTime(r['${p}_created']?.toDateTime())}',
+        '$prio · ${fmtDateTime(r['${p}_created']?.toDateTime())}',
         -prio.toDouble(), // lower priority number = more relevant = keep
         r['${p}_created']?.toDateTime(),
       );
@@ -148,7 +165,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
 
     return [
       for (final r in res.rows)
-        _Pair(rule(r, 'a'), rule(r, 'b'), r['distance']?.toDouble() ?? 1.0)
+        _Pair(rule(r, 'a'), rule(r, 'b'), r['distance']?.toDouble() ?? 1.0),
     ];
   }
 
@@ -182,8 +199,9 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
     for (final p in pairs) {
       if (p.a.id.isEmpty) continue;
       final root = find(p.a.id);
-      minDist[root] =
-          minDist[root] == null ? p.distance : (p.distance < minDist[root]! ? p.distance : minDist[root]!);
+      minDist[root] = minDist[root] == null
+          ? p.distance
+          : (p.distance < minDist[root]! ? p.distance : minDist[root]!);
     }
 
     final grouped = <String, List<_DupMember>>{};
@@ -197,7 +215,9 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
       list.sort((a, b) {
         final byScore = b.keepScore.compareTo(a.keepScore);
         if (byScore != 0) return byScore;
-        return (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0));
+        return (b.createdAt ?? DateTime(0)).compareTo(
+          a.createdAt ?? DateTime(0),
+        );
       });
       _keep.putIfAbsent(root, () => list.first.id);
       clusters.add(_DupCluster(list, minDist[root] ?? 0));
@@ -211,19 +231,26 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
 
   Future<void> _retire(String id) async {
     if (_kind == _DupKind.memories) {
-      await injector
-          .get<ForgetMemoryUsecase>()(IdVO(id), reason: 'duplicate (via Oracle Studio)', hard: false);
+      await injector.get<ForgetMemoryUsecase>()(
+        IdVO(id),
+        reason: 'duplicate (via Oracle Studio)',
+        hard: false,
+      );
     } else {
-      await injector
-          .get<RetireRuleUsecase>()(IdVO(id), reason: 'duplicate (via Oracle Studio)', hard: false);
+      await injector.get<RetireRuleUsecase>()(
+        IdVO(id),
+        reason: 'duplicate (via Oracle Studio)',
+        hard: false,
+      );
     }
   }
 
   Future<void> _runSweep() async {
     setState(() => _busy = true);
     // Dedup pass only (no decay) — retire the weaker of each near-duplicate pair.
-    final result = await injector
-        .get<RunMaintenanceUsecase>()(const DecayPolicy(runDecay: false, runDedup: true));
+    final result = await injector.get<RunMaintenanceUsecase>()(
+      const DecayPolicy(runDecay: false, runDedup: true),
+    );
     if (!mounted) return;
     setState(() => _busy = false);
     result.fold(
@@ -231,7 +258,8 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
         showSnack(context, l10n.t('dup.sweepDone'));
         _reload();
       },
-      (f) => showSnack(context, '${l10n.t('common.failure')}: ${f.errorMessage}'),
+      (f) =>
+          showSnack(context, '${l10n.t('common.failure')}: ${f.errorMessage}'),
     );
   }
 
@@ -264,69 +292,86 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
     }
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(children: [
+        RecordsToolbar(
+          title: l10n.t('nav.duplicates'),
+          description: l10n.t('dup.intro'),
+          searchController: _query,
+          onSearchChanged: (_) => setState(() {}),
+          onRefresh: _reload,
+          refreshing: _busy,
+          filters: [
             SegmentedButton<_DupKind>(
               segments: [
                 ButtonSegment(
-                    value: _DupKind.memories,
-                    label: Text(l10n.t('dup.memories')),
-                    icon: const Icon(Icons.psychology_outlined, size: 16)),
+                  value: _DupKind.memories,
+                  label: Text(l10n.t('dup.memories')),
+                  icon: const Icon(Icons.psychology_outlined, size: 16),
+                ),
                 ButtonSegment(
-                    value: _DupKind.rules,
-                    label: Text(l10n.t('dup.rules')),
-                    icon: const Icon(Icons.rule_outlined, size: 16)),
+                  value: _DupKind.rules,
+                  label: Text(l10n.t('dup.rules')),
+                  icon: const Icon(Icons.rule_outlined, size: 16),
+                ),
               ],
               selected: {_kind},
               onSelectionChanged: _busy
                   ? null
                   : (s) => setState(() {
-                        _kind = s.first;
-                        _reload();
-                      }),
+                      _kind = s.first;
+                      _reload();
+                    }),
             ),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _reload,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: Text(l10n.t('dup.rescan')),
-            ),
-            if (_kind == _DupKind.memories) ...[
-              const SizedBox(width: 8),
+          ],
+          actions: [
+            if (_kind == _DupKind.memories)
               FilledButton.icon(
                 onPressed: _busy ? null : _runSweep,
                 icon: const Icon(Icons.cleaning_services_outlined, size: 18),
                 label: Text(l10n.t('dup.runSweep')),
               ),
-            ],
-          ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(l10n.t('dup.intro'),
-                style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
-          ),
+          ],
         ),
         if (_busy) const LinearProgressIndicator(minHeight: 2),
         Expanded(
           child: AsyncView<List<_DupCluster>>(
             future: _future!,
-            builder: (context, clusters) => clusters.isEmpty
-                ? Center(child: Text(l10n.t('dup.none')))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: clusters.length,
-                    itemBuilder: (context, i) => _ClusterCard(
-                      cluster: clusters[i],
-                      keepId: _keep[_clusterKey(clusters[i])],
-                      onKeep: (id) => setState(() => _keep[_clusterKey(clusters[i])] = id),
-                      onRetire: () => _retireOthers(clusters[i]),
-                      busy: _busy,
-                    ),
-                  ),
+            builder: (context, clusters) {
+              final q = _query.text.trim().toLowerCase();
+              final filtered = clusters
+                  .where(
+                    (c) =>
+                        q.isEmpty ||
+                        c.members.any(
+                          (m) =>
+                              m.title.toLowerCase().contains(q) ||
+                              m.meta.toLowerCase().contains(q),
+                        ),
+                  )
+                  .toList();
+              return filtered.isEmpty
+                  ? RecordsEmptyState(
+                      title: clusters.isEmpty
+                          ? l10n.t('dup.none')
+                          : l10n.t('records.noMatch'),
+                      description: clusters.isEmpty
+                          ? null
+                          : l10n.t('records.noMatchHint'),
+                      icon: Icons.content_copy_outlined,
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) => _ClusterCard(
+                        cluster: filtered[i],
+                        keepId: _keep[_clusterKey(filtered[i])],
+                        onKeep: (id) => setState(
+                          () => _keep[_clusterKey(filtered[i])] = id,
+                        ),
+                        onRetire: () => _retireOthers(filtered[i]),
+                        busy: _busy,
+                      ),
+                    );
+            },
           ),
         ),
       ],
@@ -357,34 +402,54 @@ class _ClusterCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              MetaChip('${cluster.members.length} ${l10n.t('dup.items')}',
-                  icon: Icons.content_copy_outlined),
-              const SizedBox(width: 8),
-              MetaChip('~${cluster.minDistance.toStringAsFixed(3)}', icon: Icons.straighten),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: busy ? null : onRetire,
-                icon: const Icon(Icons.auto_delete_outlined, size: 16),
-                label: Text(l10n.t('dup.retireOthers')),
-              ),
-            ]),
+            Row(
+              children: [
+                MetaChip(
+                  '${cluster.members.length} ${l10n.t('dup.items')}',
+                  icon: Icons.content_copy_outlined,
+                ),
+                const SizedBox(width: 8),
+                MetaChip(
+                  '~${cluster.minDistance.toStringAsFixed(3)}',
+                  icon: Icons.straighten,
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : onRetire,
+                  icon: const Icon(Icons.auto_delete_outlined, size: 16),
+                  label: Text(l10n.t('dup.retireOthers')),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             for (final m in cluster.members)
               ListTile(
                 dense: true,
                 onTap: busy ? null : () => onKeep(m.id),
                 leading: Icon(
-                  m.id == keepId ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  m.id == keepId
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
                   size: 18,
-                  color: m.id == keepId ? OracleBrand.violetSoft : OracleBrand.gray500,
+                  color: m.id == keepId
+                      ? OracleBrand.violetSoft
+                      : OracleBrand.gray500,
                 ),
-                title: Text(m.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                title: Text(
+                  m.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 subtitle: Text(m.meta, style: const TextStyle(fontSize: 11)),
                 trailing: m.id == keepId
                     ? Tooltip(
                         message: l10n.t('dup.keep'),
-                        child: const Icon(Icons.star, color: OracleBrand.violetSoft, size: 18))
+                        child: const Icon(
+                          Icons.star,
+                          color: OracleBrand.violetSoft,
+                          size: 18,
+                        ),
+                      )
                     : null,
               ),
           ],

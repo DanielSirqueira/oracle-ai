@@ -37,4 +37,19 @@ class AgentSearchEntity {
     this.latencyMs,
     this.createdAt,
   });
+
+  AgentSearchEntity copyWith({List<Map<String, dynamic>>? results}) =>
+      AgentSearchEntity(
+        id: id,
+        sessionId: sessionId,
+        requestId: requestId,
+        tool: tool,
+        query: query,
+        scope: scope,
+        filters: filters,
+        results: results ?? this.results,
+        hits: hits,
+        latencyMs: latencyMs,
+        createdAt: createdAt,
+      );
 }

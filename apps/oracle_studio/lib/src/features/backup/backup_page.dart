@@ -36,8 +36,9 @@ class _BackupPageState extends State<BackupPage> {
       _error = null;
     });
     try {
-      final report =
-          await DbBackupService(widget.connection.database!).backup(_seedPath);
+      final report = await DbBackupService(
+        widget.connection.database!,
+      ).backup(_seedPath);
       setState(() => _lastReport = report);
     } catch (e) {
       setState(() => _error = '$e');
@@ -75,30 +76,40 @@ class _BackupPageState extends State<BackupPage> {
               label: l10n.t('bk.folder'),
               description: l10n.t('bk.folderDesc'),
               stacked: true,
-              control: Row(children: [
-                Expanded(
-                  child: Text(_dir,
-                      style: const TextStyle(fontSize: 13, color: OracleBrand.gray400),
-                      overflow: TextOverflow.ellipsis),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(onPressed: _pickDir, child: Text(l10n.t('bk.change'))),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    widget.daemon.settings.backupDir = defaultBackupDir();
-                    await widget.daemon.applySettings();
-                    setState(() {});
-                  },
-                  child: Text(l10n.t('bk.reset')),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: l10n.t('bk.openFolder'),
-                  onPressed: _openFolder,
-                  icon: const Icon(Icons.folder_open, size: 18),
-                ),
-              ]),
+              control: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _dir,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: OracleBrand.gray400,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: _pickDir,
+                    child: Text(l10n.t('bk.change')),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () async {
+                      widget.daemon.settings.backupDir = defaultBackupDir();
+                      await widget.daemon.applySettings();
+                      setState(() {});
+                    },
+                    child: Text(l10n.t('bk.reset')),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: l10n.t('bk.openFolder'),
+                    onPressed: _openFolder,
+                    icon: const Icon(Icons.folder_open, size: 18),
+                  ),
+                ],
+              ),
             ),
             SettingRow(
               label: l10n.t('bk.run'),
@@ -107,7 +118,10 @@ class _BackupPageState extends State<BackupPage> {
                 onPressed: _running ? null : _backupNow,
                 icon: _running
                     ? const SizedBox(
-                        width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.save, size: 16),
                 label: Text(_running ? l10n.t('bk.running') : l10n.t('bk.run')),
               ),
@@ -117,8 +131,10 @@ class _BackupPageState extends State<BackupPage> {
 
         if (_error != null) ...[
           const SizedBox(height: 12),
-          Text('${l10n.t('common.failure')}: $_error',
-              style: const TextStyle(color: OracleBrand.error)),
+          Text(
+            '${l10n.t('common.failure')}: $_error',
+            style: const TextStyle(color: OracleBrand.error),
+          ),
         ],
         if (_lastReport != null) ...[
           const SizedBox(height: 16),
@@ -133,7 +149,10 @@ class _BackupPageState extends State<BackupPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_lastReport!.path, style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      _lastReport!.path,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -153,7 +172,10 @@ class _BackupPageState extends State<BackupPage> {
           ),
         ],
         const SizedBox(height: 16),
-        Text(l10n.t('bk.scheduleNote'), style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          l10n.t('bk.scheduleNote'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
   }

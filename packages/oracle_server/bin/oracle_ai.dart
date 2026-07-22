@@ -66,6 +66,11 @@ Future<void> main(List<String> args) async {
     await _runSyncSkills(args, env, autoCreate);
     return;
   }
+  // Flow Runner: claim queued flow runs and drive them (Loop Engineering).
+  if (args.contains('flow-worker')) {
+    await _runFlowWorker(args, env, autoCreate);
+    return;
+  }
 
   final mode = _mode(args);
   // Only the boot-owning modes (daemon / all-in-one) may restore a seed on an
@@ -262,6 +267,33 @@ Future<void> _runSyncSkills(List<String> args, Map<String, String> env, bool aut
         '(pruned ${report.pruned} stale)');
   } on SystemFailure catch (failure) {
     stderr.writeln('[oracle] sync-skills failed: ${failure.errorMessage}');
+    exitCode = 1;
+  } finally {
+    await database.dispose();
+  }
+}
+
+/// Runs the deterministic Flow Runner: bootstraps the DB + DI, then polls for
+/// queued flow runs and drives each (worktree → launch agent per step → verify →
+/// advance). An optional worker id follows the command (`flow-worker web-1`);
+/// `--parallel N` (or ORACLE_FLOW_PARALLEL) drives N runs at the same time.
+Future<void> _runFlowWorker(
+    List<String> args, Map<String, String> env, bool autoCreate) async {
+  final i = args.indexOf('flow-worker');
+  final next = (i + 1 < args.length) ? args[i + 1] : null;
+  final workerId = (next != null && !next.startsWith('-')) ? next : 'worker-$pid';
+  final p = args.indexOf('--parallel');
+  final parallel = int.tryParse(p >= 0 && p + 1 < args.length ? args[p + 1] : '') ??
+      int.tryParse(env['ORACLE_FLOW_PARALLEL'] ?? '') ??
+      1;
+
+  final database = await Bootstrap.fromEnv(env).start(ensureDatabase: autoCreate);
+  try {
+    // Prompt language for step agents: ORACLE_LANG in .env ('pt' default).
+    await FlowWorker(language: env['ORACLE_LANG'] ?? 'pt')
+        .serve(workerId, parallel: parallel);
+  } on SystemFailure catch (failure) {
+    stderr.writeln('[oracle] flow-worker failed: ${failure.errorMessage}');
     exitCode = 1;
   } finally {
     await database.dispose();

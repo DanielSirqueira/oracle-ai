@@ -36,17 +36,20 @@ class OracleBrand {
   );
 
   static ThemeData theme() {
-    final scheme = ColorScheme.fromSeed(seedColor: violet, brightness: Brightness.dark)
-        .copyWith(
-      primary: violet,
-      secondary: blue,
-      surface: gray950,
-      surfaceContainerLow: gray900,
-      surfaceContainerHighest: gray800,
-      outline: gray700,
-      error: error,
-      onSurface: gray100,
-    );
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: violet,
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: violet,
+          secondary: blue,
+          surface: gray950,
+          surfaceContainerLow: gray900,
+          surfaceContainerHighest: gray800,
+          outline: gray700,
+          error: error,
+          onSurface: gray100,
+        );
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
@@ -55,9 +58,15 @@ class OracleBrand {
       scaffoldBackgroundColor: gray950,
       visualDensity: VisualDensity.comfortable,
       textTheme: const TextTheme(
-        headlineSmall: TextStyle(fontWeight: FontWeight.w600, letterSpacing: -0.4),
+        headlineSmall: TextStyle(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.4,
+        ),
         titleLarge: TextStyle(fontWeight: FontWeight.w600, letterSpacing: -0.3),
-        titleMedium: TextStyle(fontWeight: FontWeight.w600, letterSpacing: -0.2),
+        titleMedium: TextStyle(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
+        ),
         bodySmall: TextStyle(color: gray400, height: 1.5),
         bodyMedium: TextStyle(height: 1.55),
         labelLarge: TextStyle(fontWeight: FontWeight.w500),
@@ -77,9 +86,16 @@ class OracleBrand {
         selectedIconTheme: const IconThemeData(color: violetSoft),
         unselectedIconTheme: const IconThemeData(color: gray500),
         selectedLabelTextStyle: const TextStyle(
-            color: gray100, fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Inter'),
-        unselectedLabelTextStyle:
-            const TextStyle(color: gray500, fontSize: 12, fontFamily: 'Inter'),
+          color: gray100,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          fontFamily: 'Inter',
+        ),
+        unselectedLabelTextStyle: const TextStyle(
+          color: gray500,
+          fontSize: 12,
+          fontFamily: 'Inter',
+        ),
       ),
       dividerTheme: const DividerThemeData(color: gray700, thickness: 1),
       inputDecorationTheme: InputDecorationTheme(
@@ -104,7 +120,10 @@ class OracleBrand {
         style: FilledButton.styleFrom(
           backgroundColor: violet,
           foregroundColor: Colors.white,
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter'),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -113,7 +132,10 @@ class OracleBrand {
         style: OutlinedButton.styleFrom(
           foregroundColor: gray100,
           side: const BorderSide(color: gray700),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter'),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -121,7 +143,10 @@ class OracleBrand {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: gray400,
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter'),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+          ),
         ),
       ),
       snackBarTheme: const SnackBarThemeData(
@@ -131,7 +156,11 @@ class OracleBrand {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: gray800,
-        labelStyle: const TextStyle(color: gray400, fontSize: 12, fontFamily: 'Inter'),
+        labelStyle: const TextStyle(
+          color: gray400,
+          fontSize: 12,
+          fontFamily: 'Inter',
+        ),
         side: const BorderSide(color: gray700),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
@@ -141,11 +170,14 @@ class OracleBrand {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? Colors.white : gray400),
+          (s) => s.contains(WidgetState.selected) ? Colors.white : gray400,
+        ),
         trackColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? violet : gray800),
+          (s) => s.contains(WidgetState.selected) ? violet : gray800,
+        ),
         trackOutlineColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? violet : gray700),
+          (s) => s.contains(WidgetState.selected) ? violet : gray700,
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: gray900,
@@ -156,7 +188,11 @@ class OracleBrand {
       ),
       dataTableTheme: const DataTableThemeData(
         headingTextStyle: TextStyle(
-            color: gray400, fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Inter'),
+          color: gray400,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          fontFamily: 'Inter',
+        ),
       ),
     );
   }
@@ -171,7 +207,12 @@ class OracleLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(size / 4),
-      child: Image.asset('assets/icon.png', width: size, height: size, fit: BoxFit.cover),
+      child: Image.asset(
+        'assets/icon.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      ),
     );
   }
 }
@@ -187,8 +228,10 @@ class GradientTitle extends StatelessWidget {
     final base = style ?? Theme.of(context).textTheme.headlineSmall;
     return ShaderMask(
       shaderCallback: (bounds) => OracleBrand.gradient.createShader(bounds),
-      child: Text(text,
-          style: base?.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+      child: Text(
+        text,
+        style: base?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }
@@ -247,21 +290,29 @@ class SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.titleMedium),
-                    if (description != null) ...[
-                      const SizedBox(height: 2),
-                      Text(description!, style: Theme.of(context).textTheme.bodySmall),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      if (description != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          description!,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              if (action != null) action!,
-            ]),
+                if (action != null) action!,
+              ],
+            ),
             const SizedBox(height: 8),
             for (var i = 0; i < children.length; i++) ...[
               if (i > 0) const Divider(height: 1),
@@ -294,11 +345,12 @@ class SettingRow extends StatelessWidget {
     final text = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+        ),
         if (description != null) ...[
           const SizedBox(height: 2),
           Text(description!, style: Theme.of(context).textTheme.bodySmall),
@@ -308,16 +360,23 @@ class SettingRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: stacked
-          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              text,
-              const SizedBox(height: 10),
-              control,
-            ])
-          : Row(children: [
-              Expanded(flex: 3, child: text),
-              const SizedBox(width: 24),
-              Flexible(flex: 2, child: Align(alignment: Alignment.centerRight, child: control)),
-            ]),
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [text, const SizedBox(height: 10), control],
+            )
+          : Row(
+              children: [
+                Expanded(flex: 3, child: text),
+                const SizedBox(width: 24),
+                Flexible(
+                  flex: 2,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: control,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -337,13 +396,25 @@ class StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
-        Text(label,
-            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

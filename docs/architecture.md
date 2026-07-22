@@ -42,6 +42,7 @@ return `ResultDart<Success, Failure>` — errors are values, not exceptions, acr
 | `maintenance` | Deterministic sweep (decay + dedup) + lint. No LLM. |
 | `metrics` | Measurement harness: per-session token & compaction metrics, aggregated A/B by label. |
 | `rfc` | Multi-agent spec review: sectioned RFCs, structured findings, resolvable evidence, rounds (novelty), decisions, and a finalize gate that writes decisions back to memory. |
+| `flow` | Loop Engineering: `tasks` (backlog; one active run at a time) + `flows` (process graphs: steps=loops, edges=wiring) + `flow_runs` (execution). Enqueue-and-claim runs, blackboard context, per-step reports, artifacts, sessions and an append-only timeline. Driven by the deterministic Flow Runner (no LLM in the server). |
 
 ## Runtime topology
 
@@ -77,8 +78,31 @@ flowchart LR
 - **Hook receiver (HTTP)** — speaks the agent host's hook protocol: captures the session and injects recall
   (see [agent-integration.md](agent-integration.md)).
 - **Maintenance scheduler** — optional periodic decay/dedup sweep.
-- **Bootstrap** — on startup: builds the `Database`, registers the 9 modules in DI (one commit), runs pending
-  migrations (lock-tolerant), and optionally runs the maintenance sweep.
+- **Flow Runner** — the deterministic worker (`oracle_ai flow-worker`, or hosted by Oracle Studio like the
+  hooks daemon) that executes Loop Engineering runs: claims the oldest `queued` run (`FOR UPDATE SKIP LOCKED`
+  + lease/heartbeat), creates a git worktree, walks the flow graph, launches a headless coding agent per step,
+  runs the step's verifiers **outside** the agent, and applies budgets, human gates and transitions. It is
+  **not** an agent — the server never calls an LLM; the launched agents do. All run state lives in the
+  database, so a killed worker resumes from the last event. See [loop-engineering-plan.md](loop-engineering-plan.md).
+
+  Agent adapters invoke the supported public CLI commands (`claude`, `codex`,
+  `gemini`, `cursor-agent`) and validate those commands during preflight. Native
+  conversation ids are persisted for retries. Headless Codex execution disables
+  interactive approval prompts while retaining the node's configured sandbox.
+
+  Since v2.2.7 the scheduler checkpoints its full frontier and uses generation-fenced leases. Pause/cancel
+  wins over late process output; recovery marks interrupted attempts `abandoned` and resumes persisted
+  branches and joins. Child processes are adoptable child runs outside the global queue. Preflight checks
+  graph, repository, agent CLI and MCP. A shared supervisor caps output and kills complete process trees on
+  timeout/cancel. Wall/token budgets, permissions and output JSON Schema are enforced by the runner.
+  Every agent node gets one Oracle transcript and every iteration opens a request before its process starts;
+  its response is stored when the process exits. The native CLI conversation id is persisted independently and
+  resumed on retries and loop-backs (`--resume` for Claude/Gemini/Cursor, `codex exec … resume` for Codex).
+  Context continuity survives worker restarts without mixing nodes or parallel branches. The run UI groups the
+  interaction history by conversation. A task can have only one active root run; failed runs can be retried
+  sequentially, while terminal tasks are never reopened.
+- **Bootstrap** — on startup: builds the `Database`, registers the 14 feature modules in DI (one commit), runs
+  pending migrations (lock-tolerant), and optionally runs the maintenance sweep.
 
 ## Embeddings
 

@@ -32,6 +32,16 @@ class ProjectRepositoryImpl implements ProjectRepository {
   }
 
   @override
+  AsyncResultDart<Unit, ProjectFailure> deleteProject(IdVO id) async {
+    try {
+      await _datasource.deleteProject(id);
+      return const Success(unit);
+    } on ProjectFailure catch (failure) {
+      return Failure(failure);
+    }
+  }
+
+  @override
   AsyncResultDart<ProjectEntity, ProjectFailure> getProjectById(IdVO id) async {
     try {
       return Success(await _datasource.getProjectById(id));

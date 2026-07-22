@@ -38,6 +38,19 @@ class DatabaseProjectDatasource implements ProjectDatasource {
   @override
   Future<ProjectEntity> resolveProject(ProjectEntity project) async {
     try {
+      // On Windows the same directory arrives with varying drive-letter casing
+      // ("D:/x" vs "d:/x"); the unique index on repo_path is case-sensitive, so
+      // look up case-insensitively FIRST — an existing project always wins over
+      // creating a casing duplicate.
+      final existing = await _database.select(SqlStatement(
+        'SELECT id, organization_id, name, description, repo_path, created_at, updated_at '
+        'FROM projects WHERE lower(repo_path) = lower(:repo_path) '
+        'ORDER BY created_at LIMIT 1',
+        {'repo_path': project.repoPath},
+      ));
+      if (existing.rows.isNotEmpty) {
+        return DatabaseProjectMapper.fromRow(existing.rows.first);
+      }
       // Race-safe get-or-create keyed on repo_path. DO UPDATE (not DO NOTHING)
       // so RETURNING always yields the row — existing or freshly inserted.
       final result = await _database.executeUpdate(SqlStatement(
@@ -48,6 +61,24 @@ class DatabaseProjectDatasource implements ProjectDatasource {
         DatabaseProjectMapper.toInsertParams(project),
       ));
       return DatabaseProjectMapper.fromRow(result.rows.first);
+    } on DatabaseFailure catch (error) {
+      throw DatasourceProjectFailure(
+        errorMessage: error.errorMessage,
+        stackTrace: StackTrace.current,
+      );
+    }
+  }
+
+  @override
+  Future<void> deleteProject(IdVO id) async {
+    try {
+      final result = await _database.executeUpdate(SqlStatement(
+        'DELETE FROM projects WHERE id = :id::uuid RETURNING id',
+        {'id': id.value},
+      ));
+      if (result.rows.isEmpty) {
+        throw ProjectNotFoundFailure(stackTrace: StackTrace.current);
+      }
     } on DatabaseFailure catch (error) {
       throw DatasourceProjectFailure(
         errorMessage: error.errorMessage,

@@ -16,4 +16,6 @@ abstract interface class ProjectDatasource {
   Future<ProjectEntity> getProjectById(IdVO id);
 
   Future<List<ProjectEntity>> listProjects(ProjectFilter filter);
+
+  Future<void> deleteProject(IdVO id);
 }

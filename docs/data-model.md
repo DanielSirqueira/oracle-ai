@@ -61,6 +61,51 @@ cites an entity that resolves (an `oracle_entity` id that exists, or a `file`+`e
 `oracle_rfc_finalize` approves only with **0 verified criticals + every required section covered**, then writes
 each decision back to `memories(kind=decision)` — closing the learning loop.
 
+## Loop Engineering — multi-agent development flows (v2.2.0)
+
+Nine tables back the Loop Engineering engine (migration `v2.2.0/001_flows`), following the same
+conventions: uuid PK, `timestamptz`, an owner `CHECK` across `organization_id`/`project_id`/
+`module_id` where the row is scoped, `is_latest`/`supersedes` for the versioned `flows`, `CHECK`
+enums matching the Dart enum codes, and `vector(1024)` + generated `fts` on `tasks`. **No existing
+table changed** — the seams are new FKs (`tasks.rfc_id → rfcs`, `flow_run_steps.session_id →
+sessions`).
+
+| Table | Purpose | Notable columns |
+|---|---|---|
+| `tasks` | The backlog that triggers flows | `organization_id?`/`project_id?`/`module_id?` (owner CHECK), `title`, `status`, `priority`, `source`, `rfc_id?`, `embedding`, `fts`; at most one active root run per task |
+| `flows` | The process definition (the "n8n workflow"), versioned by `key` | `orchestrator_agent`, `entry_step_key`, `budgets` (jsonb), `version_no`, `is_latest`, `supersedes` |
+| `flow_steps` | The nodes — each node is a loop | `flow_id`, `step_key`, `kind` (agent/orchestrator/decision/rfc_create/rfc_review/rfc_consolidate/rfc_gate/subflow/command/human_gate), `agent`, `role`, `prompt_template`, `exit_criteria`/`output_schema`/`permissions`/`config` (jsonb), `max_iterations`, `on_fail` |
+| `flow_edges` | The edges (wiring between loops) | `from_step`, `to_step`, `condition` (success/failure/verdict/always), `verdict_value`, `instruction` (when to take a verdict route — rendered into the source agent's prompt, so ANY node can decide) |
+| `flow_runs` | A running instance (pins the flow version) | `flow_id`, `task_id?`, `project_id?`, `parent_run_id?`, `status`, `current_step_id?`, `execution_state`, `lease_epoch`, `branch_name`, `worktree_path`, `budgets`, `tokens_used`, `claimed_by`, `heartbeat_at` |
+| `flow_run_steps` | Each iteration of each step (the inner loop) | `run_id`, `step_id`, `iteration`, `status` (including `abandoned` after reclaim), `session_id?` (→ Oracle transcript), `agent_session_id?` (native Claude/Codex/Gemini/Cursor conversation resumed by later iterations), `claim_token`, `report`/`verifier` (jsonb) |
+| `flow_run_context` | The run's blackboard (key→value) | `run_id`, `key`, `value` (jsonb), `updated_by?`; PK `(run_id, key)` |
+| `flow_artifacts` | What a run produced, by reference | `run_id`, `run_step_id?`, `kind` (branch/commit/pr/rfc/doc/memory…), `locator`, `meta` (jsonb) |
+| `flow_run_events` | Append-only timeline (audit + Studio) | `run_id`, `run_step_id?`, `kind` (state/verifier/decision/gate/budget…), `payload` (jsonb) |
+
+**Run lifecycle** (`flow_runs.status` CHECK): `queued → running`, branching to `awaiting_human` (a
+human gate / product decision), `paused` (control), `stalled` (budget / no-progress), and
+terminating in `completed`/`failed`/`cancelled`. The **Flow Runner** claims the oldest `queued` run
+with `FOR UPDATE SKIP LOCKED`, so two workers never grab the same run; the entire run state lives in
+these tables, so a killed worker resumes from the last event. Verifiers run **outside** the agent
+(the runner executes each step's `exit_criteria` in the worktree), so an agent can never
+self-approve. See [architecture.md](architecture.md) §Flow Runner and
+[loop-engineering-plan.md](loop-engineering-plan.md).
+
+Starting a root run atomically locks the task, creates the run and moves the task to `running`. Another active
+root run for the same task is rejected even under concurrent requests. A failed run may be retried sequentially
+after the task becomes `blocked`; `done` and `cancelled` tasks remain terminal and require a new task. Child
+subflows remain part of the original run and may keep the same task reference.
+
+Before an agent process is launched, the runner creates a deterministic Oracle `session` per run node, opens a
+new `request` for the iteration and links it to `flow_run_steps.session_id`. The final output is appended as a
+message. The external CLI conversation id is stored separately in `agent_session_id`: Claude Code/Gemini start
+with a runner-selected id; Codex/Cursor return theirs in structured output. Later iterations of that node use
+the CLI's resume command. Both transcript and native context survive pause, worker restart and graph loop-back.
+
+`execution_state` checkpoints the graph frontier (queue, active step, waits,
+visits and join arrivals). `lease_epoch` increments on every claim, fencing a
+stale worker from overwriting a pause, cancellation or newer recovery.
+
 ## Migrations
 
 | Version | Adds |
@@ -74,6 +119,9 @@ each decision back to `memories(kind=decision)` — closing the learning loop.
 | `v1.6.0/001_memory_key` | `memories.key` — the same stable-key identity rules have, so an agent can supersede a memory by key. |
 | `v1.7.0/001_skills` | `skills` table (central versioned skill library) + HNSW/GIN/partial-unique indexes. |
 | `v2.1.0/001_rfc` | The 10 RFC tables (multi-agent spec review) + HNSW/GIN/partial-unique indexes; embedded migrations regenerated. |
+| `v2.2.0/001_flows` | The 9 Loop Engineering tables (tasks + flows + runs) across 4 SQL files + HNSW/GIN/partial-unique indexes; embedded migrations regenerated. |
+| `v2.2.8/001_agent_session_resume` | Adds `flow_run_steps.agent_session_id` and its lookup index so native agent conversations continue across loop iterations. |
+| `v2.2.9/001_active_task_run_unique` | Adds a partial unique index guaranteeing at database level that a task has at most one active root run; terminal history remains available for sequential retries. |
 
 The runner records applied migrations and checksums in `_migrations`, serializes with `_migrations_lock` (an
 advisory lock with a 2-minute stale-takeover), runs each migration transactionally, and is **forward-fix**

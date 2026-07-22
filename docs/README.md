@@ -20,6 +20,8 @@ Deeper material that complements the top-level [README](../README.md). Organized
   the cost A/B experiment.
 - [desktop-plan.md](desktop-plan.md) — the desktop layer: Oracle Studio (tray control center) and the single
   `OracleAI-Setup.exe` installer (bundled PostgreSQL, DPAPI-encrypted secrets).
+- [loop-engineering-plan.md](loop-engineering-plan.md) — **v2.2.0 (Fase 1 implementada)**: Loop Engineering —
+  flows de desenvolvimento multi-agente (tasks → runner → loops por etapa), análise completa + plano (em PT-BR).
 
 ## Start here
 New to the project? Read [vision.md](vision.md) → [architecture.md](architecture.md), then jump to

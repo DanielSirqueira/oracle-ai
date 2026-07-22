@@ -114,6 +114,42 @@ entities instead of hallucinating; an unverified critical never gates completion
 | `oracle_rfc_status` | `rfcId` | Readiness snapshot: `blockingCriticals` (verified), `openMajors`, required coverage, `checklistComplete`. |
 | `oracle_rfc_finalize` | `rfcId` | Approve when ready (0 verified criticals + required covered), else park in `awaiting_human`; writes decisions back to memory. |
 
+## Flow — Loop Engineering (multi-agent development flows)
+
+Define a development **process** once (steps = loops, edges = wiring), file a **task**, and trigger
+the full multi-agent cycle. The deterministic **Flow Runner** (`oracle_ai flow-worker`, or hosted by
+the Studio) claims queued runs and launches a coding agent per step; it verifies **outside** the
+agent, so an agent never self-approves. Inside a step the agent uses 3 tools on the happy path:
+`oracle_flow_step_context` → work → `oracle_flow_step_report`. See
+[loop-engineering-plan.md](loop-engineering-plan.md).
+
+| Tool | Args | Description |
+|---|---|---|
+| `oracle_task_create` | `title`, `description?`, `projectId?`/`organizationId?`/`moduleId?`, `priority?`, `source?`, `rfcId?` | Create a backlog task (dedup-embedded). |
+| `oracle_task_list` | scope, `status?`, `search?`, `limit?` | List the backlog (scope union). |
+| `oracle_task_update` | `id`, `status?`, `priority?`, `description?` | Update/move a task. |
+| `oracle_flow_save` | `key`, `name`, scope, `orchestratorAgent?`, `entryStepKey?`, `budgets?`, `steps[]`, `edges[]` | Define/version a whole process graph in one call; re-saving the same key supersedes. Each `steps[]` = `{key, kind?, agent?, role?, promptTemplate?, command?, exitCriteria?, maxIterations?, onFail?, …}`; each `edges[]` = `{from, to, condition?, verdict?}` (step keys). |
+| `oracle_flow_list` | scope, `limit?` | Available processes (latest). |
+| `oracle_flow_get` | `id?` \| `key?` + scope | The full graph (flow + steps + edges). |
+| `oracle_flow_run_start` | `taskId?`, `flowId?` \| `flowKey?` + scope, `budgets?` | **Enqueue** a run (`queued`) — the Flow Runner executes it. A task accepts only one active root run at a time; blocked tasks may retry after failure, while `running`, `done` and `cancelled` tasks are rejected. Agent runs require project scope so every interaction can own an inspectable transcript. |
+| `oracle_flow_run_status` | `runId` | Monitoring bundle: header + step iterations + blackboard + artifacts + recent events. |
+| `oracle_flow_run_list` | `projectId?`, `status?`, `limit?` | Recent / active runs. |
+| `oracle_flow_run_control` | `runId`, `action` (pause/resume/cancel) | Control a run. |
+| `oracle_flow_gate_decide` | `runId`, `approved`, `reason?` | Resolve a `human_gate` (`awaiting_human`); approval resumes the run. |
+| `oracle_flow_step_context` | `runStepId` | The bundle a step's agent pulls: task, run, step, blackboard, prior reports, artifacts. **Call first inside a step.** |
+| `oracle_flow_context_put` | `runId`, `key`, `value`, `runStepId?` | Write to the run's blackboard (upsert on runId+key). |
+| `oracle_flow_artifact_add` | `runId`, `kind`, `locator`, `runStepId?`, `meta?` | Record an artifact (PR, commit, doc…). |
+| `oracle_flow_step_report` | `runStepId`, `summary`, `status?` (done/blocked), `outputs?`, `filesTouched?`, `openQuestions?`, `claimToken?` | The structured handoff that closes a step — triggers the runner to verify and advance. The runner injects the claim token automatically. |
+
+During a step the MCP inherits `ORACLE_RUN_ID`, `ORACLE_RUN_STEP_ID` and
+`ORACLE_RUN_STEP_TOKEN`. Context, artifact and report writes are pinned to those
+IDs; a step agent cannot mutate another run or approve/resume a human gate.
+
+Agent interactions in the same run node share one native CLI conversation. The runner persists the external
+session/thread id after the first turn and resumes it on verifier retries and graph loop-backs. Oracle's audit
+session remains separate and stores one request/response pair per interaction, so the Studio can show the full
+continued conversation. Different nodes and branches never share native context.
+
 ## Measurement
 
 | Tool | Args | Description |

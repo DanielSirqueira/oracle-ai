@@ -23,7 +23,11 @@ import '../../widgets/editor_dialog.dart';
 class SettingsPage extends StatefulWidget {
   final OracleConnection connection;
   final DaemonHost daemon;
-  const SettingsPage({super.key, required this.connection, required this.daemon});
+  const SettingsPage({
+    super.key,
+    required this.connection,
+    required this.daemon,
+  });
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -33,30 +37,50 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _autostart = false;
 
   // .env form controllers, seeded from the live connection env.
-  late final _dbHost = TextEditingController(text: _env('ORACLE_DB_HOST', 'localhost'));
-  late final _dbPort = TextEditingController(text: _env('ORACLE_DB_PORT', '5432'));
-  late final _dbUser = TextEditingController(text: _env('ORACLE_DB_USER', 'postgres'));
-  late final _dbPass = TextEditingController(text: _env('ORACLE_DB_PASSWORD', ''));
-  late final _dbName = TextEditingController(text: _env('ORACLE_DB_NAME', 'oracle_db'));
+  late final _dbHost = TextEditingController(
+    text: _env('ORACLE_DB_HOST', 'localhost'),
+  );
+  late final _dbPort = TextEditingController(
+    text: _env('ORACLE_DB_PORT', '5432'),
+  );
+  late final _dbUser = TextEditingController(
+    text: _env('ORACLE_DB_USER', 'postgres'),
+  );
+  late final _dbPass = TextEditingController(
+    text: _env('ORACLE_DB_PASSWORD', ''),
+  );
+  late final _dbName = TextEditingController(
+    text: _env('ORACLE_DB_NAME', 'oracle_db'),
+  );
   late String _provider = _env('ORACLE_EMBEDDING_PROVIDER', 'local');
   late final _apiKey = TextEditingController(text: _providerKeyValue());
-  late final _httpHost = TextEditingController(text: _env('ORACLE_HTTP_HOST', '127.0.0.1'));
-  late final _httpPort = TextEditingController(text: _env('ORACLE_HTTP_PORT', '47500'));
-  late final _token = TextEditingController(text: _env('ORACLE_HOOK_TOKEN', ''));
-  late final _maintMin =
-      TextEditingController(text: _env('ORACLE_MAINTENANCE_INTERVAL_MINUTES', '30'));
-  late final _metricsLabel = TextEditingController(text: _env('ORACLE_METRICS_LABEL', 'default'));
+  late final _httpHost = TextEditingController(
+    text: _env('ORACLE_HTTP_HOST', '127.0.0.1'),
+  );
+  late final _httpPort = TextEditingController(
+    text: _env('ORACLE_HTTP_PORT', '47500'),
+  );
+  late final _token = TextEditingController(
+    text: _env('ORACLE_HOOK_TOKEN', ''),
+  );
+  late final _maintMin = TextEditingController(
+    text: _env('ORACLE_MAINTENANCE_INTERVAL_MINUTES', '30'),
+  );
+  late final _metricsLabel = TextEditingController(
+    text: _env('ORACLE_METRICS_LABEL', 'default'),
+  );
   late final TextEditingController _rawEnv;
   bool _savingEnv = false;
 
-  String _env(String key, String fallback) => widget.connection.env[key] ?? fallback;
+  String _env(String key, String fallback) =>
+      widget.connection.env[key] ?? fallback;
 
   String _providerKeyVar() => switch (_provider) {
-        'gemini' => 'GEMINI_API_KEY',
-        'openai' => 'OPENAI_API_KEY',
-        'voyage' => 'VOYAGE_API_KEY',
-        _ => 'GEMINI_API_KEY',
-      };
+    'gemini' => 'GEMINI_API_KEY',
+    'openai' => 'OPENAI_API_KEY',
+    'voyage' => 'VOYAGE_API_KEY',
+    _ => 'GEMINI_API_KEY',
+  };
 
   String _providerKeyValue() => widget.connection.env[_providerKeyVar()] ?? '';
 
@@ -65,7 +89,10 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     final path = widget.connection.envPath;
     _rawEnv = TextEditingController(
-        text: (path != null && File(path).existsSync()) ? File(path).readAsStringSync() : '');
+      text: (path != null && File(path).existsSync())
+          ? File(path).readAsStringSync()
+          : '',
+    );
     launchAtStartup.isEnabled().then((v) {
       if (mounted) setState(() => _autostart = v);
     });
@@ -74,8 +101,18 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void dispose() {
     for (final c in [
-      _dbHost, _dbPort, _dbUser, _dbPass, _dbName, _apiKey,
-      _httpHost, _httpPort, _token, _maintMin, _metricsLabel, _rawEnv,
+      _dbHost,
+      _dbPort,
+      _dbUser,
+      _dbPass,
+      _dbName,
+      _apiKey,
+      _httpHost,
+      _httpPort,
+      _token,
+      _maintMin,
+      _metricsLabel,
+      _rawEnv,
     ]) {
       c.dispose();
     }
@@ -91,7 +128,10 @@ class _SettingsPageState extends State<SettingsPage> {
     final actual = await launchAtStartup.isEnabled();
     if (mounted) {
       setState(() => _autostart = actual);
-      showSnack(context, actual ? l10n.t('set.autostartOn') : l10n.t('set.autostartOff'));
+      showSnack(
+        context,
+        actual ? l10n.t('set.autostartOn') : l10n.t('set.autostartOff'),
+      );
     }
   }
 
@@ -128,8 +168,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _generateToken() {
     final rnd = Random.secure();
-    _token.text =
-        List.generate(32, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+    _token.text = List.generate(
+      32,
+      (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
     setState(() {});
   }
 
@@ -146,7 +188,12 @@ class _SettingsPageState extends State<SettingsPage> {
     showSnack(context, '$label ${l10n.t('set.copied')}');
   }
 
-  Widget _field(TextEditingController c, {String? hint, bool obscure = false, double width = 260}) {
+  Widget _field(
+    TextEditingController c, {
+    String? hint,
+    bool obscure = false,
+    double width = 260,
+  }) {
     return SizedBox(
       width: width,
       child: TextField(
@@ -183,24 +230,30 @@ class _SettingsPageState extends State<SettingsPage> {
           BrandHeader(
             l10n.t('set.title'),
             subtitle: l10n.t('set.subtitle'),
-            trailing: Row(children: [
-              const Icon(Icons.translate, size: 16, color: OracleBrand.gray400),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                value: l10n.code,
-                underline: const SizedBox.shrink(),
-                items: const [
-                  DropdownMenuItem(value: 'pt', child: Text('Português')),
-                  DropdownMenuItem(value: 'en', child: Text('English')),
-                ],
-                onChanged: (v) {
-                  if (v == null) return;
-                  settings.language = v;
-                  settings.save();
-                  l10n.set(v);
-                },
-              ),
-            ]),
+            trailing: Row(
+              children: [
+                const Icon(
+                  Icons.translate,
+                  size: 16,
+                  color: OracleBrand.gray400,
+                ),
+                const SizedBox(width: 8),
+                DropdownButton<String>(
+                  value: l10n.code,
+                  underline: const SizedBox.shrink(),
+                  items: const [
+                    DropdownMenuItem(value: 'pt', child: Text('Português')),
+                    DropdownMenuItem(value: 'en', child: Text('English')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    settings.language = v;
+                    settings.save();
+                    l10n.set(v);
+                  },
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -211,19 +264,55 @@ class _SettingsPageState extends State<SettingsPage> {
             action: StatusBadge(
               daemon.hooksRunning
                   ? l10n.t('set.online')
-                  : (settings.hostHooks ? l10n.t('set.portBusy') : l10n.t('set.offline')),
+                  : (settings.hostHooks
+                        ? l10n.t('set.portBusy')
+                        : l10n.t('set.offline')),
               color: daemon.hooksRunning
                   ? OracleBrand.success
-                  : (settings.hostHooks ? OracleBrand.warning : OracleBrand.gray500),
+                  : (settings.hostHooks
+                        ? OracleBrand.warning
+                        : OracleBrand.gray500),
             ),
             children: [
               SettingRow(
                 label: l10n.t('set.hostToggle'),
-                description: daemon.hooksStatus,
+                description: daemon.hooksStatusDetail.isEmpty
+                    ? l10n.t('set.hooksSt.${daemon.hooksStatus}')
+                    : '${l10n.t('set.hooksSt.${daemon.hooksStatus}')} — ${daemon.hooksStatusDetail}',
                 control: Switch(
                   value: settings.hostHooks,
                   onChanged: (v) {
                     settings.hostHooks = v;
+                    daemon.applySettings();
+                  },
+                ),
+              ),
+              SettingRow(
+                label: l10n.t('set.workerToggle'),
+                description: daemon.workerStatusDetail.isEmpty
+                    ? '${l10n.t('set.workerDesc')} · ${l10n.t('set.workerSt.${daemon.workerStatus}')}'
+                    : '${l10n.t('set.workerDesc')} · ${l10n.t('set.workerSt.${daemon.workerStatus}')} — ${daemon.workerStatusDetail}',
+                control: Switch(
+                  value: settings.hostFlowWorker,
+                  onChanged: (v) {
+                    settings.hostFlowWorker = v;
+                    daemon.applySettings();
+                  },
+                ),
+              ),
+              SettingRow(
+                label: l10n.t('set.workerParallel'),
+                description: l10n.t('set.workerParallelDesc'),
+                control: DropdownButton<int>(
+                  value: settings.flowParallelRuns.clamp(1, 8),
+                  underline: const SizedBox(),
+                  items: [
+                    for (final n in const [1, 2, 3, 4, 6, 8])
+                      DropdownMenuItem(value: n, child: Text('$n')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => settings.flowParallelRuns = v);
                     daemon.applySettings();
                   },
                 ),
@@ -256,82 +345,116 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: l10n.t('bk.folder'),
                 description: l10n.t('bk.folderDesc'),
                 stacked: true,
-                control: Row(children: [
-                  Expanded(
-                    child: Text(settings.backupDir,
-                        style: const TextStyle(fontSize: 13, color: OracleBrand.gray400),
-                        overflow: TextOverflow.ellipsis),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                      onPressed: _pickBackupDir, child: Text(l10n.t('bk.change'))),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () async {
-                      settings.backupDir = defaultBackupDir();
-                      await daemon.applySettings();
-                      setState(() {});
-                    },
-                    child: Text(l10n.t('bk.reset')),
-                  ),
-                ]),
+                control: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        settings.backupDir,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: OracleBrand.gray400,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: _pickBackupDir,
+                      child: Text(l10n.t('bk.change')),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () async {
+                        settings.backupDir = defaultBackupDir();
+                        await daemon.applySettings();
+                        setState(() {});
+                      },
+                      child: Text(l10n.t('bk.reset')),
+                    ),
+                  ],
+                ),
               ),
               SettingRow(
                 label: '${l10n.t('set.every')} / ${l10n.t('set.keepLast')}',
-                control: Row(mainAxisSize: MainAxisSize.min, children: [
-                  DropdownButton<int>(
-                    value: settings.backupEveryHours,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(value: 6, child: Text(l10n.t('set.hours6'))),
-                      DropdownMenuItem(value: 12, child: Text(l10n.t('set.hours12'))),
-                      DropdownMenuItem(value: 24, child: Text(l10n.t('set.hours24'))),
-                      DropdownMenuItem(value: 48, child: Text(l10n.t('set.hours48'))),
-                    ],
-                    onChanged: (v) {
-                      settings.backupEveryHours = v ?? 24;
-                      daemon.applySettings();
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  DropdownButton<int>(
-                    value: settings.backupKeep,
-                    underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(value: 3, child: Text('3')),
-                      DropdownMenuItem(value: 7, child: Text('7')),
-                      DropdownMenuItem(value: 14, child: Text('14')),
-                      DropdownMenuItem(value: 30, child: Text('30')),
-                    ],
-                    onChanged: (v) {
-                      settings.backupKeep = v ?? 7;
-                      daemon.applySettings();
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  OutlinedButton.icon(
-                    onPressed: daemon.backingUp ? null : daemon.backupNow,
-                    icon: daemon.backingUp
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.save_outlined, size: 16),
-                    label: Text(
-                        daemon.backingUp ? l10n.t('set.runningNow') : l10n.t('set.runNow')),
-                  ),
-                ]),
+                control: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButton<int>(
+                      value: settings.backupEveryHours,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        DropdownMenuItem(
+                          value: 6,
+                          child: Text(l10n.t('set.hours6')),
+                        ),
+                        DropdownMenuItem(
+                          value: 12,
+                          child: Text(l10n.t('set.hours12')),
+                        ),
+                        DropdownMenuItem(
+                          value: 24,
+                          child: Text(l10n.t('set.hours24')),
+                        ),
+                        DropdownMenuItem(
+                          value: 48,
+                          child: Text(l10n.t('set.hours48')),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        settings.backupEveryHours = v ?? 24;
+                        daemon.applySettings();
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    DropdownButton<int>(
+                      value: settings.backupKeep,
+                      underline: const SizedBox.shrink(),
+                      items: const [
+                        DropdownMenuItem(value: 3, child: Text('3')),
+                        DropdownMenuItem(value: 7, child: Text('7')),
+                        DropdownMenuItem(value: 14, child: Text('14')),
+                        DropdownMenuItem(value: 30, child: Text('30')),
+                      ],
+                      onChanged: (v) {
+                        settings.backupKeep = v ?? 7;
+                        daemon.applySettings();
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    OutlinedButton.icon(
+                      onPressed: daemon.backingUp ? null : daemon.backupNow,
+                      icon: daemon.backingUp
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined, size: 16),
+                      label: Text(
+                        daemon.backingUp
+                            ? l10n.t('set.runningNow')
+                            : l10n.t('set.runNow'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               if (daemon.lastBackupAt != null || daemon.lastBackupError != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: daemon.lastBackupError != null
-                      ? Text('${l10n.t('common.failure')}: ${daemon.lastBackupError}',
-                          style: const TextStyle(color: OracleBrand.error, fontSize: 13))
+                      ? Text(
+                          '${l10n.t('common.failure')}: ${daemon.lastBackupError}',
+                          style: const TextStyle(
+                            color: OracleBrand.error,
+                            fontSize: 13,
+                          ),
+                        )
                       : Text(
                           '${l10n.t('set.lastBackup')}: ${fmtDateTime(daemon.lastBackupAt)}'
                           ' — ${daemon.lastBackupInfo}',
-                          style: Theme.of(context).textTheme.bodySmall),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                 ),
             ],
           ),
@@ -345,7 +468,10 @@ class _SettingsPageState extends State<SettingsPage> {
               onPressed: _savingEnv ? null : _saveEnvForm,
               icon: _savingEnv
                   ? const SizedBox(
-                      width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.save, size: 16),
               label: Text(l10n.t('env.save')),
             ),
@@ -354,85 +480,144 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: l10n.t('env.db'),
                 description: l10n.t('env.dbDesc'),
                 stacked: true,
-                control: Wrap(spacing: 12, runSpacing: 12, children: [
-                  _labeled(l10n.t('env.host'), _field(_dbHost, width: 220)),
-                  _labeled(l10n.t('env.port'), _field(_dbPort, width: 100)),
-                  _labeled(l10n.t('env.user'), _field(_dbUser, width: 160)),
-                  _labeled(l10n.t('env.password'), _field(_dbPass, obscure: true, width: 180)),
-                  _labeled(l10n.t('env.dbName'), _field(_dbName, width: 170)),
-                ]),
+                control: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _labeled(l10n.t('env.host'), _field(_dbHost, width: 220)),
+                    _labeled(l10n.t('env.port'), _field(_dbPort, width: 100)),
+                    _labeled(l10n.t('env.user'), _field(_dbUser, width: 160)),
+                    _labeled(
+                      l10n.t('env.password'),
+                      _field(_dbPass, obscure: true, width: 180),
+                    ),
+                    _labeled(l10n.t('env.dbName'), _field(_dbName, width: 170)),
+                  ],
+                ),
               ),
               SettingRow(
                 label: l10n.t('env.embed'),
                 description: l10n.t('env.embedDesc'),
                 stacked: true,
-                control: Wrap(spacing: 12, runSpacing: 12, children: [
-                  _labeled(
-                    l10n.t('env.provider'),
-                    SizedBox(
-                      width: 220,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _provider,
-                        decoration: const InputDecoration(isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'local', child: Text('local')),
-                          DropdownMenuItem(value: 'gemini', child: Text('Google Gemini')),
-                          DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
-                          DropdownMenuItem(value: 'voyage', child: Text('Voyage')),
-                        ],
-                        onChanged: (v) => setState(() {
-                          _provider = v ?? 'local';
-                          _apiKey.text = _providerKeyValue();
-                        }),
+                control: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _labeled(
+                      l10n.t('env.provider'),
+                      SizedBox(
+                        width: 220,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _provider,
+                          decoration: const InputDecoration(isDense: true),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'local',
+                              child: Text('local'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'gemini',
+                              child: Text('Google Gemini'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'openai',
+                              child: Text('OpenAI'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'voyage',
+                              child: Text('Voyage'),
+                            ),
+                          ],
+                          onChanged: (v) => setState(() {
+                            _provider = v ?? 'local';
+                            _apiKey.text = _providerKeyValue();
+                          }),
+                        ),
                       ),
                     ),
-                  ),
-                  if (_provider != 'local')
-                    _labeled(l10n.t('env.apiKey'),
-                        _field(_apiKey, obscure: true, width: 380)),
-                ]),
+                    if (_provider != 'local')
+                      _labeled(
+                        l10n.t('env.apiKey'),
+                        _field(_apiKey, obscure: true, width: 380),
+                      ),
+                  ],
+                ),
               ),
               SettingRow(
                 label: l10n.t('env.server'),
                 description: l10n.t('env.serverDesc'),
                 stacked: true,
-                control: Wrap(spacing: 12, runSpacing: 12, children: [
-                  _labeled(l10n.t('env.httpHost'), _field(_httpHost, width: 180)),
-                  _labeled(l10n.t('env.httpPort'), _field(_httpPort, width: 100)),
-                ]),
+                control: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _labeled(
+                      l10n.t('env.httpHost'),
+                      _field(_httpHost, width: 180),
+                    ),
+                    _labeled(
+                      l10n.t('env.httpPort'),
+                      _field(_httpPort, width: 100),
+                    ),
+                  ],
+                ),
               ),
               SettingRow(
                 label: l10n.t('env.token'),
                 description: l10n.t('env.tokenDesc'),
                 stacked: true,
-                control: Row(children: [
-                  Expanded(child: _field(_token, width: double.infinity)),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                      onPressed: _generateToken, child: Text(l10n.t('env.generate'))),
-                ]),
+                control: Row(
+                  children: [
+                    Expanded(child: _field(_token, width: double.infinity)),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: _generateToken,
+                      child: Text(l10n.t('env.generate')),
+                    ),
+                  ],
+                ),
               ),
               SettingRow(
                 label: l10n.t('env.maint'),
                 description: l10n.t('env.intervalDesc'),
                 stacked: true,
-                control: Wrap(spacing: 12, runSpacing: 12, children: [
-                  _labeled(l10n.t('env.interval'), _field(_maintMin, width: 140)),
-                  _labeled(l10n.t('env.metricsLabel'), _field(_metricsLabel, width: 200)),
-                ]),
+                control: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _labeled(
+                      l10n.t('env.interval'),
+                      _field(_maintMin, width: 140),
+                    ),
+                    _labeled(
+                      l10n.t('env.metricsLabel'),
+                      _field(_metricsLabel, width: 200),
+                    ),
+                  ],
+                ),
               ),
               // advanced raw editor
               Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   tilePadding: EdgeInsets.zero,
-                  title: Text(l10n.t('env.advanced'),
-                      style: const TextStyle(fontSize: 13, color: OracleBrand.gray400)),
+                  title: Text(
+                    l10n.t('env.advanced'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: OracleBrand.gray400,
+                    ),
+                  ),
                   children: [
                     TextField(
                       controller: _rawEnv,
                       maxLines: 12,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
                     ),
                     Align(
                       alignment: Alignment.centerRight,
@@ -442,8 +627,12 @@ class _SettingsPageState extends State<SettingsPage> {
                           onPressed: () async {
                             final path = widget.connection.envPath;
                             if (path == null) return;
-                            await File(path).writeAsString(_rawEnv.text, flush: true);
-                            if (context.mounted) showSnack(context, l10n.t('set.envSaved'));
+                            await File(
+                              path,
+                            ).writeAsString(_rawEnv.text, flush: true);
+                            if (context.mounted) {
+                              showSnack(context, l10n.t('set.envSaved'));
+                            }
                           },
                           child: Text(l10n.t('set.envSave')),
                         ),
@@ -468,9 +657,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 description: l10n.t('set.promptDesc'),
                 stacked: true,
                 control: _snippet(
+                  server.agentProtocol().trim(),
+                  () => _copy(
                     server.agentProtocol().trim(),
-                    () => _copy(server.agentProtocol().trim(),
-                        l10n.t('set.promptTitle'))),
+                    l10n.t('set.promptTitle'),
+                  ),
+                ),
               ),
             ],
           ),
@@ -480,37 +672,46 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _labeled(String label, Widget child) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 12, color: OracleBrand.gray400, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 6),
-          child,
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          color: OracleBrand.gray400,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      const SizedBox(height: 6),
+      child,
+    ],
+  );
 
-  Widget _snippet(String content, VoidCallback onCopy) => Stack(children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: OracleBrand.gray950,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: OracleBrand.gray700),
-          ),
-          child: SelectableText(content,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+  Widget _snippet(String content, VoidCallback onCopy) => Stack(
+    children: [
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: OracleBrand.gray950,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: OracleBrand.gray700),
         ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: IconButton(
-            tooltip: l10n.t('set.copy'),
-            onPressed: onCopy,
-            icon: const Icon(Icons.copy, size: 16),
-          ),
+        child: SelectableText(
+          content,
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
         ),
-      ]);
+      ),
+      Positioned(
+        top: 4,
+        right: 4,
+        child: IconButton(
+          tooltip: l10n.t('set.copy'),
+          onPressed: onCopy,
+          icon: const Icon(Icons.copy, size: 16),
+        ),
+      ),
+    ],
+  );
 }

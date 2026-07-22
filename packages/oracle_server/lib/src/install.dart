@@ -28,7 +28,7 @@ String mcpJson({String? command}) {
 String agentTargetsMarkdown({required String command}) {
   // TOML *literal* string (single quotes) so Windows backslashes in the path are
   // taken verbatim instead of being read as escape sequences.
-  final codexToml = "[mcp_servers.oracle-ai]\ncommand = '$command'\nargs = []";
+  final codexToml = _codexMcp(command);
   return '''
 ## Where to configure each agent
 
@@ -104,6 +104,13 @@ acting on a claim that names a specific file, symbol, or value.
 Scope hierarchy: **organization -> project -> module**. A project has many modules (a service, layer, or
 package). Anchor knowledge at the RIGHT level and recall unions all three (most specific first). Never
 register a submodule as its own project.
+
+Call `oracle_*` through the MCP surface exposed by the client. Prefer a native direct tool when available.
+Some Codex clients expose MCP tools only through `functions.exec` / `exec` as
+`tools.mcp__oracle_ai__oracle_*`; in that client, use this supported programmatic wrapper and do not refuse
+the task because a native direct tool is absent. Never emulate Oracle with shell, curl, or by launching its
+executable yourself. In a flow step, always call `oracle_flow_step_context` first and
+`oracle_flow_step_report` last, even when the result is partial or blocked.
 
 ## Start of every task
 1. Resolve the project — call `oracle_project_resolve` with the absolute repo path (your cwd). Reuse the
@@ -328,7 +335,13 @@ String _vscodeMcp(String command) => _enc.convert({
 
 /// Codex MCP config is TOML. Literal (single-quoted) string keeps Windows
 /// backslashes verbatim.
-String _codexMcp(String command) => "[mcp_servers.oracle-ai]\ncommand = '$command'\nargs = []";
+String _codexMcp(String command) => '''[mcp_servers.oracle-ai]
+command = '$command'
+args = []
+required = true
+startup_timeout_sec = 30
+tool_timeout_sec = 300
+default_tools_approval_mode = "approve"''';
 
 /// The full per-agent matrix. [command] is the installed CLI path; [host]/[port]/
 /// [token] describe the running hook receiver (from the installed `.env`).

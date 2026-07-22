@@ -5,6 +5,7 @@ import 'package:oracle_memory/oracle_memory.dart';
 import '../../core/l10n.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/markdown_view.dart';
+import '../../widgets/records_toolbar.dart';
 
 class _GlobalResults {
   final List<MemorySearchResult> memories;
@@ -35,6 +36,7 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final _query = TextEditingController();
   Future<_GlobalResults>? _future;
+  String _kind = 'all';
 
   @override
   void dispose() {
@@ -51,17 +53,23 @@ class _SearchPageState extends State<SearchPage> {
         final results = await Future.wait([
           injector
               .get<SearchMemoriesUsecase>()(
-                  MemorySearchFilter(query: q, projectId: pid, limit: 10))
+                MemorySearchFilter(query: q, projectId: pid, limit: 10),
+              )
               .then((r) => r.getOrDefault(const [])),
           injector
-              .get<SearchRulesUsecase>()(RuleSearchFilter(query: q, projectId: pid, limit: 10))
+              .get<SearchRulesUsecase>()(
+                RuleSearchFilter(query: q, projectId: pid, limit: 10),
+              )
               .then((r) => r.getOrDefault(const [])),
           injector
-              .get<SearchSkillsUsecase>()(SkillSearchFilter(query: q, projectId: pid, limit: 10))
+              .get<SearchSkillsUsecase>()(
+                SkillSearchFilter(query: q, projectId: pid, limit: 10),
+              )
               .then((r) => r.getOrDefault(const [])),
           injector
               .get<SearchArchitectureUsecase>()(
-                  ArchitectureSearchFilter(query: q, projectId: pid, limit: 10))
+                ArchitectureSearchFilter(query: q, projectId: pid, limit: 10),
+              )
               .then((r) => r.getOrDefault(const [])),
         ]);
         return _GlobalResults(
@@ -85,7 +93,9 @@ class _SearchPageState extends State<SearchPage> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: Text(l10n.t('common.close'))),
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.t('common.close')),
+          ),
         ],
       ),
     );
@@ -95,19 +105,38 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: TextField(
-            controller: _query,
-            autofocus: true,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search),
-              hintText: l10n.t('search.hint'),
-              border: const OutlineInputBorder(),
-              isDense: true,
+        RecordsToolbar(
+          title: l10n.t('nav.search'),
+          description: l10n.t('nav.searchHint'),
+          searchController: _query,
+          searchHint: l10n.t('search.hint'),
+          onSearchSubmitted: (_) => _search(),
+          onRefresh: _search,
+          filters: [
+            for (final kind in const [
+              'all',
+              'memories',
+              'rules',
+              'skills',
+              'sections',
+            ])
+              ChoiceChip(
+                label: Text(
+                  kind == 'all'
+                      ? l10n.t('records.all')
+                      : l10n.t('search.$kind'),
+                ),
+                selected: _kind == kind,
+                onSelected: (_) => setState(() => _kind = kind),
+              ),
+          ],
+          actions: [
+            FilledButton.icon(
+              onPressed: _search,
+              icon: const Icon(Icons.search),
+              label: Text(l10n.t('nav.search')),
             ),
-            onSubmitted: (_) => _search(),
-          ),
+          ],
         ),
         Expanded(
           child: _future == null
@@ -119,9 +148,13 @@ class _SearchPageState extends State<SearchPage> {
                       : ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
-                            if (data.memories.isNotEmpty) ...[
-                              _SectionHeader(l10n.t('search.memories'),
-                                  Icons.psychology_outlined, data.memories.length),
+                            if ((_kind == 'all' || _kind == 'memories') &&
+                                data.memories.isNotEmpty) ...[
+                              _SectionHeader(
+                                l10n.t('search.memories'),
+                                Icons.psychology_outlined,
+                                data.memories.length,
+                              ),
                               for (final h in data.memories)
                                 _HitTile(
                                   icon: Icons.psychology_outlined,
@@ -129,13 +162,20 @@ class _SearchPageState extends State<SearchPage> {
                                   subtitle:
                                       '${h.memory.kind.code} · ${h.memory.tier.code} · score ${h.score.toStringAsFixed(3)}',
                                   onTap: () => _showContent(
-                                      context, h.memory.title.value, h.memory.body.value),
+                                    context,
+                                    h.memory.title.value,
+                                    h.memory.body.value,
+                                  ),
                                 ),
                               const SizedBox(height: 16),
                             ],
-                            if (data.rules.isNotEmpty) ...[
+                            if ((_kind == 'all' || _kind == 'rules') &&
+                                data.rules.isNotEmpty) ...[
                               _SectionHeader(
-                                  l10n.t('search.rules'), Icons.rule_outlined, data.rules.length),
+                                l10n.t('search.rules'),
+                                Icons.rule_outlined,
+                                data.rules.length,
+                              ),
                               for (final h in data.rules)
                                 _HitTile(
                                   icon: Icons.rule_outlined,
@@ -143,34 +183,52 @@ class _SearchPageState extends State<SearchPage> {
                                   subtitle:
                                       '${h.rule.key} · ${h.rule.scope} · score ${h.score.toStringAsFixed(3)}',
                                   onTap: () => _showContent(
-                                      context, h.rule.title.value, h.rule.content.value),
+                                    context,
+                                    h.rule.title.value,
+                                    h.rule.content.value,
+                                  ),
                                 ),
                               const SizedBox(height: 16),
                             ],
-                            if (data.skills.isNotEmpty) ...[
+                            if ((_kind == 'all' || _kind == 'skills') &&
+                                data.skills.isNotEmpty) ...[
                               _SectionHeader(
-                                  l10n.t('search.skills'), Icons.school_outlined, data.skills.length),
+                                l10n.t('search.skills'),
+                                Icons.school_outlined,
+                                data.skills.length,
+                              ),
                               for (final h in data.skills)
                                 _HitTile(
                                   icon: Icons.school_outlined,
                                   title: h.skill.name.value,
                                   subtitle:
                                       '${h.skill.key} · score ${h.score.toStringAsFixed(3)}',
-                                  onTap: () => _showContent(context, h.skill.name.value,
-                                      '${h.skill.description.value}\n\n${h.skill.content.value}'),
+                                  onTap: () => _showContent(
+                                    context,
+                                    h.skill.name.value,
+                                    '${h.skill.description.value}\n\n${h.skill.content.value}',
+                                  ),
                                 ),
                               const SizedBox(height: 16),
                             ],
-                            if (data.sections.isNotEmpty) ...[
-                              _SectionHeader(l10n.t('search.sections'),
-                                  Icons.account_tree_outlined, data.sections.length),
+                            if ((_kind == 'all' || _kind == 'sections') &&
+                                data.sections.isNotEmpty) ...[
+                              _SectionHeader(
+                                l10n.t('search.sections'),
+                                Icons.account_tree_outlined,
+                                data.sections.length,
+                              ),
                               for (final h in data.sections)
                                 _HitTile(
                                   icon: Icons.account_tree_outlined,
                                   title: h.architecture.area,
-                                  subtitle: 'score ${h.score.toStringAsFixed(3)}',
-                                  onTap: () => _showContent(context, h.architecture.area,
-                                      h.architecture.content.value),
+                                  subtitle:
+                                      'score ${h.score.toStringAsFixed(3)}',
+                                  onTap: () => _showContent(
+                                    context,
+                                    h.architecture.area,
+                                    h.architecture.content.value,
+                                  ),
                                 ),
                             ],
                           ],
@@ -192,11 +250,16 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(children: [
-        Icon(icon, size: 18),
-        const SizedBox(width: 8),
-        Text('$label ($count)', style: Theme.of(context).textTheme.titleMedium),
-      ]),
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            '$label ($count)',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ],
+      ),
     );
   }
 }

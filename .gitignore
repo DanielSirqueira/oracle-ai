@@ -44,3 +44,7 @@ backups/*.sql.tmp
 # OS
 .DS_Store
 Thumbs.db
+
+# Local DB backups and installer build logs (machine artifacts, never source)
+backups/
+build_installer*.log

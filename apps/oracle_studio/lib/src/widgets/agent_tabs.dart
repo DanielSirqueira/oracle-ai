@@ -24,26 +24,29 @@ class _AgentTabsState extends State<AgentTabs> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var i = 0; i < widget.agents.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(widget.agents[i].name),
-                  selected: _sel == i,
-                  onSelected: (_) => setState(() => _sel = i),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < widget.agents.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(widget.agents[i].name),
+                    selected: _sel == i,
+                    onSelected: (_) => setState(() => _sel = i),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 16),
-      _AgentPane(widget.agents[_sel], onCopy: widget.onCopy),
-    ]);
+        const SizedBox(height: 16),
+        _AgentPane(widget.agents[_sel], onCopy: widget.onCopy),
+      ],
+    );
   }
 }
 
@@ -71,7 +74,9 @@ class _AgentPane extends StatelessWidget {
         const SizedBox(height: 20),
 
         // ── Hooks ──
-        _label('${l10n.t('ag.hooks')}${a.hooksFile != null ? ' · ${a.hooksFile}' : ''}'),
+        _label(
+          '${l10n.t('ag.hooks')}${a.hooksFile != null ? ' · ${a.hooksFile}' : ''}',
+        ),
         _hookBody(),
         const SizedBox(height: 20),
 
@@ -85,7 +90,10 @@ class _AgentPane extends StatelessWidget {
   Widget _hookBadge() {
     final (String text, Color color) = switch (a.hooks) {
       server.HookSupport.http => (l10n.t('ag.badgeHttp'), OracleBrand.success),
-      server.HookSupport.bridge => (l10n.t('ag.badgeBridge'), OracleBrand.violet),
+      server.HookSupport.bridge => (
+        l10n.t('ag.badgeBridge'),
+        OracleBrand.violet,
+      ),
       server.HookSupport.none => (l10n.t('ag.badgeNone'), OracleBrand.gray500),
     };
     return Container(
@@ -95,24 +103,43 @@ class _AgentPane extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(text, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
   Widget _hookBody() {
     switch (a.hooks) {
       case server.HookSupport.http:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _snippet(a.hooksSnippet!, () => onCopy(a.hooksSnippet!, '${a.name} · hooks')),
-          const SizedBox(height: 6),
-          _note(l10n.t('ag.hooksHttp')),
-        ]);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _snippet(
+              a.hooksSnippet!,
+              () => onCopy(a.hooksSnippet!, '${a.name} · hooks'),
+            ),
+            const SizedBox(height: 6),
+            _note(l10n.t('ag.hooksHttp')),
+          ],
+        );
       case server.HookSupport.bridge:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _snippet(a.hooksSnippet!, () => onCopy(a.hooksSnippet!, '${a.name} · hooks')),
-          const SizedBox(height: 6),
-          _note(l10n.t('ag.hooksBridge')),
-        ]);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _snippet(
+              a.hooksSnippet!,
+              () => onCopy(a.hooksSnippet!, '${a.name} · hooks'),
+            ),
+            const SizedBox(height: 6),
+            _note(l10n.t('ag.hooksBridge')),
+          ],
+        );
       case server.HookSupport.none:
         return _note(l10n.t('ag.hooksNone'));
     }
@@ -121,48 +148,70 @@ class _AgentPane extends StatelessWidget {
   // ── small building blocks ──
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 12, color: OracleBrand.gray400, fontWeight: FontWeight.w600)),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12,
+        color: OracleBrand.gray400,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 
-  Widget _note(String text) => Text(text,
-      style: const TextStyle(fontSize: 12, color: OracleBrand.gray400, height: 1.4));
+  Widget _note(String text) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 12,
+      color: OracleBrand.gray400,
+      height: 1.4,
+    ),
+  );
 
-  Widget _inline(String prefix, String value) => Row(children: [
-        Text(prefix, style: const TextStyle(fontSize: 12, color: OracleBrand.gray400)),
-        Expanded(
-          child: SelectableText(value,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+  Widget _inline(String prefix, String value) => Row(
+    children: [
+      Text(
+        prefix,
+        style: const TextStyle(fontSize: 12, color: OracleBrand.gray400),
+      ),
+      Expanded(
+        child: SelectableText(
+          value,
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
         ),
-        IconButton(
+      ),
+      IconButton(
+        tooltip: l10n.t('set.copy'),
+        onPressed: () => onCopy(value, prefix),
+        icon: const Icon(Icons.copy, size: 15),
+      ),
+    ],
+  );
+
+  Widget _snippet(String content, VoidCallback onCopyTap) => Stack(
+    children: [
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 12, 40, 12),
+        decoration: BoxDecoration(
+          color: OracleBrand.gray950,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: OracleBrand.gray700),
+        ),
+        child: SelectableText(
+          content,
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+        ),
+      ),
+      Positioned(
+        top: 4,
+        right: 4,
+        child: IconButton(
           tooltip: l10n.t('set.copy'),
-          onPressed: () => onCopy(value, prefix),
-          icon: const Icon(Icons.copy, size: 15),
+          onPressed: onCopyTap,
+          icon: const Icon(Icons.copy, size: 16),
         ),
-      ]);
-
-  Widget _snippet(String content, VoidCallback onCopyTap) => Stack(children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(12, 12, 40, 12),
-          decoration: BoxDecoration(
-            color: OracleBrand.gray950,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: OracleBrand.gray700),
-          ),
-          child: SelectableText(content,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-        ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: IconButton(
-            tooltip: l10n.t('set.copy'),
-            onPressed: onCopyTap,
-            icon: const Icon(Icons.copy, size: 16),
-          ),
-        ),
-      ]);
+      ),
+    ],
+  );
 }

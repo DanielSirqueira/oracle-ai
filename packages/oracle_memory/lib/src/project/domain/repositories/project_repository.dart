@@ -15,4 +15,7 @@ abstract interface class ProjectRepository {
   AsyncResultDart<ProjectEntity, ProjectFailure> getProjectById(IdVO id);
 
   AsyncResultDart<List<ProjectEntity>, ProjectFailure> listProjects(ProjectFilter filter);
+
+  /// Deletes a project; every project-scoped table cascades.
+  AsyncResultDart<Unit, ProjectFailure> deleteProject(IdVO id);
 }

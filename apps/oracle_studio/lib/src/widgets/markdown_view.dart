@@ -28,9 +28,16 @@ class MarkdownView extends StatelessWidget {
     );
   }
 
-  Widget _codeBlock(BuildContext context, String name, String code, bool closed) {
+  Widget _codeBlock(
+    BuildContext context,
+    String name,
+    String code,
+    bool closed,
+  ) {
     // Strip a single trailing newline the parser tends to keep.
-    final text = code.endsWith('\n') ? code.substring(0, code.length - 1) : code;
+    final text = code.endsWith('\n')
+        ? code.substring(0, code.length - 1)
+        : code;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -47,9 +54,13 @@ class MarkdownView extends StatelessWidget {
               if (name.trim().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(left: 12),
-                  child: Text(name.trim(),
-                      style: const TextStyle(
-                          fontSize: 11, color: OracleBrand.gray400)),
+                  child: Text(
+                    name.trim(),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: OracleBrand.gray400,
+                    ),
+                  ),
                 ),
               const Spacer(),
               IconButton(
@@ -65,12 +76,15 @@ class MarkdownView extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Text(text,
-                  style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12.5,
-                      height: 1.45,
-                      color: OracleBrand.gray100)),
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12.5,
+                  height: 1.45,
+                  color: OracleBrand.gray100,
+                ),
+              ),
             ),
           ),
         ],

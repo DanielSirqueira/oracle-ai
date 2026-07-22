@@ -18,8 +18,9 @@ Future<bool> confirmAction(
       content: Text(message),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.t('common.cancel'))),
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l10n.t('common.cancel')),
+        ),
         FilledButton(
           style: destructive
               ? FilledButton.styleFrom(
@@ -54,6 +55,7 @@ class FieldRow extends StatelessWidget {
   /// field is for, so the form documents itself.
   final String? description;
   final bool enabled;
+  final bool expandable;
   const FieldRow(
     this.label,
     this.controller, {
@@ -62,7 +64,46 @@ class FieldRow extends StatelessWidget {
     this.hint,
     this.description,
     this.enabled = true,
+    this.expandable = false,
   });
+
+  Future<void> _openExpandedEditor(BuildContext context) async {
+    final draft = TextEditingController(text: controller.text);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('$label — ${l10n.t('flows.expandedEditor')}'),
+        content: SizedBox(
+          width: 720,
+          child: TextField(
+            controller: draft,
+            autofocus: true,
+            minLines: 12,
+            maxLines: 22,
+            enabled: enabled,
+            decoration: InputDecoration(
+              hintText: hint,
+              alignLabelWithHint: true,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.t('common.cancel')),
+          ),
+          FilledButton(
+            onPressed: enabled
+                ? () => Navigator.pop(dialogContext, true)
+                : null,
+            child: Text(l10n.t('common.save')),
+          ),
+        ],
+      ),
+    );
+    if (saved == true) controller.text = draft.text;
+    draft.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,11 +112,12 @@ class FieldRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+          ),
           if (description != null) ...[
             const SizedBox(height: 2),
             Text(description!, style: Theme.of(context).textTheme.bodySmall),
@@ -85,7 +127,17 @@ class FieldRow extends StatelessWidget {
             controller: controller,
             maxLines: maxLines,
             enabled: enabled,
-            decoration: InputDecoration(hintText: hint, isDense: true),
+            decoration: InputDecoration(
+              hintText: hint,
+              isDense: true,
+              suffixIcon: expandable
+                  ? IconButton(
+                      tooltip: l10n.t('flows.expandField'),
+                      icon: const Icon(Icons.open_in_full, size: 17),
+                      onPressed: () => _openExpandedEditor(context),
+                    )
+                  : null,
+            ),
           ),
         ],
       ),
@@ -97,7 +149,8 @@ class FieldRow extends StatelessWidget {
 Future<bool?> showEditorDialog(
   BuildContext context, {
   required String title,
-  required List<Widget> Function(BuildContext context, StateSetter setState) fields,
+  required List<Widget> Function(BuildContext context, StateSetter setState)
+  fields,
   required Future<String?> Function() onSave,
   double width = 640,
 }) {
@@ -121,8 +174,12 @@ Future<bool?> showEditorDialog(
                   if (error != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(error!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      child: Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -130,8 +187,9 @@ Future<bool?> showEditorDialog(
           ),
           actions: [
             TextButton(
-                onPressed: saving ? null : () => Navigator.pop(context, false),
-                child: Text(l10n.t('common.cancel'))),
+              onPressed: saving ? null : () => Navigator.pop(context, false),
+              child: Text(l10n.t('common.cancel')),
+            ),
             FilledButton(
               onPressed: saving
                   ? null
@@ -147,7 +205,9 @@ Future<bool?> showEditorDialog(
                         });
                       }
                     },
-              child: Text(saving ? l10n.t('common.saving') : l10n.t('common.save')),
+              child: Text(
+                saving ? l10n.t('common.saving') : l10n.t('common.save'),
+              ),
             ),
           ],
         ),
@@ -156,8 +216,5 @@ Future<bool?> showEditorDialog(
   );
 }
 
-List<String> parseTags(String raw) => raw
-    .split(',')
-    .map((t) => t.trim())
-    .where((t) => t.isNotEmpty)
-    .toList();
+List<String> parseTags(String raw) =>
+    raw.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();

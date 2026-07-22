@@ -12,8 +12,12 @@ String fmtDateTime(DateTime? dt) {
 
 /// `12,3k` / `4,5M` style compact numbers.
 String fmtCompact(int n) {
-  if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1).replaceAll('.', ',')}M';
-  if (n >= 1000) return '${(n / 1000).toStringAsFixed(1).replaceAll('.', ',')}k';
+  if (n >= 1000000) {
+    return '${(n / 1000000).toStringAsFixed(1).replaceAll('.', ',')}M';
+  }
+  if (n >= 1000) {
+    return '${(n / 1000).toStringAsFixed(1).replaceAll('.', ',')}k';
+  }
   return '$n';
 }
 
@@ -22,6 +26,8 @@ String fmtBytes(int bytes) {
   if (bytes >= 1024 * 1024) {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',')} MB';
   }
-  if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(1).replaceAll('.', ',')} kB';
+  if (bytes >= 1024) {
+    return '${(bytes / 1024).toStringAsFixed(1).replaceAll('.', ',')} kB';
+  }
   return '$bytes B';
 }

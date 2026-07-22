@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../core/l10n.dart';
+
 /// Uniform loading/error/data rendering for page futures.
 class AsyncView<T> extends StatelessWidget {
   final Future<T> future;
   final Widget Function(BuildContext context, T data) builder;
-  const AsyncView({super.key, required this.future, required this.builder});
+  final VoidCallback? onRetry;
+  const AsyncView({
+    super.key,
+    required this.future,
+    required this.builder,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -16,9 +24,30 @@ class AsyncView<T> extends StatelessWidget {
         }
         if (snapshot.hasError) {
           return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text('Erro ao carregar: ${snapshot.error}'),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, size: 36),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${l10n.t('common.loadError')}: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                    if (onRetry != null) ...[
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: onRetry,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(l10n.t('app.retry')),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           );
         }
