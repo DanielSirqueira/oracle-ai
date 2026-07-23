@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:oracle_core/oracle_core.dart';
@@ -6,6 +7,46 @@ import 'package:oracle_migration/oracle_migration.dart';
 
 import 'backup/db_backup_service.dart';
 import 'migrations/embedded_migrations.dart';
+
+/// Tracks the BACKGROUND database bring-up for the resilient MCP path.
+///
+/// The MCP stdio server must answer `initialize` even while the database is
+/// still connecting (or unreachable): an MCP host treats a server that exits
+/// before the initialize response as fatal ("connection closed") — and with
+/// `required = true` that kills the host's whole session. Tools await this
+/// gate instead; when the database never comes up they return a clear,
+/// actionable error rather than the server dying.
+class DbReadyGate {
+  var _ready = false;
+  String? lastError;
+  final _waiters = <Completer<void>>[];
+
+  bool get isReady => _ready;
+
+  void markReady() {
+    _ready = true;
+    for (final w in _waiters) {
+      if (!w.isCompleted) w.complete();
+    }
+    _waiters.clear();
+  }
+
+  void markError(Object error) => lastError = '$error';
+
+  /// Waits until ready or [timeout]; true when the database became available.
+  Future<bool> wait(Duration timeout) async {
+    if (_ready) return true;
+    final waiter = Completer<void>();
+    _waiters.add(waiter);
+    try {
+      await waiter.future.timeout(timeout);
+      return true;
+    } on TimeoutException {
+      _waiters.remove(waiter);
+      return false;
+    }
+  }
+}
 
 /// Brings the process up: resolves configuration, registers core dependencies
 /// in DI, and applies pending database migrations.
@@ -60,8 +101,29 @@ class Bootstrap {
   /// When [ensureDatabase] is true, the target database is created if it does
   /// not exist yet (requires access to the `postgres` admin database).
   Future<Database> start({bool ensureDatabase = false, bool allowSeed = false}) async {
-    stderr.writeln('[oracle] starting — $config');
+    final database = prepare();
+    await completeStart(database, ensureDatabase: ensureDatabase, allowSeed: allowSeed);
+    return database;
+  }
 
+  /// Phase 1 — NO I/O: builds the (lazy) [Database] and registers the DI graph.
+  /// After this, the MCP server can be constructed and answer `initialize`;
+  /// the pool only opens on the first query.
+  Database prepare() {
+    stderr.writeln('[oracle] starting — $config');
+    final database = PostgreSQLDatabase.fromConfig(config);
+    _registerCore(database);
+    return database;
+  }
+
+  /// Phase 2 — the I/O part of [start]: ensure/connect the database and run
+  /// migrations (+ optional seed/maintenance). Throws on failure so a caller
+  /// can retry (see the resilient MCP path in `bin/oracle_ai.dart`).
+  Future<void> completeStart(
+    Database database, {
+    bool ensureDatabase = false,
+    bool allowSeed = false,
+  }) async {
     if (ensureDatabase) {
       final exists = await MigrationSystem.databaseExists(config: config);
       if (!exists) {
@@ -69,9 +131,6 @@ class Bootstrap {
         await MigrationSystem.createDatabase(config: config);
       }
     }
-
-    final database = PostgreSQLDatabase.fromConfig(config);
-    _registerCore(database);
 
     final report = await runMigrations(database);
     _logReport(report);
@@ -94,8 +153,6 @@ class Bootstrap {
     if (maintenanceOnStartup) {
       await _runStartupMaintenance();
     }
-
-    return database;
   }
 
   /// Restores the data seed when the database is empty. A bad or missing seed is

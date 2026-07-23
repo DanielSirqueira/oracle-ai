@@ -78,6 +78,90 @@ Future<void> main(List<String> args) async {
   final allowSeed = mode == _Mode.hooks || mode == _Mode.all;
 
   final bootstrap = Bootstrap.fromEnv(env);
+  final runHooks = mode == _Mode.hooks || mode == _Mode.all;
+  final runMcp = mode == _Mode.mcp || mode == _Mode.all;
+
+  Future<(HooksServer?, MaintenanceScheduler?)> startHooksAndScheduler() async {
+    HooksServer? hooks = HooksServer(
+      host: env['ORACLE_HTTP_HOST'] ?? '127.0.0.1',
+      port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500,
+      // Config comes from the merged .env map (loadEnv), NOT Platform.environment
+      // — a `.env`-only ORACLE_HOOK_TOKEN would otherwise be silently ignored and
+      // the endpoint would accept unauthenticated writes while looking protected.
+      hookToken: env['ORACLE_HOOK_TOKEN'],
+      metricsEnabled: env['ORACLE_METRICS_ENABLED'] == null
+          ? null
+          : env['ORACLE_METRICS_ENABLED']!.toLowerCase() == 'true',
+      metricsLabel: env['ORACLE_METRICS_LABEL'],
+    );
+    try {
+      await hooks.start();
+      stderr.writeln('[oracle] hooks HTTP on ${hooks.host}:${hooks.port}');
+    } on SocketException catch (e) {
+      // Expected in multi-agent: another process already owns the port.
+      stderr.writeln('[oracle] hooks HTTP not started (port in use?): '
+          '${e.osError?.message ?? e.message}');
+      hooks = null;
+    }
+    final intervalMin = int.tryParse(env['ORACLE_MAINTENANCE_INTERVAL_MINUTES'] ?? '') ?? 0;
+    final scheduler = MaintenanceScheduler(interval: Duration(minutes: intervalMin))..start();
+    return (hooks, scheduler);
+  }
+
+  if (runMcp) {
+    // RESILIENT MCP PATH: an MCP host treats a server that exits before the
+    // initialize response as fatal ("handshaking failed: connection closed"),
+    // and with `required = true` that kills the host's WHOLE session (seen in
+    // the ChatGPT/Codex desktop app when its sandbox blocks the DB network).
+    // So: register DI now (no I/O — the pool is lazy), answer initialize
+    // immediately, and bring the database up in the background with retries.
+    // Tools gate on readiness and fail with an actionable message instead.
+    final database = bootstrap.prepare();
+    final gate = DbReadyGate();
+    HooksServer? hooks;
+    MaintenanceScheduler? scheduler;
+    var stopping = false;
+    unawaited(() async {
+      var delay = const Duration(seconds: 1);
+      while (!stopping) {
+        try {
+          await bootstrap.completeStart(
+            database,
+            ensureDatabase: autoCreate,
+            allowSeed: allowSeed,
+          );
+          gate.markReady();
+          stderr.writeln('[oracle] database ready.');
+          if (runHooks && !stopping) {
+            (hooks, scheduler) = await startHooksAndScheduler();
+          }
+          return;
+        } catch (error) {
+          gate.markError(error);
+          stderr.writeln('[oracle] database bring-up failed '
+              '(retry in ${delay.inSeconds}s): $error');
+          await Future<void>.delayed(delay);
+          if (delay < const Duration(seconds: 15)) delay *= 2;
+        }
+      }
+    }());
+    try {
+      stderr.writeln('[oracle] MCP server (stdio) ready.');
+      await OracleMcpServer(dbGate: gate).serveStdio(); // blocks until stdin EOF
+      stderr.writeln('[oracle] MCP server stopped.');
+    } finally {
+      stopping = true;
+      scheduler?.stop();
+      if (hooks != null) await hooks!.stop();
+      await database.dispose();
+    }
+    // The background bring-up may still hold a pending retry timer, which
+    // would keep the VM alive after stdin EOF — exit explicitly.
+    exit(exitCode);
+  }
+
+  // migrate / hooks-daemon modes: fail-fast startup (a visible error beats a
+  // daemon that silently retries forever — Studio surfaces it to the user).
   Database? database;
   try {
     database = await bootstrap.start(ensureDatabase: autoCreate, allowSeed: allowSeed);
@@ -86,46 +170,15 @@ Future<void> main(List<String> args) async {
       return;
     }
 
-    final runHooks = mode == _Mode.hooks || mode == _Mode.all;
-    final runMcp = mode == _Mode.mcp || mode == _Mode.all;
-
     HooksServer? hooks;
     MaintenanceScheduler? scheduler;
     if (runHooks) {
-      hooks = HooksServer(
-        host: env['ORACLE_HTTP_HOST'] ?? '127.0.0.1',
-        port: int.tryParse(env['ORACLE_HTTP_PORT'] ?? '') ?? 47500,
-        // Config comes from the merged .env map (loadEnv), NOT Platform.environment
-        // — a `.env`-only ORACLE_HOOK_TOKEN would otherwise be silently ignored and
-        // the endpoint would accept unauthenticated writes while looking protected.
-        hookToken: env['ORACLE_HOOK_TOKEN'],
-        metricsEnabled: env['ORACLE_METRICS_ENABLED'] == null
-            ? null
-            : env['ORACLE_METRICS_ENABLED']!.toLowerCase() == 'true',
-        metricsLabel: env['ORACLE_METRICS_LABEL'],
-      );
-      try {
-        await hooks.start();
-        stderr.writeln('[oracle] hooks HTTP on ${hooks.host}:${hooks.port}');
-      } on SocketException catch (e) {
-        // Expected in multi-agent: another process already owns the port.
-        stderr.writeln('[oracle] hooks HTTP not started (port in use?): '
-            '${e.osError?.message ?? e.message}');
-        hooks = null;
-      }
-      final intervalMin = int.tryParse(env['ORACLE_MAINTENANCE_INTERVAL_MINUTES'] ?? '') ?? 0;
-      scheduler = MaintenanceScheduler(interval: Duration(minutes: intervalMin))..start();
+      (hooks, scheduler) = await startHooksAndScheduler();
     }
 
-    if (runMcp) {
-      stderr.writeln('[oracle] MCP server (stdio) ready.');
-      await OracleMcpServer().serveStdio(); // blocks until stdin EOF
-      stderr.writeln('[oracle] MCP server stopped.');
-    } else {
-      // Hooks daemon: stay up until the process is signalled to stop.
-      stderr.writeln('[oracle] hooks daemon running — SIGINT/SIGTERM to stop.');
-      await _awaitTermination();
-    }
+    // Hooks daemon: stay up until the process is signalled to stop.
+    stderr.writeln('[oracle] hooks daemon running — SIGINT/SIGTERM to stop.');
+    await _awaitTermination();
 
     scheduler?.stop();
     if (hooks != null) await hooks.stop();

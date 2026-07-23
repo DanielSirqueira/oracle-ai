@@ -334,14 +334,20 @@ String _vscodeMcp(String command) => _enc.convert({
     });
 
 /// Codex MCP config is TOML. Literal (single-quoted) string keeps Windows
-/// backslashes verbatim.
+/// backslashes verbatim. `network_access` is part of the contract: the
+/// workspace-write sandbox blocks network by default — including for MCP
+/// servers spawned by the ChatGPT/Codex desktop app — and oracle-ai needs to
+/// reach the local PostgreSQL.
 String _codexMcp(String command) => '''[mcp_servers.oracle-ai]
 command = '$command'
 args = []
 required = true
 startup_timeout_sec = 30
 tool_timeout_sec = 300
-default_tools_approval_mode = "approve"''';
+default_tools_approval_mode = "approve"
+
+[sandbox_workspace_write]
+network_access = true''';
 
 /// The full per-agent matrix. [command] is the installed CLI path; [host]/[port]/
 /// [token] describe the running hook receiver (from the installed `.env`).

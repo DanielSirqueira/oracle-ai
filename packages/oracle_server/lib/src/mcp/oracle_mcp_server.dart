@@ -7,6 +7,7 @@ import 'package:oracle_core/oracle_core.dart';
 import 'package:oracle_memory/oracle_memory.dart';
 
 import '../backup/db_backup_service.dart';
+import '../bootstrap.dart' show DbReadyGate;
 import '../recall_service.dart';
 import '../repo_root.dart';
 
@@ -17,7 +18,14 @@ class OracleMcpServer {
   final String name;
   final String version;
 
-  OracleMcpServer({this.name = 'oracle-ai', this.version = '0.1.0'});
+  /// When set, the database is coming up in the BACKGROUND (resilient path):
+  /// `initialize` is answered immediately and each tool call first awaits the
+  /// gate — returning an actionable error instead of dying when the database
+  /// is unreachable (which an MCP host would surface as the fatal
+  /// "connection closed: initialize response").
+  final DbReadyGate? dbGate;
+
+  OracleMcpServer({this.name = 'oracle-ai', this.version = '0.1.0', this.dbGate});
 
   /// Standing guidance auto-injected ONCE by the client at connect time (MCP
   /// `instructions` → Claude Code's `mcp_instructions_delta`). Kept STATIC so it
@@ -97,8 +105,8 @@ Capture is automatic — hooks record the session, each user request, and your w
     // open-world. Headless agents running with approval=never may therefore
     // cancel even a read-only Oracle call before it reaches this server. Route
     // every registration through one registrar so the complete surface is
-    // advertised with accurate safety hints.
-    final server = _OracleToolRegistrar(rawServer);
+    // advertised with accurate safety hints (and gated on DB readiness).
+    final server = _OracleToolRegistrar(rawServer, dbGate);
     server.tool(
       'oracle_status',
       description: 'Returns Oracle AI server status.',
@@ -3680,8 +3688,9 @@ Capture is automatic — hooks record the session, each user request, and your w
 /// defaults.
 class _OracleToolRegistrar {
   final mcp.McpServer _server;
+  final DbReadyGate? _gate;
 
-  const _OracleToolRegistrar(this._server);
+  const _OracleToolRegistrar(this._server, this._gate);
 
   void tool(
     String name, {
@@ -3690,13 +3699,38 @@ class _OracleToolRegistrar {
     mcp.ToolOutputSchema? toolOutputSchema,
     required mcp.ToolCallback callback,
   }) {
+    final gate = _gate;
+    // oracle_status needs no database — keep it as an always-on liveness probe.
+    final gated = (gate == null || name == 'oracle_status')
+        ? callback
+        : ({Map<String, dynamic>? args, mcp.RequestHandlerExtra? extra}) async {
+            if (!gate.isReady && !await gate.wait(const Duration(seconds: 15))) {
+              return mcp.CallToolResult.fromContent(
+                content: [
+                  mcp.TextContent(
+                    text: jsonEncode({
+                      'error':
+                          'Oracle database is not available yet: '
+                          '${gate.lastError ?? 'still connecting'}. '
+                          'Check that PostgreSQL is running and reachable '
+                          '(docker: oracle-postgres, port from .env) and that '
+                          'this process is allowed outbound network access, '
+                          'then retry this call.',
+                    }),
+                  ),
+                ],
+                isError: true,
+              );
+            }
+            return callback(args: args, extra: extra);
+          };
     _server.tool(
       name,
       description: description,
       toolInputSchema: toolInputSchema,
       toolOutputSchema: toolOutputSchema,
       annotations: OracleMcpServer.toolAnnotationsFor(name),
-      callback: callback,
+      callback: gated,
     );
   }
 }

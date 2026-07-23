@@ -116,20 +116,40 @@ If a machine ran the older sandboxed steps, check for ACL debris (`icacls
 <dir>` showing `CodexSandboxUsers` or orphan `S-1-5-21-…` entries on the
 worktree/SDK) and remove the non-inherited entries.
 
-### 5. ChatGPT/Codex desktop app cannot even spawn the MCP server (Windows)
+### 5. ChatGPT/Codex desktop app: "handshaking with MCP server failed" (Windows)
 
 `error creating thread: … required MCP servers failed to initialize:
 oracle-ai: handshaking with MCP server failed: connection closed: initialize
-response` — while `codex exec` (CLI) works fine. The desktop app spawns MCP
-servers under its Windows sandbox user (`CodexSandboxUsers`), and
-`%LOCALAPPDATA%\Programs\Oracle AI` is user-only by default, so the sandbox
-user cannot read/execute `oracle_ai.exe` and the process dies before the
-initialize response. With `required = true` the whole session creation fails.
-Fix (the installer now applies it automatically, best-effort):
+response` — while `codex exec` (CLI) works fine. Two stacked causes, both
+addressed:
 
-```
-icacls "%LOCALAPPDATA%\Programs\Oracle AI" /grant "CodexSandboxUsers:(OI)(CI)(RX)"
-```
+**Root cause — the desktop app spawns MCP servers inside its sandbox, with
+network blocked** (see upstream
+[#30356](https://github.com/openai/codex/issues/30356),
+[#8634](https://github.com/openai/codex/issues/8634)). Oracle used to connect
+to PostgreSQL *before* serving MCP; with the DB unreachable it exited without
+answering `initialize`, which the host reports as "connection closed" — and
+with `required = true` the whole session creation fails.
+
+Fixes:
+- **Resilient startup (server side, definitive)**: in the MCP-serving modes
+  `oracle_ai.exe` now registers DI with a lazy pool, answers `initialize`
+  immediately, and brings the database up in the background with retry/backoff.
+  Tool calls gate on DB readiness (15 s) and return an actionable error instead
+  of the server dying. Verified: initialize + tools respond correctly both with
+  the DB down and up.
+- **Sandbox network (config side)**: the Codex snippet written by the
+  installer/Studio now includes
+
+  ```toml
+  [sandbox_workspace_write]
+  network_access = true
+  ```
+
+  so the sandboxed MCP process can reach the local PostgreSQL.
+- **ACLs (belt and suspenders)**: the sandbox user must be able to read/execute
+  the program folder; the installer grants
+  `CodexSandboxUsers:(OI)(CI)(RX)` on `%LOCALAPPDATA%\Programs\Oracle AI`.
 
 ### 6. Per-repo MCP config missing from the run worktree (all agents)
 
