@@ -116,7 +116,22 @@ If a machine ran the older sandboxed steps, check for ACL debris (`icacls
 <dir>` showing `CodexSandboxUsers` or orphan `S-1-5-21-…` entries on the
 worktree/SDK) and remove the non-inherited entries.
 
-### 5. Per-repo MCP config missing from the run worktree (all agents)
+### 5. ChatGPT/Codex desktop app cannot even spawn the MCP server (Windows)
+
+`error creating thread: … required MCP servers failed to initialize:
+oracle-ai: handshaking with MCP server failed: connection closed: initialize
+response` — while `codex exec` (CLI) works fine. The desktop app spawns MCP
+servers under its Windows sandbox user (`CodexSandboxUsers`), and
+`%LOCALAPPDATA%\Programs\Oracle AI` is user-only by default, so the sandbox
+user cannot read/execute `oracle_ai.exe` and the process dies before the
+initialize response. With `required = true` the whole session creation fails.
+Fix (the installer now applies it automatically, best-effort):
+
+```
+icacls "%LOCALAPPDATA%\Programs\Oracle AI" /grant "CodexSandboxUsers:(OI)(CI)(RX)"
+```
+
+### 6. Per-repo MCP config missing from the run worktree (all agents)
 
 Claude Code, Gemini, Cursor and Copilot discover the Oracle MCP server from
 per-repo files (`.mcp.json`, `.gemini/settings.json`, `.cursor/mcp.json`,

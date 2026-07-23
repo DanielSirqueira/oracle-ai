@@ -605,6 +605,22 @@ volumes:
         _log(l10n.t('log.noAppPayload'));
       }
 
+      // 1b) The ChatGPT/Codex desktop app spawns MCP servers under its
+      // Windows sandbox user (CodexSandboxUsers). %LOCALAPPDATA%\Programs is
+      // user-only by default, so without read+execute here the oracle-ai MCP
+      // dies at spawn ("handshaking with MCP server failed: connection
+      // closed") and, with required=true, the whole Codex session fails.
+      // Best-effort: the group only exists after Codex desktop ran once.
+      if (Platform.isWindows) {
+        try {
+          await Process.run('icacls', [
+            installRoot,
+            '/grant',
+            'CodexSandboxUsers:(OI)(CI)(RX)',
+          ]);
+        } catch (_) {/* group absent / icacls unavailable */}
+      }
+
       // 2) Configuration lives with the program.
       final envFile = File(envTargetPath);
       if (envFile.existsSync()) {
